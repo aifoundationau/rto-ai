@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}"
+self.__REACT_LOADABLE_MANIFEST="{\"components\\\\auth\\\\GoogleClassroomLoginModal.tsx -> @/lib/firebase/client\":{\"id\":\"components\\\\auth\\\\GoogleClassroomLoginModal.tsx -> @/lib/firebase/client\",\"files\":[\"static/chunks/_app-pages-browser_lib_firebase_client_ts.js\"]},\"components\\\\auth\\\\GoogleClassroomLoginModal.tsx -> firebase/auth\":{\"id\":\"components\\\\auth\\\\GoogleClassroomLoginModal.tsx -> firebase/auth\",\"files\":[\"static/chunks/_app-pages-browser_node_modules_firebase_auth_dist_esm_index_esm_js.js\"]}}"
