@@ -35,6 +35,8 @@ import {
 } from 'lucide-react';
 
 import { ImageManager } from './ImageManager';
+import { AdminEventsManager } from './AdminEventsManager';
+import { GoogleClassroomManager } from './GoogleClassroomManager';
 
 interface AdminDashboardViewProps {
   apiKey?: string;
@@ -999,30 +1001,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         </div>
       )}
 
-      {/* Tab 2: Events Management */}
+      {/* Tab 2: Events & Calendar Management */}
       {activeTab === 'events' && (
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4">
-          <h3 className="font-bold text-slate-800 text-sm">Admissions Event Capacities & Schedules</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {EVENTS_DATA.map((ev) => (
-              <div key={ev.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-slate-800 text-sm">{ev.title}</span>
-                  <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded font-semibold text-[10px]">
-                    {ev.category}
-                  </span>
-                </div>
-                <div className="text-slate-500">{ev.location}</div>
-                <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-slate-600">
-                  <span>Registered: <strong>{ev.registeredCount}</strong> / {ev.capacity}</span>
-                  <span className="text-emerald-700 font-bold">
-                    {Math.round((ev.registeredCount / ev.capacity) * 100)}% Full
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <AdminEventsManager userPermissions={['super_admin', 'manage_events']} />
       )}
 
       {/* Tab 3: Knowledge Base & FAQs */}
@@ -1051,6 +1032,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       {/* Tab 4: Images Folders */}
       {activeTab === 'images' && (
         <ImageManager />
+      )}
+
+      {/* Tab 5: Google Classroom API Management */}
+      {activeTab === 'classroom' && (
+        <GoogleClassroomManager userPermissions={['super_admin', 'manage_google_classroom']} />
       )}
 
       {/* Inspect Application Modal */}

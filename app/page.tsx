@@ -9,6 +9,7 @@ import { ApplicationPortalView } from '@/components/application/ApplicationPorta
 import { EventsCalendarView } from '@/components/events/EventsCalendarView';
 import { AdminDashboardView } from '@/components/admin/AdminDashboardView';
 import { AdminLoginModal } from '@/components/admin/AdminLoginModal';
+import { GoogleClassroomLoginModal, ClassroomUser } from '@/components/auth/GoogleClassroomLoginModal';
 import { ApiKeyModal } from '@/components/ApiKeyModal';
 import { ChatMessage } from '@/lib/agent/engine';
 import { StudentApplication, INITIAL_APPLICATION_STATE } from '@/data/applications';
@@ -40,6 +41,8 @@ export default function HomePage() {
   const [apiKey, setApiKey] = useState<string>('');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isClassroomLoginOpen, setIsClassroomLoginOpen] = useState(false);
+  const [classroomUser, setClassroomUser] = useState<ClassroomUser | null>(null);
 
   // Load saved application or API key from localStorage if available
   useEffect(() => {
@@ -218,6 +221,7 @@ export default function HomePage() {
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         onOpenSettings={handleOpenSettings}
+        onOpenClassroomLogin={() => setIsClassroomLoginOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -278,6 +282,18 @@ export default function HomePage() {
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
+      />
+
+      {/* Google Classroom Login Modal for Teachers & Students */}
+      <GoogleClassroomLoginModal
+        isOpen={isClassroomLoginOpen}
+        onClose={() => setIsClassroomLoginOpen(false)}
+        currentUser={classroomUser}
+        onLoginSuccess={(user) => {
+          setClassroomUser(user);
+          setIsClassroomLoginOpen(false);
+        }}
+        onLogout={() => setClassroomUser(null)}
       />
     </div>
   );
