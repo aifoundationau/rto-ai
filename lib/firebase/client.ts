@@ -5,21 +5,23 @@
  * a custom token with RBAC role claims.
  */
 
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, multiFactor, TotpSecret, TotpMultiFactorGenerator, EmailAuthProvider, signInWithEmailAndPassword } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
-// Initialize Firebase App using environment variables.
+// Initialize Firebase App using environment variables with config fallback.
 const firebaseConfig = {
-  apiKey: "AIzaSyCPeAOWQj8456TeIWDIPsyxyWT7QLrCBJ8",
-  authDomain: "ai-foundation-firebase.firebaseapp.com",
-  projectId: "ai-foundation-firebase",
-  storageBucket: "ai-foundation-firebase.firebasestorage.app",
-  messagingSenderId: "614773274800",
-  appId: "1:614773274800:web:bcfa9d363de884cf9ea375"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCPeAOWQj8456TeIWDIPsyxyWT7QLrCBJ8",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "ai-foundation-firebase.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "ai-foundation-firebase",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "ai-foundation-firebase.firebasestorage.app",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "614773274800",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:614773274800:web:bcfa9d363de884cf9ea375"
 };
 
-const app = initializeApp(firebaseConfig);
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
+export const db = getFirestore(app);
 
 /**
  * Enroll the signed‑in user in TOTP MFA using Google Authenticator.

@@ -215,31 +215,7 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
         {/* Step 1: Personal Details */}
         {activeStep === 1 && (
           <div className="space-y-6">
-            {/* Server-Generated Student Profile Card */}
-            <div className="p-4 bg-gradient-to-r from-indigo-50 via-slate-50 to-purple-50 rounded-2xl border border-indigo-100/80 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white font-mono font-bold text-lg flex items-center justify-center shadow-sm">
-                  ID
-                </div>
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-indigo-950 flex items-center gap-1.5">
-                    <span>Verified University Student ID</span>
-                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md text-[10px] font-mono">Immutable</span>
-                  </div>
-                  <div className="text-xl font-mono font-extrabold text-indigo-950 mt-0.5">
-                    {application.studentNumber || 'STU-2026-00001'}
-                  </div>
-                  <div className="text-xs text-slate-600">
-                    Dept: <strong className="text-slate-800">{application.department || 'School of Computer Science & Engineering'}</strong>
-                  </div>
-                </div>
-              </div>
 
-              <div className="px-3.5 py-2 bg-white rounded-xl border border-slate-200 text-slate-600 text-xs flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Server-Generated & Custom Claims Verified</span>
-              </div>
-            </div>
 
             <div>
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">

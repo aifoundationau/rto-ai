@@ -16,6 +16,8 @@ import { StudentApplication, INITIAL_APPLICATION_STATE } from '@/data/applicatio
 import { CourseProgram, COURSES_DATA } from '@/data/courses';
 import { Sparkles, Calendar, BookOpen, FileText, ArrowRight, ShieldCheck } from 'lucide-react';
 
+import { trackClientEvent, trackPageView } from '@/lib/firebase/telemetry';
+
 const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   id: 'msg-welcome',
   role: 'assistant',
@@ -43,6 +45,14 @@ export default function HomePage() {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isClassroomLoginOpen, setIsClassroomLoginOpen] = useState(false);
   const [classroomUser, setClassroomUser] = useState<ClassroomUser | null>(null);
+
+  // Track page navigation changes to Firebase
+  useEffect(() => {
+    trackPageView(activeTab, {
+      hasClassroomUser: !!classroomUser,
+      isAdmin: isAdminLoggedIn,
+    });
+  }, [activeTab, classroomUser, isAdminLoggedIn]);
 
   // Load saved application or API key from localStorage if available
   useEffect(() => {
@@ -85,6 +95,11 @@ export default function HomePage() {
     } catch {
       // ignore
     }
+    trackClientEvent({
+      category: 'AUTH',
+      action: 'ADMIN_SESSION_LOGIN',
+      userRole: 'ADMIN',
+    });
     setActiveTab('admin');
   };
 
@@ -95,6 +110,11 @@ export default function HomePage() {
     } catch {
       // ignore
     }
+    trackClientEvent({
+      category: 'AUTH',
+      action: 'ADMIN_SESSION_LOGOUT',
+      userRole: 'ADMIN',
+    });
     setActiveTab('chat');
   };
 
@@ -105,6 +125,18 @@ export default function HomePage() {
     } catch {
       // ignore
     }
+    // Record application progress to Firestore
+    trackClientEvent({
+      category: 'APPLICATION',
+      action: 'APPLICATION_DRAFT_MODIFIED',
+      userId: updated.id,
+      userEmail: updated.personalDetails?.email,
+      metadata: {
+        id: updated.id,
+        status: updated.status,
+        courseName: updated.coursePreferences?.firstChoiceCourseName,
+      }
+    });
   };
 
   const handleSendMessage = async (text: string) => {
@@ -172,11 +204,21 @@ export default function HomePage() {
 
   // Cross-view shortcuts
   const handleSelectCourseForChat = (course: CourseProgram) => {
+    trackClientEvent({
+      category: 'NAVIGATION',
+      action: 'COURSE_INQUIRY_INITIATED',
+      metadata: { courseCode: course.code, courseTitle: course.title },
+    });
     setActiveTab('chat');
     handleSendMessage(`Tell me all about ${course.title} (${course.code}), including admission requirements, tuition, and majors.`);
   };
 
   const handleApplyForCourse = (course: CourseProgram) => {
+    trackClientEvent({
+      category: 'APPLICATION',
+      action: 'COURSE_APPLY_CLICKED',
+      metadata: { courseCode: course.code, courseTitle: course.title },
+    });
     const updated = {
       ...application,
       coursePreferences: {
@@ -192,11 +234,21 @@ export default function HomePage() {
   };
 
   const handleSelectUnitForChat = (unitCode: string) => {
+    trackClientEvent({
+      category: 'NAVIGATION',
+      action: 'UNIT_SYLLABUS_INSPECTED',
+      metadata: { unitCode },
+    });
     setActiveTab('chat');
     handleSendMessage(`Show me the unit syllabus, coordinator, prerequisites, and assessment breakdown for ${unitCode}.`);
   };
 
   const handleAskAgentToBook = (eventTitle: string) => {
+    trackClientEvent({
+      category: 'CALENDAR',
+      action: 'BOOKING_INTENT_FROM_VIEW',
+      metadata: { eventTitle },
+    });
     setActiveTab('chat');
     handleSendMessage(`I would like to register for "${eventTitle}". Please book me in and generate my Google Calendar invite.`);
   };

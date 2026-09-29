@@ -95,6 +95,25 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
 
       setActiveSession(user);
       onLoginSuccess(user);
+
+      // Record to Firebase Telemetry and sync user profile
+      try {
+        const { trackClientEvent } = await import('@/lib/firebase/telemetry');
+        trackClientEvent({
+          category: 'AUTH',
+          action: `GOOGLE_CLASSROOM_${role}_LOGIN`,
+          userId: user.googleWorkspaceId,
+          userEmail: user.email,
+          userRole: role,
+          metadata: {
+            displayName: user.name,
+            provider: 'google.com',
+            scopesGranted: user.scopesGranted,
+          },
+        });
+      } catch (e) {
+        // non-blocking
+      }
     } catch (error) {
       console.error("Login failed:", error);
     } finally {
@@ -107,9 +126,17 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
 
   const handleSignOut = async () => {
     try {
+      const email = activeSession?.email;
       const { auth } = await import('@/lib/firebase/client');
       const { signOut } = await import('firebase/auth');
       await signOut(auth);
+
+      const { trackClientEvent } = await import('@/lib/firebase/telemetry');
+      trackClientEvent({
+        category: 'AUTH',
+        action: 'GOOGLE_CLASSROOM_SIGNOUT',
+        userEmail: email,
+      });
     } catch (error) {
       console.error("Logout failed:", error);
     }

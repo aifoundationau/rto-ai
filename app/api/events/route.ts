@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { activeEventsState } from '@/lib/agent/tools';
 import { createGoogleCalendarUrl, createIcsContent } from '@/lib/calendar/googleCalendar';
+import { saveEventBooking } from '@/lib/firebase/admin';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -52,10 +53,24 @@ export async function POST(req: NextRequest) {
 
     const googleCalendarUrl = createGoogleCalendarUrl(payload);
     const icsContent = createIcsContent(payload);
+    const bookingId = `BK-${Date.now().toString().slice(-6)}`;
+
+    // Persist event booking to Firestore
+    saveEventBooking({
+      bookingId,
+      eventId,
+      title: event.title,
+      studentName,
+      studentEmail,
+      startTime,
+      endTime,
+      location: event.location,
+      notes,
+    }).catch(err => console.warn('[Events] Non-blocking Firestore save warning:', err));
 
     return NextResponse.json({
       success: true,
-      bookingId: `BK-${Date.now().toString().slice(-6)}`,
+      bookingId,
       event,
       studentName,
       studentEmail,

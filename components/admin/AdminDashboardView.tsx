@@ -31,12 +31,16 @@ import {
   Lock,
   Key,
   LogOut,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Coins,
+  Activity
 } from 'lucide-react';
 
 import { ImageManager } from './ImageManager';
 import { AdminEventsManager } from './AdminEventsManager';
 import { GoogleClassroomManager } from './GoogleClassroomManager';
+import { TokenManager } from './TokenManager';
+import { FirebaseTelemetryView } from './FirebaseTelemetryView';
 
 interface AdminDashboardViewProps {
   apiKey?: string;
@@ -51,7 +55,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 }) => {
   const [applications, setApplications] = useState<StudentApplication[]>([]);
   const [selectedApp, setSelectedApp] = useState<StudentApplication | null>(null);
-  const [activeTab, setActiveTab] = useState<'api_key' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom'>('api_key');
+  const [activeTab, setActiveTab] = useState<'api_key' | 'telemetry' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens'>('telemetry');
   const [apiKeys, setApiKeys] = useState({
     gemini: apiKey || '',
     firebase: '',
@@ -305,6 +309,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <span>API</span>
           </button>
           <button
+            onClick={() => setActiveTab('telemetry')}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeTab === 'telemetry' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5 text-emerald-300" />
+            <span>Firebase Telemetry</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+          </button>
+          <button
             onClick={() => setActiveTab('user_management')}
             className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
               activeTab === 'user_management' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
@@ -372,6 +386,15 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             }`}
           >
             Knowledge & FAQs ({FAQS_DATA.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('tokens')}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              activeTab === 'tokens' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Coins className="w-3.5 h-3.5" />
+            <span>Tokens / Emergency Fund</span>
           </button>
           {onLogout && (
             <button
@@ -600,6 +623,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Tab: Universal Firebase Telemetry */}
+      {activeTab === 'telemetry' && <FirebaseTelemetryView />}
 
       {/* Tab: User & Student ID Management */}
       {activeTab === 'user_management' && (
@@ -1037,6 +1063,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       {/* Tab 5: Google Classroom API Management */}
       {activeTab === 'classroom' && (
         <GoogleClassroomManager userPermissions={['super_admin', 'manage_google_classroom']} />
+      )}
+
+      {/* Tab: Token Management */}
+      {activeTab === 'tokens' && (
+        <TokenManager />
       )}
 
       {/* Inspect Application Modal */}

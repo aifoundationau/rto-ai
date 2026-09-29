@@ -81,7 +81,23 @@ const applicationsDatabase: StudentApplication[] = [
   }
 ];
 
+import { saveApplicationToFirestore, getApplicationsFromFirestore } from '@/lib/firebase/admin';
+
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
+  try {
+    const firestoreApps = await getApplicationsFromFirestore();
+    if (firestoreApps && firestoreApps.length > 0) {
+      // Merge or return firestore apps
+      const map = new Map<string, StudentApplication>();
+      applicationsDatabase.forEach(a => map.set(a.id, a));
+      firestoreApps.forEach(a => map.set(a.id, a));
+      return NextResponse.json({ applications: Array.from(map.values()) });
+    }
+  } catch (err) {
+    console.warn('[Applications GET] Firestore read fallback:', err);
+  }
   return NextResponse.json({ applications: applicationsDatabase });
 }
 
@@ -94,6 +110,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid application object' }, { status: 400 });
     }
 
+    // Save to Firestore via Admin SDK
+    const firestoreResult = await saveApplicationToFirestore(app);
+
+    // Keep in-memory cache synchronized
     const existingIndex = applicationsDatabase.findIndex(a => a.id === app.id);
     if (existingIndex >= 0) {
       applicationsDatabase[existingIndex] = app;
@@ -101,7 +121,12 @@ export async function POST(req: NextRequest) {
       applicationsDatabase.unshift(app);
     }
 
-    return NextResponse.json({ success: true, application: app, total: applicationsDatabase.length });
+    return NextResponse.json({
+      success: true,
+      application: app,
+      firestoreSynced: firestoreResult.success,
+      total: applicationsDatabase.length,
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
