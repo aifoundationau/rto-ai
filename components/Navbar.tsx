@@ -81,10 +81,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Right Action Icons */}
         <div className="flex items-center gap-2">
           {/* Google Classroom Logon Icon & Button for Teachers & Students */}
-          <a
-            href="https://classroom.google.com"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={onOpenClassroomLogin}
             className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-2"
             title="Log in to Google Classroom as Teacher or Student"
           >
@@ -92,7 +90,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <BookOpen className="w-3 h-3 text-white" />
             </div>
             <span className="hidden sm:inline">Classroom</span>
-          </a>
+          </button>
 
           <button
             onClick={onOpenSettings}

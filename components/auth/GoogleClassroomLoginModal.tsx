@@ -177,12 +177,15 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
               >
                 <LogOut className="w-3.5 h-3.5" /> Sign Out
               </button>
-              <button
+              <a
+                href="https://classroom.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={onClose}
                 className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" /> Continue to Classroom
-              </button>
+              </a>
             </div>
           </div>
         ) : (
