@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Home,
   Bot,
   BookOpen,
   GraduationCap,
@@ -10,7 +11,7 @@ import {
   Sparkles
 } from 'lucide-react';
 
-export type NavTab = 'chat' | 'courses' | 'units' | 'application' | 'events' | 'admin';
+export type NavTab = 'home' | 'courses' | 'units' | 'application' | 'events' | 'chat' | 'admin';
 
 interface NavbarProps {
   activeTab: NavTab;
@@ -27,6 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenClassroomLogin,
 }) => {
   const navItems = [
+    { id: 'home' as NavTab, label: 'Home', icon: Home },
     { id: 'courses' as NavTab, label: 'Degree Programs', icon: GraduationCap },
     { id: 'units' as NavTab, label: 'Unit Syllabuses', icon: BookOpen },
     { id: 'application' as NavTab, label: 'Application Form', icon: FileText },
@@ -39,7 +41,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Brand */}
         <div
-          onClick={() => onSelectTab('chat')}
+          onClick={() => onSelectTab('home')}
           className="flex items-center gap-2.5 cursor-pointer group shrink-0"
         >
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-primary-600 to-purple-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">

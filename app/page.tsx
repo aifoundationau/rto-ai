@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Navbar, NavTab } from '@/components/Navbar';
+import { HomeView } from '@/components/home/HomeView';
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import { CourseCatalogView } from '@/components/catalog/CourseCatalogView';
 import { UnitCatalogView } from '@/components/catalog/UnitCatalogView';
@@ -36,7 +37,7 @@ How would you like to get started today?`,
 };
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<NavTab>('chat');
+  const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_WELCOME_MESSAGE]);
   const [isLoading, setIsLoading] = useState(false);
   const [application, setApplication] = useState<StudentApplication>(INITIAL_APPLICATION_STATE);
@@ -278,6 +279,19 @@ export default function HomePage() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+        {activeTab === 'home' && (
+          <HomeView
+            onNavigateTab={setActiveTab}
+            onAskAgent={(query) => {
+              setActiveTab('chat');
+              handleSendMessage(query);
+            }}
+            onApplyForCourse={handleApplyForCourse}
+            onExploreUnit={handleSelectUnitForChat}
+            onOpenClassroom={() => setIsClassroomLoginOpen(true)}
+          />
+        )}
+
         {activeTab === 'chat' && (
           <div className="h-[calc(100vh-12rem)] min-h-[600px]">
             <ChatInterface

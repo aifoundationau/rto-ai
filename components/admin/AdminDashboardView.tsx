@@ -33,7 +33,8 @@ import {
   LogOut,
   Image as ImageIcon,
   Coins,
-  Activity
+  Activity,
+  MessageSquare
 } from 'lucide-react';
 
 import { ImageManager } from './ImageManager';
@@ -41,6 +42,7 @@ import { AdminEventsManager } from './AdminEventsManager';
 import { GoogleClassroomManager } from './GoogleClassroomManager';
 import { TokenManager } from './TokenManager';
 import { FirebaseTelemetryView } from './FirebaseTelemetryView';
+import { StaffMessagingView } from './StaffMessagingView';
 
 interface AdminDashboardViewProps {
   apiKey?: string;
@@ -55,7 +57,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 }) => {
   const [applications, setApplications] = useState<StudentApplication[]>([]);
   const [selectedApp, setSelectedApp] = useState<StudentApplication | null>(null);
-  const [activeTab, setActiveTab] = useState<'api_key' | 'telemetry' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens'>('telemetry');
+  const [activeTab, setActiveTab] = useState<'api_key' | 'telemetry' | 'staff_messaging' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens'>('telemetry');
   const [apiKeys, setApiKeys] = useState({
     gemini: apiKey || '',
     firebase: '',
@@ -317,6 +319,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <Activity className="w-3.5 h-3.5 text-emerald-300" />
             <span>Firebase Telemetry</span>
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+          </button>
+          <button
+            onClick={() => setActiveTab('staff_messaging')}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeTab === 'staff_messaging' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-indigo-300" />
+            <span>Staff Messages</span>
+            <span className="px-1.5 py-0.2 bg-rose-500 text-white text-[9px] font-extrabold rounded-full">2</span>
           </button>
           <button
             onClick={() => setActiveTab('user_management')}
@@ -1068,6 +1080,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       {/* Tab: Token Management */}
       {activeTab === 'tokens' && (
         <TokenManager />
+      )}
+
+      {/* Tab: Staff Messages & Intercom */}
+      {activeTab === 'staff_messaging' && (
+        <StaffMessagingView />
       )}
 
       {/* Inspect Application Modal */}
