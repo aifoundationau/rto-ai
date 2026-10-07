@@ -81,10 +81,10 @@ export default function HomePage() {
   };
 
   const handleOpenSettings = () => {
-    if (isAdminLoggedIn) {
+    if (classroomUser || isAdminLoggedIn) {
       setActiveTab('admin');
     } else {
-      setIsLoginModalOpen(true);
+      setIsClassroomLoginOpen(true);
     }
   };
 
@@ -269,12 +269,11 @@ export default function HomePage() {
         </button>
       </div>
 
-      {/* Main Navbar */}
       <Navbar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         onOpenSettings={handleOpenSettings}
-        onOpenClassroomLogin={() => setIsClassroomLoginOpen(true)}
+        currentUser={classroomUser}
       />
 
       {/* Main Content Area */}
@@ -357,9 +356,14 @@ export default function HomePage() {
         currentUser={classroomUser}
         onLoginSuccess={(user) => {
           setClassroomUser(user);
+          setIsAdminLoggedIn(true);
           setIsClassroomLoginOpen(false);
+          setActiveTab('admin');
         }}
-        onLogout={() => setClassroomUser(null)}
+        onLogout={() => {
+          setClassroomUser(null);
+          setIsAdminLoggedIn(false);
+        }}
       />
     </div>
   );

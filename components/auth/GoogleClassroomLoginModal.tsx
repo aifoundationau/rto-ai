@@ -61,7 +61,9 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
         'https://www.googleapis.com/auth/classroom.courses',
         'https://www.googleapis.com/auth/classroom.rosters',
         'https://www.googleapis.com/auth/classroom.coursework.students',
-        'https://www.googleapis.com/auth/spreadsheets.readonly'
+        'https://www.googleapis.com/auth/spreadsheets.readonly',
+        'https://www.googleapis.com/auth/calendar',
+        'https://www.googleapis.com/auth/calendar.events'
       ];
       
       const studentScopes = [
@@ -114,8 +116,9 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
       } catch (e) {
         // non-blocking
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed:", error);
+      alert(`Login failed: ${error.message || 'Unknown error'}. Please check the console for more details.`);
     } finally {
       setIsLoading(false);
     }

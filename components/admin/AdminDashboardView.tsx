@@ -43,6 +43,7 @@ import { GoogleClassroomManager } from './GoogleClassroomManager';
 import { TokenManager } from './TokenManager';
 import { FirebaseTelemetryView } from './FirebaseTelemetryView';
 import { StaffMessagingView } from './StaffMessagingView';
+import { AdminCalendarManager } from './AdminCalendarManager';
 
 interface AdminDashboardViewProps {
   apiKey?: string;
@@ -57,7 +58,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 }) => {
   const [applications, setApplications] = useState<StudentApplication[]>([]);
   const [selectedApp, setSelectedApp] = useState<StudentApplication | null>(null);
-  const [activeTab, setActiveTab] = useState<'api_key' | 'telemetry' | 'staff_messaging' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens'>('telemetry');
+  const [activeTab, setActiveTab] = useState<'api_key' | 'telemetry' | 'staff_messaging' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens' | 'calendar'>('telemetry');
   const [apiKeys, setApiKeys] = useState({
     gemini: apiKey || '',
     firebase: '',
@@ -407,6 +408,15 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           >
             <Coins className="w-3.5 h-3.5" />
             <span>Tokens / Emergency Fund</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('calendar')}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            <span>Google Calendar</span>
           </button>
           {onLogout && (
             <button
@@ -1301,6 +1311,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </div>
         </div>
       )}
+      {/* Tab: Google Calendar */}
+      {activeTab === 'calendar' && <AdminCalendarManager />}
     </div>
   );
 };

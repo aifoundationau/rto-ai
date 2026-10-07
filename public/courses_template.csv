@@ -1,0 +1,4 @@
+courseName,section,descriptionHeading,room,ownerId,weeklyTopics,studentEmails,action
+"Advanced Physics 101","Fall 2026","An introduction to classical mechanics and thermodynamics.","Room 304","teacher@example.com","Week 1: Kinematics|Week 2: Dynamics|Week 3: Energy","student1@example.com|student2@example.com",CREATE
+"CS 204: Data Structures","Spring 2026","Learn about arrays, lists, trees, and graphs.","Online","teacher@example.com","Week 1: Big O|Week 2: Arrays","student3@example.com",UPDATE
+"ENG 310: Technical Writing","Fall 2025","Writing for engineering and sciences.","Room 102","teacher2@example.com","","student4@example.com",ARCHIVE

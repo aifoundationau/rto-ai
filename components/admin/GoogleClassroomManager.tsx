@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BookOpen,
   Plus,
@@ -84,8 +84,30 @@ export const GoogleClassroomManager: React.FC<GoogleClassroomManagerProps> = ({
   const [currentPermissions, setCurrentPermissions] = useState<string[]>(userPermissions);
   
   // OAuth 2.0 Connection State Simulation
-  const [isOAuthConnected, setIsOAuthConnected] = useState<boolean>(true);
-  const [oauthAccount, setOauthAccount] = useState<string>('admin.faculty@edupulse.edu');
+  const [isOAuthConnected, setIsOAuthConnected] = useState<boolean>(false);
+  const [oauthAccount, setOauthAccount] = useState<string>('');
+
+  useEffect(() => {
+    let unsubscribe = () => {};
+    const checkAuth = async () => {
+      try {
+        const { auth } = await import('@/lib/firebase/client');
+        unsubscribe = auth.onAuthStateChanged((user) => {
+          if (user) {
+            setIsOAuthConnected(true);
+            setOauthAccount(user.email || 'admin.faculty@edupulse.edu');
+          } else {
+            setIsOAuthConnected(false);
+            setOauthAccount('');
+          }
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    checkAuth();
+    return () => unsubscribe();
+  }, []);
 
   // Check RBAC Permissions: 'manage_google_classroom' OR 'teacher_admin' OR 'super_admin'
   const canManageClassroom =
@@ -647,9 +669,19 @@ export const GoogleClassroomManager: React.FC<GoogleClassroomManagerProps> = ({
           <div className="pt-2 flex justify-center gap-3">
             {!isOAuthConnected && (
               <button
-                onClick={() => {
-                  setIsOAuthConnected(true);
-                  showToast('Google Workspace OAuth token granted!', 'success');
+                onClick={async () => {
+                  try {
+                    const { auth } = await import('@/lib/firebase/client');
+                    const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
+                    const provider = new GoogleAuthProvider();
+                    provider.addScope('https://www.googleapis.com/auth/classroom.courses');
+                    provider.addScope('https://www.googleapis.com/auth/classroom.rosters');
+                    provider.addScope('https://www.googleapis.com/auth/classroom.coursework.students');
+                    await signInWithPopup(auth, provider);
+                    showToast('Google Workspace OAuth token granted!', 'success');
+                  } catch (e: any) {
+                    showToast(e.message || 'OAuth connection failed', 'warning');
+                  }
                 }}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm"
               >
