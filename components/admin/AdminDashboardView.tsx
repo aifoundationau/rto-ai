@@ -289,17 +289,21 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-2">
             <span className="px-3 py-1 bg-amber-500/30 text-amber-300 rounded-full text-xs font-semibold uppercase tracking-wider border border-amber-400/20">
-              Staff Portal
+              Superadmin Control Center
             </span>
             <span className="px-3 py-1 bg-indigo-500/30 text-indigo-300 rounded-full text-xs font-semibold">
-              Live Admissions Admin
+              Executive Level Access
+            </span>
+            <span className="px-3 py-1 bg-emerald-500/30 text-emerald-300 rounded-full text-xs font-semibold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Google Authenticated
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Admissions & Agent Management Dashboard
+            Superadmin & Operations Panel
           </h1>
           <p className="text-sm text-slate-300 mt-1">
-            Manage student numbers, 24/7 Google Sheets synchronization, applications, and custom role claims.
+            Executive control over LMS Course Builder, admissions telemetry, 24/7 Google Sheets synchronization, and student identifiers.
           </p>
         </div>
 

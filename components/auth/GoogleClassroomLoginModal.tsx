@@ -17,7 +17,7 @@ import {
 export interface ClassroomUser {
   name: string;
   email: string;
-  role: 'TEACHER' | 'STUDENT';
+  role: 'TEACHER' | 'STUDENT' | 'SUPERADMIN' | 'ADMIN';
   avatarUrl: string;
   googleWorkspaceId: string;
   scopesGranted: string[];
@@ -56,7 +56,7 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
       const { signInWithPopup, GoogleAuthProvider, signOut: firebaseSignOut } = await import('firebase/auth');
 
       const provider = new GoogleAuthProvider();
-      
+
       const teacherScopes = [
         'https://www.googleapis.com/auth/classroom.courses',
         'https://www.googleapis.com/auth/classroom.rosters',
@@ -65,7 +65,7 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
         'https://www.googleapis.com/auth/calendar',
         'https://www.googleapis.com/auth/calendar.events'
       ];
-      
+
       const studentScopes = [
         'https://www.googleapis.com/auth/classroom.courses.readonly',
         'https://www.googleapis.com/auth/classroom.rosters.readonly',
@@ -76,7 +76,7 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
       scopes.forEach(scope => provider.addScope(scope));
 
       const result = await signInWithPopup(auth, provider);
-      
+
       // Get the OAuth access token
       const credential = GoogleAuthProvider.credentialFromResult(result);
       const accessToken = credential?.accessToken;
@@ -229,11 +229,10 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
               <button
                 type="button"
                 onClick={() => setSelectedRole('TEACHER')}
-                className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                  selectedRole === 'TEACHER'
+                className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${selectedRole === 'TEACHER'
                     ? 'bg-white text-indigo-900 shadow-sm'
                     : 'text-slate-500 hover:text-slate-800'
-                }`}
+                  }`}
               >
                 <GraduationCap className="w-4 h-4 text-indigo-600" />
                 <span>Teacher / Faculty</span>
@@ -241,11 +240,10 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
               <button
                 type="button"
                 onClick={() => setSelectedRole('STUDENT')}
-                className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                  selectedRole === 'STUDENT'
+                className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${selectedRole === 'STUDENT'
                     ? 'bg-white text-emerald-900 shadow-sm'
                     : 'text-slate-500 hover:text-slate-800'
-                }`}
+                  }`}
               >
                 <User className="w-4 h-4 text-emerald-600" />
                 <span>Student</span>
@@ -273,11 +271,10 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
               type="button"
               disabled={isLoading}
               onClick={selectedRole === 'TEACHER' ? handleTeacherLogin : handleStudentLogin}
-              className={`w-full py-3 px-4 font-bold text-xs rounded-2xl text-white shadow-md flex items-center justify-center gap-3 transition-all cursor-pointer ${
-                selectedRole === 'TEACHER'
+              className={`w-full py-3 px-4 font-bold text-xs rounded-2xl text-white shadow-md flex items-center justify-center gap-3 transition-all cursor-pointer ${selectedRole === 'TEACHER'
                   ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
                   : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
-              }`}
+                }`}
             >
               {/* Google Colored Icon */}
               <svg className="w-4 h-4 bg-white rounded-full p-0.5" viewBox="0 0 24 24">

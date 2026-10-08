@@ -9,7 +9,6 @@ import { UnitCatalogView } from '@/components/catalog/UnitCatalogView';
 import { ApplicationPortalView } from '@/components/application/ApplicationPortalView';
 import { EventsCalendarView } from '@/components/events/EventsCalendarView';
 import { AdminDashboardView } from '@/components/admin/AdminDashboardView';
-import { AdminLoginModal } from '@/components/admin/AdminLoginModal';
 import { GoogleClassroomLoginModal, ClassroomUser } from '@/components/auth/GoogleClassroomLoginModal';
 import { SignInView } from '@/components/auth/SignInView';
 import { ApiKeyModal } from '@/components/ApiKeyModal';
@@ -43,7 +42,6 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [application, setApplication] = useState<StudentApplication>(INITIAL_APPLICATION_STATE);
   const [apiKey, setApiKey] = useState<string>('');
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isClassroomLoginOpen, setIsClassroomLoginOpen] = useState(false);
   const [classroomUser, setClassroomUser] = useState<ClassroomUser | null>(null);
@@ -56,7 +54,7 @@ export default function HomePage() {
     });
   }, [activeTab, classroomUser, isAdminLoggedIn]);
 
-  // Load saved application or API key from localStorage if available
+  // Load saved application, API key, and restore Google Superadmin user from localStorage & Firebase
   useEffect(() => {
     try {
       const savedKey = localStorage.getItem('edupulse_api_key');
@@ -65,11 +63,55 @@ export default function HomePage() {
       const savedApp = localStorage.getItem('edupulse_active_application');
       if (savedApp) setApplication(JSON.parse(savedApp));
 
-      const adminState = localStorage.getItem('edupulse_is_admin');
-      if (adminState === 'true') setIsAdminLoggedIn(true);
+      const savedUser = localStorage.getItem('edupulse_user');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        setClassroomUser(parsed);
+        setIsAdminLoggedIn(true);
+      } else {
+        const adminState = localStorage.getItem('edupulse_is_admin');
+        if (adminState === 'true') setIsAdminLoggedIn(true);
+      }
     } catch {
       // ignore
     }
+
+    // Auto-sync with Firebase Auth state
+    let isMounted = true;
+    import('@/lib/firebase/client').then(({ auth }) => {
+      import('firebase/auth').then(({ onAuthStateChanged }) => {
+        onAuthStateChanged(auth, (firebaseUser) => {
+          if (!isMounted) return;
+          if (firebaseUser) {
+            const superadminUser: ClassroomUser = {
+              name: firebaseUser.displayName || 'Superadmin User',
+              email: firebaseUser.email || '',
+              role: 'SUPERADMIN',
+              avatarUrl: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+              googleWorkspaceId: firebaseUser.uid,
+              scopesGranted: [
+                'userinfo.email',
+                'userinfo.profile',
+                'classroom.courses',
+                'classroom.rosters',
+                'calendar.events',
+                'spreadsheets.readonly'
+              ]
+            };
+            setClassroomUser(superadminUser);
+            setIsAdminLoggedIn(true);
+            try {
+              localStorage.setItem('edupulse_user', JSON.stringify(superadminUser));
+              localStorage.setItem('edupulse_is_admin', 'true');
+            } catch (e) {}
+          }
+        });
+      }).catch(() => {});
+    }).catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleSaveApiKey = (key: string) => {
@@ -85,39 +127,96 @@ export default function HomePage() {
     if (classroomUser || isAdminLoggedIn) {
       setActiveTab('admin');
     } else {
-      setIsClassroomLoginOpen(true);
+      handleGoogleSignInDirect();
     }
   };
 
-  const handleLoginSuccess = () => {
-    setIsAdminLoggedIn(true);
-    setIsLoginModalOpen(false);
+  const handleGoogleSignInDirect = async () => {
     try {
-      localStorage.setItem('edupulse_is_admin', 'true');
-    } catch {
-      // ignore
+      const { auth } = await import('@/lib/firebase/client');
+      const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
+
+      const provider = new GoogleAuthProvider();
+      provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+      provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+      provider.addScope('https://www.googleapis.com/auth/classroom.courses');
+      provider.addScope('https://www.googleapis.com/auth/classroom.rosters');
+      provider.addScope('https://www.googleapis.com/auth/calendar.events');
+      provider.addScope('https://www.googleapis.com/auth/spreadsheets.readonly');
+      provider.setCustomParameters({ prompt: 'select_account' });
+
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const accessToken = credential?.accessToken;
+
+      if (accessToken && typeof window !== 'undefined') {
+        sessionStorage.setItem('google_oauth_access_token', accessToken);
+      }
+
+      const superadminUser: ClassroomUser = {
+        name: result.user.displayName || 'Superadmin User',
+        email: result.user.email || '',
+        role: 'SUPERADMIN',
+        avatarUrl: result.user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+        googleWorkspaceId: result.user.uid,
+        scopesGranted: [
+          'userinfo.email',
+          'userinfo.profile',
+          'classroom.courses',
+          'classroom.rosters',
+          'calendar.events',
+          'spreadsheets.readonly'
+        ]
+      };
+
+      setClassroomUser(superadminUser);
+      setIsAdminLoggedIn(true);
+      try {
+        localStorage.setItem('edupulse_user', JSON.stringify(superadminUser));
+        localStorage.setItem('edupulse_is_admin', 'true');
+      } catch (e) {}
+
+      trackClientEvent({
+        category: 'AUTH',
+        action: 'GOOGLE_SSO_SUPERADMIN_SUCCESS',
+        userId: superadminUser.googleWorkspaceId,
+        userEmail: superadminUser.email,
+        userRole: 'SUPERADMIN',
+      });
+
+      // Go straight to superadmin panel
+      setActiveTab('admin');
+    } catch (err: any) {
+      console.error('Google Sign In error:', err);
+      setActiveTab('signin');
     }
-    trackClientEvent({
-      category: 'AUTH',
-      action: 'ADMIN_SESSION_LOGIN',
-      userRole: 'ADMIN',
-    });
-    setActiveTab('admin');
   };
 
-  const handleLogoutAdmin = () => {
+  const handleLogoutAdmin = async () => {
+    try {
+      const { auth } = await import('@/lib/firebase/client');
+      const { signOut } = await import('firebase/auth');
+      await signOut(auth);
+    } catch (e) {
+      console.warn('Sign out warning:', e);
+    }
+    setClassroomUser(null);
     setIsAdminLoggedIn(false);
     try {
+      localStorage.removeItem('edupulse_user');
       localStorage.removeItem('edupulse_is_admin');
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('google_oauth_access_token');
+      }
     } catch {
       // ignore
     }
     trackClientEvent({
       category: 'AUTH',
       action: 'ADMIN_SESSION_LOGOUT',
-      userRole: 'ADMIN',
+      userRole: 'SUPERADMIN',
     });
-    setActiveTab('chat');
+    setActiveTab('home');
   };
 
   const handleUpdateApplication = (updated: StudentApplication) => {
@@ -275,6 +374,7 @@ export default function HomePage() {
         onSelectTab={setActiveTab}
         onOpenSettings={handleOpenSettings}
         currentUser={classroomUser}
+        onGoogleSignIn={handleGoogleSignInDirect}
       />
 
       {/* Main Content Area */}
@@ -288,7 +388,13 @@ export default function HomePage() {
             }}
             onApplyForCourse={handleApplyForCourse}
             onExploreUnit={handleSelectUnitForChat}
-            onOpenClassroom={() => setIsClassroomLoginOpen(true)}
+            onOpenClassroom={() => {
+              if (classroomUser || isAdminLoggedIn) {
+                setActiveTab('admin');
+              } else {
+                handleGoogleSignInDirect();
+              }
+            }}
           />
         )}
 
@@ -348,26 +454,20 @@ export default function HomePage() {
             onLoginSuccess={(user) => {
               setClassroomUser(user);
               setIsAdminLoggedIn(true);
-              setActiveTab('home');
+              try {
+                localStorage.setItem('edupulse_user', JSON.stringify(user));
+                localStorage.setItem('edupulse_is_admin', 'true');
+              } catch (e) {}
+              // Go straight to superadmin panel
+              setActiveTab('admin');
             }}
-            onLogout={() => {
-              setClassroomUser(null);
-              setIsAdminLoggedIn(false);
-              setActiveTab('home');
-            }}
+            onLogout={handleLogoutAdmin}
             onNavigateTab={setActiveTab}
           />
         )}
       </main>
 
-      {/* Admin Login Modal */}
-      <AdminLoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
-        onLoginSuccess={handleLoginSuccess}
-      />
-
-      {/* Google Classroom Login Modal for Teachers & Students */}
+      {/* Google Classroom Login Modal */}
       <GoogleClassroomLoginModal
         isOpen={isClassroomLoginOpen}
         onClose={() => setIsClassroomLoginOpen(false)}
@@ -375,13 +475,14 @@ export default function HomePage() {
         onLoginSuccess={(user) => {
           setClassroomUser(user);
           setIsAdminLoggedIn(true);
+          try {
+            localStorage.setItem('edupulse_user', JSON.stringify(user));
+            localStorage.setItem('edupulse_is_admin', 'true');
+          } catch (e) {}
           setIsClassroomLoginOpen(false);
           setActiveTab('admin');
         }}
-        onLogout={() => {
-          setClassroomUser(null);
-          setIsAdminLoggedIn(false);
-        }}
+        onLogout={handleLogoutAdmin}
       />
     </div>
   );

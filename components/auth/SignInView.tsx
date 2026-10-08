@@ -32,7 +32,6 @@ export const SignInView: React.FC<SignInViewProps> = ({
   onLogout,
   onNavigateTab
 }) => {
-  const [selectedRole, setSelectedRole] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -46,16 +45,13 @@ export const SignInView: React.FC<SignInViewProps> = ({
 
       const provider = new GoogleAuthProvider();
       
-      // Ecosystem Scopes per FUTURE_FIREBASE_AUTH_AND_GOOGLE_SSO_PROMPT.txt
+      // Google Ecosystem Scopes for Superadmin Access
       provider.addScope('https://www.googleapis.com/auth/userinfo.email');
       provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
-      provider.addScope('https://www.googleapis.com/auth/classroom.courses.readonly');
+      provider.addScope('https://www.googleapis.com/auth/classroom.courses');
+      provider.addScope('https://www.googleapis.com/auth/classroom.rosters');
       provider.addScope('https://www.googleapis.com/auth/calendar.events');
-
-      if (selectedRole === 'TEACHER') {
-        provider.addScope('https://www.googleapis.com/auth/classroom.courses');
-        provider.addScope('https://www.googleapis.com/auth/classroom.rosters');
-      }
+      provider.addScope('https://www.googleapis.com/auth/spreadsheets.readonly');
 
       provider.setCustomParameters({
         prompt: 'select_account',
@@ -67,37 +63,39 @@ export const SignInView: React.FC<SignInViewProps> = ({
 
       if (accessToken && typeof window !== 'undefined') {
         sessionStorage.setItem('google_oauth_access_token', accessToken);
-        console.log('[Auth] Google OAuth Token saved for Google APIs in sessionStorage');
+        console.log('[Auth] Google OAuth Token saved in sessionStorage');
       }
 
-      const classroomUser: ClassroomUser = {
-        name: result.user.displayName || 'Authorized User',
+      const superadminUser: ClassroomUser = {
+        name: result.user.displayName || 'Superadmin User',
         email: result.user.email || '',
-        role: selectedRole,
+        role: 'SUPERADMIN',
         avatarUrl: result.user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
         googleWorkspaceId: result.user.uid,
         scopesGranted: [
           'userinfo.email',
           'userinfo.profile',
-          'classroom.courses.readonly',
-          'calendar.events'
+          'classroom.courses',
+          'classroom.rosters',
+          'calendar.events',
+          'spreadsheets.readonly'
         ]
       };
 
       // Telemetry log
       trackClientEvent({
         category: 'AUTH',
-        action: `GOOGLE_SSO_${selectedRole}_SUCCESS`,
-        userId: classroomUser.googleWorkspaceId,
-        userEmail: classroomUser.email,
-        userRole: selectedRole,
+        action: 'GOOGLE_SSO_SUPERADMIN_SUCCESS',
+        userId: superadminUser.googleWorkspaceId,
+        userEmail: superadminUser.email,
+        userRole: 'SUPERADMIN',
         metadata: {
           provider: 'google.com',
-          displayName: classroomUser.name
+          displayName: superadminUser.name
         }
       });
 
-      onLoginSuccess(classroomUser);
+      onLoginSuccess(superadminUser);
     } catch (err: any) {
       console.error('[Google SSO Error]', err);
       setErrorMessage(err.message || 'Google sign in was cancelled or failed.');
@@ -132,19 +130,19 @@ export const SignInView: React.FC<SignInViewProps> = ({
       <div className="bg-[#0f172a] rounded-3xl p-6 sm:p-10 text-white shadow-xl border border-slate-800">
         <div className="flex items-center gap-2 mb-3">
           <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full text-xs font-semibold uppercase tracking-wider">
-            Centralized Identity & Access
+            Centralized Identity
           </span>
           <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 rounded-full text-xs font-semibold">
-            Google Ecosystem SSO
+            Google Authentication
           </span>
         </div>
         <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-          {currentUser ? 'Your Unified Student & Staff Account' : 'Sign In to EduPulse AI'}
+          {currentUser ? 'Superadmin Account Active' : 'Sign In with Google'}
         </h1>
         <p className="text-sm text-slate-300 mt-2 max-w-2xl leading-relaxed">
           {currentUser
-            ? 'Manage your active academic profile, Google Classroom courses, admissions application, and event registrations.'
-            : 'Authenticate securely with your Google or University Workspace account for seamless access across courses, calendars, and admissions.'}
+            ? 'Your Google account is verified with full Superadmin privileges across EduPulse AI.'
+            : 'Authenticate securely using your Google account to access all systems and the Superadmin Panel.'}
         </p>
       </div>
 
@@ -167,8 +165,8 @@ export const SignInView: React.FC<SignInViewProps> = ({
                 </div>
                 <p className="text-xs font-mono text-slate-500 mt-0.5">{currentUser.email}</p>
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="px-2.5 py-0.5 bg-indigo-100 text-indigo-800 text-[11px] font-bold rounded-lg uppercase tracking-wide">
-                    {currentUser.role}
+                  <span className="px-2.5 py-0.5 bg-indigo-600 text-white text-[11px] font-black rounded-lg uppercase tracking-wide">
+                    SUPERADMIN
                   </span>
                   <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[11px] font-semibold rounded-lg flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -178,17 +176,40 @@ export const SignInView: React.FC<SignInViewProps> = ({
               </div>
             </div>
 
-            <button
-              onClick={handleSignOut}
-              className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition-colors flex items-center gap-2 self-start sm:self-center border border-rose-200/60"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Sign Out</span>
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => onNavigateTab('admin')}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-2 shadow-md shadow-indigo-200 cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Go to Superadmin Panel</span>
+              </button>
+              <button
+                onClick={handleSignOut}
+                className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition-colors flex items-center gap-2 border border-rose-200/60 cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Sign Out</span>
+              </button>
+            </div>
           </div>
 
           {/* Quick Shortcuts */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div
+              onClick={() => onNavigateTab('admin')}
+              className="p-5 bg-white rounded-2xl border-2 border-indigo-200 hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                <Layers className="w-5 h-5" />
+              </div>
+              <h3 className="font-bold text-slate-900 text-sm">Superadmin Panel</h3>
+              <p className="text-xs text-slate-500 mt-1">Full control over courses, telemetry, sheets sync, and staff tools.</p>
+              <span className="text-xs font-bold text-indigo-600 flex items-center gap-1 mt-3">
+                Open Superadmin Panel &rarr;
+              </span>
+            </div>
+
             <div
               onClick={() => onNavigateTab('application')}
               className="p-5 bg-white rounded-2xl border border-slate-200/80 hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer group"
@@ -197,9 +218,9 @@ export const SignInView: React.FC<SignInViewProps> = ({
                 <GraduationCap className="w-5 h-5" />
               </div>
               <h3 className="font-bold text-slate-900 text-sm">Admissions Application</h3>
-              <p className="text-xs text-slate-500 mt-1">Review your submitted application form and entry criteria.</p>
+              <p className="text-xs text-slate-500 mt-1">Review student applications, entry criteria, and status.</p>
               <span className="text-xs font-bold text-indigo-600 flex items-center gap-1 mt-3">
-                Open Portal &rarr;
+                Open Applications &rarr;
               </span>
             </div>
 
@@ -211,38 +232,24 @@ export const SignInView: React.FC<SignInViewProps> = ({
                 <Calendar className="w-5 h-5" />
               </div>
               <h3 className="font-bold text-slate-900 text-sm">Events & Calendar</h3>
-              <p className="text-xs text-slate-500 mt-1">View campus tours, open days, and your Google Calendar RSVPs.</p>
+              <p className="text-xs text-slate-500 mt-1">Manage campus tours, open days, and calendar bookings.</p>
               <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 mt-3">
                 View Schedule &rarr;
-              </span>
-            </div>
-
-            <div
-              onClick={() => onNavigateTab('admin')}
-              className="p-5 bg-white rounded-2xl border border-slate-200/80 hover:border-purple-300 hover:shadow-md transition-all cursor-pointer group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                <Layers className="w-5 h-5" />
-              </div>
-              <h3 className="font-bold text-slate-900 text-sm">Staff & Admin Hub</h3>
-              <p className="text-xs text-slate-500 mt-1">Access telemetry, Google Sheets sync, and student management.</p>
-              <span className="text-xs font-bold text-purple-600 flex items-center gap-1 mt-3">
-                Open Dashboard &rarr;
               </span>
             </div>
           </div>
         </div>
       ) : (
-        /* 3. SIGN IN FORM */
-        <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-100 shadow-sm max-w-xl mx-auto space-y-6 text-center">
+        /* 3. GOOGLE ONLY SIGN IN FORM */
+        <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-100 shadow-sm max-w-lg mx-auto space-y-6 text-center">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-xs">
             <Lock className="w-8 h-8" />
           </div>
 
           <div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900">Unified Google Single Sign-On</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900">Sign In with Google</h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-              Select your university role and authenticate with your verified Google account.
+              All accounts authenticate through Google and receive instant Superadmin panel access.
             </p>
           </div>
 
@@ -253,50 +260,22 @@ export const SignInView: React.FC<SignInViewProps> = ({
             </div>
           )}
 
-          {/* Role Selector Tabs */}
-          <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-2xl">
-            <button
-              type="button"
-              onClick={() => setSelectedRole('STUDENT')}
-              className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                selectedRole === 'STUDENT'
-                  ? 'bg-white text-indigo-950 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <GraduationCap className="w-4 h-4" />
-              <span>Student / Applicant</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedRole('TEACHER')}
-              className={`py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                selectedRole === 'TEACHER'
-                  ? 'bg-white text-indigo-950 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <User className="w-4 h-4" />
-              <span>Staff / Educator</span>
-            </button>
-          </div>
-
-          {/* Permissions Unlocked */}
+          {/* Included Ecosystem Integrations */}
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left space-y-2.5 text-xs text-slate-600">
             <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">
-              Included Google Ecosystem Integrations:
+              Superadmin Google Privileges:
             </span>
             <div className="flex items-center gap-2 text-slate-700">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Google Classroom course &amp; syllabus auto-synchronization</span>
+              <span>Direct access to the Superadmin Control Center</span>
             </div>
             <div className="flex items-center gap-2 text-slate-700">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Google Calendar 1-click Open Day &amp; advising session sync</span>
+              <span>Google Classroom course &amp; syllabus synchronization</span>
             </div>
             <div className="flex items-center gap-2 text-slate-700">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Auto-generated permanent student credential ({selectedRole === 'STUDENT' ? 'STU-2026-XXXXX' : 'STAFF-2026-XXXXX'})</span>
+              <span>Google Calendar event scheduling &amp; booking management</span>
             </div>
           </div>
 
@@ -304,7 +283,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
           <button
             onClick={handleGoogleSignIn}
             disabled={isLoading}
-            className="w-full py-3.5 px-6 bg-white hover:bg-slate-50 border-2 border-slate-200 text-slate-800 hover:border-slate-300 font-bold rounded-2xl text-sm transition-all shadow-sm flex items-center justify-center gap-3 active:scale-98 disabled:opacity-50 cursor-pointer"
+            className="w-full py-4 px-6 bg-white hover:bg-slate-50 border-2 border-slate-300 hover:border-slate-400 text-slate-800 font-bold rounded-2xl text-sm transition-all shadow-sm flex items-center justify-center gap-3 active:scale-98 disabled:opacity-50 cursor-pointer"
           >
             {/* Google SVG Logo */}
             <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -325,11 +304,11 @@ export const SignInView: React.FC<SignInViewProps> = ({
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span>{isLoading ? 'Connecting Google Account...' : 'Continue with Google'}</span>
+            <span>{isLoading ? 'Connecting with Google...' : 'Sign In with Google'}</span>
           </button>
 
           <p className="text-[11px] text-slate-400">
-            By signing in, you agree to the university's privacy framework and Google OAuth data handling policies.
+            Centralized Google Authentication — Seamless Superadmin Access
           </p>
         </div>
       )}
