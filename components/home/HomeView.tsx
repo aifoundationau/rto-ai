@@ -20,7 +20,8 @@ import {
   Calendar,
   X,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Award
 } from 'lucide-react';
 import { CourseProgram, COURSES_DATA } from '@/data/courses';
 import { UnitDetail, UNITS_DATA } from '@/data/units';
@@ -248,8 +249,58 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </div>
       </section>
 
+      {/* 2. STATS & CAPABILITIES STRIP */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div
+          onClick={() => onNavigateTab('courses')}
+          className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+        >
+          <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mb-3 group-hover:scale-105 transition-transform">
+            <GraduationCap className="w-5 h-5" />
+          </div>
+          <div className="text-2xl font-black text-slate-900 tracking-tight">14 Programs</div>
+          <div className="text-xs font-bold text-slate-700 mt-0.5">Accredited Degrees</div>
+          <div className="text-[11px] text-slate-400 mt-1">Undergraduate & Master's</div>
+        </div>
 
-      {/* 2. BLOCK 1: FEATURED UNIVERSITY DEGREES */}
+        <div
+          onClick={() => onNavigateTab('units')}
+          className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+        >
+          <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-3 group-hover:scale-105 transition-transform">
+            <BookOpen className="w-5 h-5" />
+          </div>
+          <div className="text-2xl font-black text-slate-900 tracking-tight">120+ Units</div>
+          <div className="text-xs font-bold text-slate-700 mt-0.5">Curriculum Syllabuses</div>
+          <div className="text-[11px] text-slate-400 mt-1">12-week lecture & lab plans</div>
+        </div>
+
+        <div
+          onClick={() => onNavigateTab('events')}
+          className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+        >
+          <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mb-3 group-hover:scale-105 transition-transform">
+            <Award className="w-5 h-5" />
+          </div>
+          <div className="text-2xl font-black text-slate-900 tracking-tight">96% Rate</div>
+          <div className="text-xs font-bold text-slate-700 mt-0.5">Graduate Employment</div>
+          <div className="text-[11px] text-slate-400 mt-1">Top 3 national ranking</div>
+        </div>
+
+        <div
+          onClick={() => onNavigateTab('chat')}
+          className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+        >
+          <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 mb-3 group-hover:scale-105 transition-transform">
+            <Bot className="w-5 h-5" />
+          </div>
+          <div className="text-2xl font-black text-slate-900 tracking-tight">24/7 Agent</div>
+          <div className="text-xs font-bold text-slate-700 mt-0.5">Autonomous Advisor</div>
+          <div className="text-[11px] text-slate-400 mt-1">Gemini 3.1 & GCP sync</div>
+        </div>
+      </section>
+
+      {/* 3. BLOCK 1: FEATURED UNIVERSITY DEGREES */}
       <section className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-slate-200 pb-4 gap-4">
           <div>

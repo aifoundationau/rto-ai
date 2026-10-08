@@ -81,6 +81,11 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
       const credential = GoogleAuthProvider.credentialFromResult(result);
       const accessToken = credential?.accessToken;
 
+      if (accessToken && typeof window !== 'undefined') {
+        sessionStorage.setItem('google_oauth_access_token', accessToken);
+        console.log('[Auth] Google OAuth Token saved for Classroom & Gmail');
+      }
+
       const user: ClassroomUser = {
         name: result.user.displayName || 'Unknown User',
         email: result.user.email || '',
@@ -88,12 +93,7 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
         avatarUrl: result.user.photoURL || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80',
         googleWorkspaceId: result.user.uid,
         scopesGranted: scopes,
-        // In a real app we might pass accessToken back to the parent to use with Google APIs
       };
-      
-      // To expose the token we can store it temporarily on the user object if needed,
-      // but for this UI to match existing interface we just populate ClassroomUser.
-      // (Optional) user.accessToken = accessToken;
 
       setActiveSession(user);
       onLoginSuccess(user);
@@ -129,6 +129,9 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
 
   const handleSignOut = async () => {
     try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('google_oauth_access_token');
+      }
       const email = activeSession?.email;
       const { auth } = await import('@/lib/firebase/client');
       const { signOut } = await import('firebase/auth');

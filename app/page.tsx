@@ -11,6 +11,7 @@ import { EventsCalendarView } from '@/components/events/EventsCalendarView';
 import { AdminDashboardView } from '@/components/admin/AdminDashboardView';
 import { AdminLoginModal } from '@/components/admin/AdminLoginModal';
 import { GoogleClassroomLoginModal, ClassroomUser } from '@/components/auth/GoogleClassroomLoginModal';
+import { SignInView } from '@/components/auth/SignInView';
 import { ApiKeyModal } from '@/components/ApiKeyModal';
 import { ChatMessage } from '@/lib/agent/engine';
 import { StudentApplication, INITIAL_APPLICATION_STATE } from '@/data/applications';
@@ -257,13 +258,13 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       {/* Top Banner Notice */}
-      <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-900 text-white text-xs py-2 px-4 text-center border-b border-indigo-950/50 flex items-center justify-center gap-2">
+      <div className="bg-[#0f172a] text-slate-200 text-xs py-2 px-4 text-center border-b border-slate-800/80 flex items-center justify-center gap-2">
         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="font-semibold text-indigo-200">2026 Admissions Open:</span>
+        <span className="font-semibold text-slate-200">2026 Admissions Open:</span>
         <span className="text-slate-300">Semester 1 Intake Applications & Open Day Registrations are now active.</span>
         <button
           onClick={() => setActiveTab('events')}
-          className="ml-2 text-indigo-300 hover:text-white font-bold underline transition-colors"
+          className="ml-2 text-indigo-400 hover:text-white font-bold underline transition-colors"
         >
           View Events & Calendar &rarr;
         </button>
@@ -338,6 +339,23 @@ export default function HomePage() {
             apiKey={apiKey}
             onSaveApiKey={handleSaveApiKey}
             onLogout={handleLogoutAdmin}
+          />
+        )}
+
+        {activeTab === 'signin' && (
+          <SignInView
+            currentUser={classroomUser}
+            onLoginSuccess={(user) => {
+              setClassroomUser(user);
+              setIsAdminLoggedIn(true);
+              setActiveTab('home');
+            }}
+            onLogout={() => {
+              setClassroomUser(null);
+              setIsAdminLoggedIn(false);
+              setActiveTab('home');
+            }}
+            onNavigateTab={setActiveTab}
           />
         )}
       </main>

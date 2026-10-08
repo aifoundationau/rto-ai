@@ -7,7 +7,7 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, multiFactor, TotpSecret, TotpMultiFactorGenerator, EmailAuthProvider, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore/lite';
+import { getFirestore } from 'firebase/firestore';
 
 // Initialize Firebase App using environment variables with config fallback.
 const firebaseConfig = {
@@ -19,9 +19,16 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:614773274800:web:bcfa9d363de884cf9ea375"
 };
 
+export const DATABASE_CODE = process.env.NEXT_PUBLIC_DATABASE_CODE || 'rto-ai';
+export const APP_ID = 'rto-ai';
+
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+const clientDatabaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID;
+export const db = clientDatabaseId && clientDatabaseId !== '(default)'
+  ? getFirestore(app, clientDatabaseId)
+  : getFirestore(app);
 
 /**
  * Enroll the signed‑in user in TOTP MFA using Google Authenticator.

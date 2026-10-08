@@ -92,9 +92,17 @@ function getAdminApp() {
   }
 }
 
+export const DATABASE_CODE = process.env.DATABASE_CODE || process.env.NEXT_PUBLIC_DATABASE_CODE || 'rto-ai';
+export const APP_ID = 'rto-ai';
+
 const adminApp = getAdminApp();
 const auth = getAuth(adminApp);
-const db = getFirestore(adminApp);
+
+const configuredDatabaseId = process.env.FIRESTORE_DATABASE_ID;
+const db = (configuredDatabaseId && configuredDatabaseId !== '(default)') 
+  ? getFirestore(adminApp, configuredDatabaseId) 
+  : getFirestore(adminApp);
+
 try {
   db.settings({ ignoreUndefinedProperties: true });
 } catch (e) {
@@ -233,6 +241,8 @@ export async function assignUniversityRole(params: {
   // 2. Prepare Firestore user profile data
   const userProfileData: Record<string, any> = {
     uid,
+    databaseCode: DATABASE_CODE,
+    systemId: DATABASE_CODE,
     email: userEmail,
     displayName: displayName,
     role,
@@ -280,6 +290,8 @@ export async function recordActivity(event: {
   userId?: string;
   userEmail?: string;
   userRole?: string;
+  databaseCode?: string;
+  systemId?: string;
   metadata?: Record<string, any>;
   timestamp?: string;
   userAgent?: string;
@@ -288,6 +300,8 @@ export async function recordActivity(event: {
   try {
     const eventTime = event.timestamp ? new Date(event.timestamp) : new Date();
     const docData = cleanUndefined({
+      databaseCode: event.databaseCode || DATABASE_CODE,
+      systemId: event.systemId || DATABASE_CODE,
       ...event,
       timestamp: eventTime.toISOString(),
       createdAt: FieldValue.serverTimestamp(),
@@ -326,6 +340,8 @@ export async function saveApplicationToFirestore(appData: any) {
     const docRef = db.collection('applications').doc(appData.id);
     await docRef.set(
       {
+        databaseCode: DATABASE_CODE,
+        systemId: DATABASE_CODE,
         ...appData,
         savedToFirestoreAt: FieldValue.serverTimestamp(),
       },
@@ -386,6 +402,8 @@ export async function saveChatInteraction(interaction: {
 }) {
   try {
     const docRef = await db.collection('chat_interactions').add({
+      databaseCode: DATABASE_CODE,
+      systemId: DATABASE_CODE,
       ...interaction,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -422,6 +440,8 @@ export async function saveTokenTransaction(tx: {
 }) {
   try {
     const docRef = await db.collection('token_transactions').add({
+      databaseCode: DATABASE_CODE,
+      systemId: DATABASE_CODE,
       ...tx,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -451,6 +471,8 @@ export async function saveTokenTransaction(tx: {
 export async function saveEventBooking(booking: any) {
   try {
     const docRef = await db.collection('event_bookings').add({
+      databaseCode: DATABASE_CODE,
+      systemId: DATABASE_CODE,
       ...booking,
       createdAt: FieldValue.serverTimestamp(),
     });
@@ -503,4 +525,4 @@ export async function getRecentActivityLogs(limitCount = 40) {
   }
 }
 
-export { auth, db, FieldValue };
+export { auth, db };

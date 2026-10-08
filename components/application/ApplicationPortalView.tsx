@@ -128,7 +128,7 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
     ) || COURSES_DATA[0];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-800">
         <div>

@@ -11,6 +11,8 @@ export interface ActivityEvent {
   userId?: string;
   userEmail?: string;
   userRole?: string;
+  databaseCode?: string;
+  systemId?: string;
   metadata?: Record<string, any>;
   timestamp?: string;
   userAgent?: string;
@@ -23,6 +25,8 @@ export interface ActivityEvent {
 export async function trackClientEvent(event: Omit<ActivityEvent, 'timestamp'>): Promise<void> {
   try {
     const payload: ActivityEvent = {
+      databaseCode: 'rto-ai',
+      systemId: 'rto-ai',
       ...event,
       timestamp: new Date().toISOString(),
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,

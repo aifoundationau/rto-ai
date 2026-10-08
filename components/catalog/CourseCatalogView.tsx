@@ -75,7 +75,7 @@ export const CourseCatalogView: React.FC<CourseCatalogViewProps> = ({
   });
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl">
         <div className="flex items-center gap-2 mb-2">
