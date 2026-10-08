@@ -84,7 +84,7 @@ export default function HomePage() {
           if (!isMounted) return;
           if (firebaseUser) {
             const superadminUser: ClassroomUser = {
-              name: firebaseUser.displayName || 'Superadmin User',
+              name: firebaseUser.displayName || 'Admin User',
               email: firebaseUser.email || '',
               role: 'SUPERADMIN',
               avatarUrl: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
@@ -154,7 +154,7 @@ export default function HomePage() {
       }
 
       const superadminUser: ClassroomUser = {
-        name: result.user.displayName || 'Superadmin User',
+        name: result.user.displayName || 'Admin User',
         email: result.user.email || '',
         role: 'SUPERADMIN',
         avatarUrl: result.user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
@@ -441,11 +441,28 @@ export default function HomePage() {
         )}
 
         {activeTab === 'admin' && (
-          <AdminDashboardView
-            apiKey={apiKey}
-            onSaveApiKey={handleSaveApiKey}
-            onLogout={handleLogoutAdmin}
-          />
+          (classroomUser || isAdminLoggedIn) ? (
+            <AdminDashboardView
+              apiKey={apiKey}
+              onSaveApiKey={handleSaveApiKey}
+              onLogout={handleLogoutAdmin}
+            />
+          ) : (
+            <SignInView
+              currentUser={classroomUser}
+              onLoginSuccess={(user) => {
+                setClassroomUser(user);
+                setIsAdminLoggedIn(true);
+                try {
+                  localStorage.setItem('edupulse_user', JSON.stringify(user));
+                  localStorage.setItem('edupulse_is_admin', 'true');
+                } catch (e) {}
+                setActiveTab('admin');
+              }}
+              onLogout={handleLogoutAdmin}
+              onNavigateTab={setActiveTab}
+            />
+          )
         )}
 
         {activeTab === 'signin' && (

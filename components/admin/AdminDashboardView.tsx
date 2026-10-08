@@ -285,29 +285,33 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   return (
     <div className="w-full space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-3 py-1 bg-amber-500/30 text-amber-300 rounded-full text-xs font-semibold uppercase tracking-wider border border-amber-400/20">
-              Superadmin Control Center
-            </span>
-            <span className="px-3 py-1 bg-indigo-500/30 text-indigo-300 rounded-full text-xs font-semibold">
-              Executive Level Access
-            </span>
-            <span className="px-3 py-1 bg-emerald-500/30 text-emerald-300 rounded-full text-xs font-semibold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Google Authenticated
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Superadmin & Operations Panel
-          </h1>
-          <p className="text-sm text-slate-300 mt-1">
-            Executive control over LMS Course Builder, admissions telemetry, 24/7 Google Sheets synchronization, and student identifiers.
-          </p>
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-4">
+        {/* Top Single Line Badges */}
+        <div className="flex flex-row flex-nowrap items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+          <span className="whitespace-nowrap px-3 py-1 bg-amber-500/30 text-amber-300 rounded-full text-xs font-semibold uppercase tracking-wider border border-amber-400/20 shrink-0">
+            Superadmin Control Center
+          </span>
+          <span className="whitespace-nowrap px-3 py-1 bg-indigo-500/30 text-indigo-300 rounded-full text-xs font-semibold shrink-0">
+            Executive Level Access
+          </span>
+          <span className="whitespace-nowrap px-3 py-1 bg-emerald-500/30 text-emerald-300 rounded-full text-xs font-semibold flex items-center gap-1.5 shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Google Authenticated
+          </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 bg-white/10 p-1.5 rounded-2xl">
+        {/* Title and Controls Row */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Admin & Operations Panel
+            </h1>
+            <p className="text-sm text-slate-300 mt-1">
+              Executive control over LMS Course Builder, admissions telemetry, 24/7 Google Sheets synchronization, and student identifiers.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 bg-white/10 p-1.5 rounded-2xl">
           <button
             onClick={() => setActiveTab('course_builder')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
@@ -446,6 +450,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           )}
         </div>
       </div>
+    </div>
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

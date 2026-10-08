@@ -137,12 +137,12 @@ export const SignInView: React.FC<SignInViewProps> = ({
           </span>
         </div>
         <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-          {currentUser ? 'Superadmin Account Active' : 'Sign In with Google'}
+          {currentUser ? 'Admin Account Active' : 'Sign In with Google'}
         </h1>
         <p className="text-sm text-slate-300 mt-2 max-w-2xl leading-relaxed">
           {currentUser
-            ? 'Your Google account is verified with full Superadmin privileges across EduPulse AI.'
-            : 'Authenticate securely using your Google account to access all systems and the Superadmin Panel.'}
+            ? 'Your Google account is verified with full Admin privileges across EduPulse AI.'
+            : 'Authenticate securely using your Google account to access all systems and the Admin Panel.'}
         </p>
       </div>
 
@@ -166,7 +166,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
                 <p className="text-xs font-mono text-slate-500 mt-0.5">{currentUser.email}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="px-2.5 py-0.5 bg-indigo-600 text-white text-[11px] font-black rounded-lg uppercase tracking-wide">
-                    SUPERADMIN
+                    ADMIN
                   </span>
                   <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[11px] font-semibold rounded-lg flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -182,7 +182,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-2 shadow-md shadow-indigo-200 cursor-pointer"
               >
                 <ShieldCheck className="w-4 h-4" />
-                <span>Go to Superadmin Panel</span>
+                <span>Go to Admin Panel</span>
               </button>
               <button
                 onClick={handleSignOut}
@@ -203,10 +203,10 @@ export const SignInView: React.FC<SignInViewProps> = ({
               <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
                 <Layers className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-slate-900 text-sm">Superadmin Panel</h3>
+              <h3 className="font-bold text-slate-900 text-sm">Admin Panel</h3>
               <p className="text-xs text-slate-500 mt-1">Full control over courses, telemetry, sheets sync, and staff tools.</p>
               <span className="text-xs font-bold text-indigo-600 flex items-center gap-1 mt-3">
-                Open Superadmin Panel &rarr;
+                Open Admin Panel &rarr;
               </span>
             </div>
 
@@ -249,7 +249,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
           <div>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900">Sign In with Google</h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-              All accounts authenticate through Google and receive instant Superadmin panel access.
+              All accounts authenticate through Google and receive instant Admin panel access.
             </p>
           </div>
 
@@ -263,11 +263,11 @@ export const SignInView: React.FC<SignInViewProps> = ({
           {/* Included Ecosystem Integrations */}
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left space-y-2.5 text-xs text-slate-600">
             <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">
-              Superadmin Google Privileges:
+              Admin Google Privileges:
             </span>
             <div className="flex items-center gap-2 text-slate-700">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Direct access to the Superadmin Control Center</span>
+              <span>Direct access to the Admin Control Center</span>
             </div>
             <div className="flex items-center gap-2 text-slate-700">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -308,7 +308,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
           </button>
 
           <p className="text-[11px] text-slate-400">
-            Centralized Google Authentication — Seamless Superadmin Access
+            Centralized Google Authentication — Seamless Admin Access
           </p>
         </div>
       )}

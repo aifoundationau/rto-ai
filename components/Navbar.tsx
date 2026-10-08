@@ -6,10 +6,7 @@ import {
   GraduationCap,
   FileText,
   Calendar,
-  Shield,
-  Settings,
-  Sparkles,
-  LogIn
+  Sparkles
 } from 'lucide-react';
 
 export type NavTab = 'home' | 'courses' | 'units' | 'application' | 'events' | 'chat' | 'admin' | 'signin';
@@ -36,7 +33,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'application' as NavTab, label: 'Application Form', icon: FileText },
     { id: 'events' as NavTab, label: 'Events & Calendar', icon: Calendar },
     { id: 'chat' as NavTab, label: 'AI Assistant', icon: Bot },
-    ...(currentUser ? [{ id: 'admin' as NavTab, label: 'Superadmin Panel', icon: Shield }] : []),
   ];
 
   return (
@@ -72,8 +68,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 key={item.id}
                 onClick={() => onSelectTab(item.id)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${isActive
-                    ? 'bg-white text-indigo-950 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                  ? 'bg-white text-indigo-950 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
                   }`}
               >
                 <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
@@ -88,15 +84,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           {currentUser ? (
             <button
               onClick={() => onSelectTab('admin')}
-              className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200/80 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer"
-              title="Open Superadmin Panel"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer border ${activeTab === 'admin'
+                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm ring-2 ring-indigo-500/20'
+                  : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200/80'
+                }`}
+              title="Open Admin Panel"
             >
-              <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-5 h-5 rounded-full object-cover ring-1 ring-indigo-500/30" />
+              <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-5 h-5 rounded-full object-cover ring-1 ring-white/50" />
               <span className="hidden sm:inline text-[11px] truncate max-w-[120px]">
                 {currentUser.name}
               </span>
-              <span className="px-1.5 py-0.5 bg-indigo-600 text-white text-[9px] font-black rounded-md uppercase tracking-wider">
-                Superadmin
+              <span className={`px-1.5 py-0.5 text-[9px] font-black rounded-md uppercase tracking-wider ${activeTab === 'admin' ? 'bg-white/20 text-white' : 'bg-indigo-600 text-white'
+                }`}>
+                Admin
               </span>
             </button>
           ) : (
@@ -129,8 +129,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 key={item.id}
                 onClick={() => onSelectTab(item.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${isActive
-                    ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                    : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
                   }`}
               >
                 <Icon className="w-3.5 h-3.5" />
