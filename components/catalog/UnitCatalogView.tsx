@@ -14,15 +14,52 @@ export const UnitCatalogView: React.FC<UnitCatalogViewProps> = ({ onAskAgentAbou
   const [selectedUnitCode, setSelectedUnitCode] = useState<string | null>(UNITS_DATA[0].code);
 
   useEffect(() => {
-    fetch('/api/sheets/sync')
+    // 1. Fetch live published units from Course Builder
+    fetch('/api/course-builder')
       .then((res) => res.json())
       .then((data) => {
         if (data.units && data.units.length > 0) {
-          setUnits(data.units);
-          if (!data.units.some((u: UnitDetail) => u.code === selectedUnitCode)) {
-            setSelectedUnitCode(data.units[0].code);
+          const publishedUnits = data.units.filter((u: any) => u.status === 'published');
+          if (publishedUnits.length > 0) {
+            const mappedUnits: UnitDetail[] = publishedUnits.map((u: any) => ({
+              code: u.code,
+              title: u.title,
+              creditPoints: u.creditWeight || 6,
+              faculty: 'Faculty of Engineering & Computer Science',
+              level: u.code.includes('5') ? 'Postgraduate' : 'Undergraduate',
+              semester: ['Semester 1', 'Semester 2'],
+              deliveryMode: u.deliveryMode || 'Hybrid',
+              overview: u.overview || 'Accredited syllabus.',
+              learningOutcomes: u.outcomes ? u.outcomes.map((o: any) => o.statement) : [],
+              assessments: u.assessments ? u.assessments.map((a: any) => ({
+                title: a.title,
+                type: a.type,
+                weight: `${a.weight}%`,
+                dueWeek: `Week ${a.dueDateWeek || 10}`
+              })) : [],
+              topics: u.modules ? u.modules.map((m: any) => ({
+                week: m.order,
+                title: m.title,
+                readings: `${m.studyHours || 8} Hours Estimated Study`
+              })) : [],
+              prerequisites: u.prerequisites || [],
+              coordinator: u.coordinator ? `${u.coordinator.name} (${u.coordinator.email})` : 'Academic Faculty Team'
+            }));
+            setUnits(mappedUnits);
+            if (!mappedUnits.some((u) => u.code === selectedUnitCode)) {
+              setSelectedUnitCode(mappedUnits[0].code);
+            }
+            return;
           }
         }
+        return fetch('/api/sheets/sync').then((r) => r.json()).then((d) => {
+          if (d.units && d.units.length > 0) {
+            setUnits(d.units);
+            if (!d.units.some((u: UnitDetail) => u.code === selectedUnitCode)) {
+              setSelectedUnitCode(d.units[0].code);
+            }
+          }
+        });
       })
       .catch((err) => console.log('Using default units catalog:', err));
   }, []);

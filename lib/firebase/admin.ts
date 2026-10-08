@@ -503,4 +503,4 @@ export async function getRecentActivityLogs(limitCount = 40) {
   }
 }
 
-export { auth, db };
+export { auth, db, FieldValue };

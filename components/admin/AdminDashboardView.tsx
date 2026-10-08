@@ -34,7 +34,8 @@ import {
   Image as ImageIcon,
   Coins,
   Activity,
-  MessageSquare
+  MessageSquare,
+  GraduationCap
 } from 'lucide-react';
 
 import { ImageManager } from './ImageManager';
@@ -44,6 +45,7 @@ import { TokenManager } from './TokenManager';
 import { FirebaseTelemetryView } from './FirebaseTelemetryView';
 import { StaffMessagingView } from './StaffMessagingView';
 import { AdminCalendarManager } from './AdminCalendarManager';
+import { CourseBuilderView } from './CourseBuilderView';
 
 interface AdminDashboardViewProps {
   apiKey?: string;
@@ -58,7 +60,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 }) => {
   const [applications, setApplications] = useState<StudentApplication[]>([]);
   const [selectedApp, setSelectedApp] = useState<StudentApplication | null>(null);
-  const [activeTab, setActiveTab] = useState<'api_key' | 'telemetry' | 'staff_messaging' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens' | 'calendar'>('telemetry');
+  const [activeTab, setActiveTab] = useState<'course_builder' | 'api_key' | 'telemetry' | 'staff_messaging' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens' | 'calendar'>('course_builder');
   const [apiKeys, setApiKeys] = useState({
     gemini: apiKey || '',
     firebase: '',
@@ -303,6 +305,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
         <div className="flex flex-wrap items-center gap-1.5 bg-white/10 p-1.5 rounded-2xl">
           <button
+            onClick={() => setActiveTab('course_builder')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeTab === 'course_builder' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <GraduationCap className="w-4 h-4 text-indigo-300" />
+            <span>Course Builder</span>
+            <span className="px-1.5 py-0.2 bg-emerald-500 text-white text-[9px] font-extrabold rounded-full">LMS</span>
+          </button>
+          <button
             onClick={() => setActiveTab('api_key')}
             className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeTab === 'api_key' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
@@ -476,6 +488,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Tab: Course Builder (LMS & Website) */}
+      {activeTab === 'course_builder' && (
+        <CourseBuilderView apiKey={apiKeys.gemini} />
+      )}
 
       {/* Tab: API Configuration */}
       {activeTab === 'api_key' && (

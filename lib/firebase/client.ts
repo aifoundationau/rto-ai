@@ -7,7 +7,7 @@
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, multiFactor, TotpSecret, TotpMultiFactorGenerator, EmailAuthProvider, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore/lite';
 
 // Initialize Firebase App using environment variables with config fallback.
 const firebaseConfig = {

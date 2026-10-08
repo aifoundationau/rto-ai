@@ -1,0 +1,68 @@
+# Project Overview
+Act as a Principal Full-Stack Cloud Architect and Firebase Specialist. I need you to design the complete backend architecture, Cloud Firestore data model, and admin panel specifications for a globally agnostic, multi-tenant "Course Builder".
+
+# Context & Constraints
+- **Primary Database:** Google Cloud Firestore (Firebase).
+- **Backend Environment:** Firebase Cloud Functions (v2), Firebase Authentication, Firebase Security Rules, and Cloud Storage.
+- **Target Audience:** Educational institutions globally (K-12, Vocational, Higher Education, Corporate).
+- **Compliance:** Must support varied global accreditation frameworks dynamically (e.g., Australian TEQSA/AQF, European EQF/Bologna Process, US Regional Accreditation/Carnegie units, UK QAA/CATS).
+- **NoSQL Considerations:** Must follow Firestore best practices—avoiding deeply nested subcollections where root querying is needed, managing document size limits (under 1MB), structuring collections for read/write efficiency, and denormalizing data strategically for rapid UI rendering.
+
+# 1. Taxonomy & Global Configuration (The Rules Engine)
+The system must allow each tenant/institution to define localized rules and naming conventions without database re-architecting:
+
+- **Frameworks & Levels:** Configurable standards (e.g., Name: "EQF", Levels: 1–8) or toggleable for unaccredited/K-12 paths.
+- **Credit Systems:** Measurement rules (e.g., Name: "ECTS", "Carnegie Units", "EFTSL", "Credit Points").
+- **Terminology Mapping:** Key-value store defining structural labels (e.g., AU: Program -> Unit -> Module; US: Program -> Course -> Week). UI components must consume these dynamically.
+- **Outcome Chain Definition:** Multi-tiered outcome hierarchy configs (e.g., Institutional Attributes -> Program Outcomes -> Unit Outcomes).
+
+# 2. Firestore Data Model Design (The "What")
+Design a complete Firestore collection and subcollection architecture. Clearly distinguish between **Root Collections** (for cross-tenant or global queries) and **Subcollections** (for strict parent-child tenancy). 
+
+Detail document structures (JSON/TypeScript interfaces) for:
+
+## A. `/tenants/{tenantId}/config`
+- Taxonomy settings, custom labels, enabled framework IDs, and credit unit definitions.
+
+## B. `/programs/{programId}`
+- Metadata: Program Code, Title, Tenant ID, Framework Level (reference), Total Volume/Credits.
+- Program Learning Outcomes (PLOs / CLOs): Stored as a subcollection `/programs/{programId}/outcomes/{outcomeId}`.
+- Structural Rules: Required core credits, elective caps, prerequisite logic.
+- Status: `draft` | `in_review` | `approved` | `published` with semantic versioning (`v1.0`, `v1.1`).
+
+## C. `/units/{unitId}` (Subjects / Courses)
+- Metadata: Unit Code, Title, Program Reference, Delivery Mode, Credit Weight.
+- Prerequisites & Co-requisites: Array of referenced `unitId`s.
+- Unit Learning Outcomes (ULOs): Subcollection `/units/{unitId}/outcomes/{outcomeId}`.
+- **Outcome Mapping Junction:** Document array or subcollection mapping ULO IDs to parent Program Outcome IDs.
+
+## D. Assessments (`/units/{unitId}/assessments/{assessmentId}`)
+- Title, Assessment Type (Summative, Formative, Capstone).
+- Weighting: Numeric percentage (must strictly validate to 100% per unit).
+- Assessment-to-Outcome Mapping: Array of evaluated `outcomeId`s to maintain accreditation compliance.
+
+## E. Modules / Content (`/units/{unitId}/modules/{moduleId}`)
+- Ordering index, title, estimated study hours.
+- Content Blocks: Array or subcollection supporting Rich Text, Video, SCORM packages (stored via Cloud Storage), and LTI items.
+
+# 3. Admin Panel UI & Frontend Architecture (The "How")
+Provide the frontend integration specifications (React/Vue/Svelte):
+
+- **Dynamic Label Provider:** Context/State layer that hydrates UI components with tenant terminology (e.g., replacing "Add Unit" with "Add Course" dynamically).
+- **Conditional Field Hiding:** Automatic suppression of Credit Points, EFTSL/Carnegie units, and compliance matrices when a course is flagged as K-12 or Non-Accredited.
+- **Visual Curriculum Canvas:** Drag-and-drop hierarchy builder that updates Firestore via batched writes.
+- **Compliance Matrix Grid:** A UI matrix mapping Assessments -> Unit Outcomes -> Program Outcomes, highlighting any "Orphaned Outcomes" (unassessed outcomes or unmapped unit outcomes).
+- **Real-Time Collaboration & Versioning:** Utilizing Firestore onSnapshot listeners with optimistic UI updates.
+
+# 4. Backend Logic & Security Specifications
+- **Firebase Cloud Functions (Callable / Triggers):**
+  - Validation Trigger: An `onDocumentWritten` trigger or HTTPS callable that enforces total assessment weight = 100% before allowing status change to `published`.
+  - Orphan Detection: A function that traverses the outcome graph and reports broken or unassessed outcomes.
+  - Course Snapshot/Versioning: A callable function to clone/version an approved course into an immutable published state to safeguard active student enrollments.
+- **Firestore Security Rules:** Production-ready `firestore.rules` snippet enforcing multi-tenant isolation, role-based access (Admin, Instructional Designer, Reviewer), and publication status locks (preventing writes to `published` courses).
+
+# 5. Required Deliverables
+1. **TypeScript Interfaces & Firestore Hierarchy:** Full type definitions for every document and subcollection layout.
+2. **Cloud Firestore Rules:** Robust security rule definitions covering tenant boundaries and status locks.
+3. **Cloud Functions Code:** Production-grade TypeScript implementation for assessment weighting validation (100%) and orphan outcome detection.
+4. **Dynamic Context Component Tree:** Architecture diagram/tree for how the frontend consumes the Firestore taxonomy snapshot and dynamically alters form labels.

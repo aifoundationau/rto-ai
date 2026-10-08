@@ -136,7 +136,7 @@ export const AdminCalendarManager: React.FC = () => {
           {/* Embedded Google Calendar */}
           <div className="mt-6 rounded-2xl overflow-hidden border border-emerald-200 bg-white shadow-sm h-[500px]">
             <iframe 
-              src={`https://calendar.google.com/calendar/embed?src=${encodeURIComponent(calendarUser.email)}&ctz=UTC&showTitle=0&showPrint=0&showTabs=1&showCalendars=1`}
+              src={`https://calendar.google.com/calendar/embed?src=${encodeURIComponent(calendarUser.email)}&ctz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}&showTitle=0&showPrint=0&showTabs=1&showCalendars=1`}
               style={{ border: 0 }} 
               width="100%" 
               height="100%" 

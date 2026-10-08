@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
+    // Core Identity Helpers
     function isSignedIn() {
       return request.auth != null;
     }
@@ -12,23 +12,96 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
     
-    function isAdmin() {
+    function isSuperAdmin() {
       return isSignedIn() && (
-        request.auth.token.role == 'SUPERADMIN' || 
-        request.auth.token.role == 'REGISTRAR' || 
-        request.auth.token.role == 'ACADEMIC_STAFF' ||
-        'admin' in request.auth.token.roles ||
-        request.auth.token.role == 'ADMIN'
+        request.auth.token.role == 'SUPERADMIN' ||
+        request.auth.token.role == 'ADMIN' ||
+        'SUPERADMIN' in request.auth.token.roles ||
+        'admin' in request.auth.token.roles
       );
     }
 
-    // Check if the studentNumber field is being modified or written
+    function isAdmin() {
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        request.auth.token.role == 'REGISTRAR' || 
+        request.auth.token.role == 'ACADEMIC_STAFF'
+      );
+    }
+
+    function isCourseStaff() {
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        request.auth.token.role == 'ACADEMIC_STAFF' ||
+        request.auth.token.role == 'INSTRUCTIONAL_DESIGNER' ||
+        request.auth.token.role == 'REGISTRAR'
+      );
+    }
+
+    // Check if the studentNumber field is being modified
     function isModifyingStudentNumber() {
       return 'studentNumber' in request.resource.data && 
         (!resource.data.keys().hasAll(['studentNumber']) || request.resource.data.studentNumber != resource.data.studentNumber);
     }
 
-    // Counter document access - Restricted to Admin/Server only
+    // ==========================================
+    // Course Builder & Multi-Tenant Rules
+    // ==========================================
+
+    // Tenant Configuration (/tenants/{tenantId})
+    match /tenants/{tenantId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+      
+      match /{document=**} {
+        allow read: if isSignedIn();
+        allow write: if isSuperAdmin();
+      }
+    }
+
+    // Programs & Degrees (/programs/{programId})
+    match /programs/{programId} {
+      // Public / Students can read published programs; staff can view drafts
+      allow read: if (resource.data.status == 'published') || isCourseStaff();
+      allow create: if isCourseStaff();
+      
+      // Status lock: Cannot modify a published program unless Superadmin or creating a new version
+      allow update: if isSuperAdmin() || (
+        isCourseStaff() && 
+        (resource.data.status != 'published' || request.resource.data.status == 'in_review')
+      );
+      allow delete: if isSuperAdmin();
+
+      // Program Outcomes subcollection
+      match /outcomes/{outcomeId} {
+        allow read: if (get(/databases/$(database)/documents/programs/$(programId)).data.status == 'published') || isCourseStaff();
+        allow write: if isCourseStaff();
+      }
+    }
+
+    // Units / Subjects (/units/{unitId})
+    match /units/{unitId} {
+      allow read: if (resource.data.status == 'published') || isCourseStaff();
+      allow create: if isCourseStaff();
+      
+      // Status lock on units
+      allow update: if isSuperAdmin() || (
+        isCourseStaff() && resource.data.status != 'published'
+      );
+      allow delete: if isSuperAdmin();
+
+      // Subcollections: outcomes, assessments, modules
+      match /{subcollection=**}/{docId} {
+        allow read: if (get(/databases/$(database)/documents/units/$(unitId)).data.status == 'published') || isCourseStaff();
+        allow write: if isCourseStaff();
+      }
+    }
+
+    // ==========================================
+    // Student, Admin & Operational Rules
+    // ==========================================
+
+    // Counter document access - Restricted to Admin/Server
     match /counters/{counterId} {
       allow read: if isAdmin();
       allow write: if isAdmin();
@@ -36,34 +109,18 @@ service cloud.firestore {
     
     // Users collection (/users/{uid})
     match /users/{userId} {
-      // Allow students to read their own profile and view their studentNumber
       allow read: if isOwner(userId) || isAdmin();
-      
-      // Allow user creation without studentNumber field (unless admin)
       allow create: if isAdmin() || (isOwner(userId) && !('studentNumber' in request.resource.data));
-      
-      // Explicitly block students or non-admin roles from writing, editing, or modifying studentNumber
-      allow update: if isAdmin() || (
-        isOwner(userId) && !isModifyingStudentNumber()
-      );
-      
-      allow delete: if isAdmin();
+      allow update: if isAdmin() || (isOwner(userId) && !isModifyingStudentNumber());
+      allow delete: if isSuperAdmin();
     }
 
     // Students collection (/students/{uid})
     match /students/{userId} {
-      // Allow students to read their own profile and view their studentNumber
       allow read: if isOwner(userId) || isAdmin();
-      
-      // Allow user creation without studentNumber field (unless admin)
       allow create: if isAdmin() || (isOwner(userId) && !('studentNumber' in request.resource.data));
-      
-      // Explicitly block students or non-admin roles from writing, editing, or modifying studentNumber
-      allow update: if isAdmin() || (
-        isOwner(userId) && !isModifyingStudentNumber()
-      );
-      
-      allow delete: if isAdmin();
+      allow update: if isAdmin() || (isOwner(userId) && !isModifyingStudentNumber());
+      allow delete: if isSuperAdmin();
     }
 
     // Default rule for all other documents

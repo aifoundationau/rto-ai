@@ -18,12 +18,46 @@ export const CourseCatalogView: React.FC<CourseCatalogViewProps> = ({
   const [selectedLevel, setSelectedLevel] = useState<string>('All');
 
   useEffect(() => {
-    fetch('/api/sheets/sync')
+    // 1. Fetch live published accredited programs from Course Builder
+    fetch('/api/course-builder')
       .then((res) => res.json())
       .then((data) => {
-        if (data.courses && data.courses.length > 0) {
-          setCourses(data.courses);
+        if (data.programs && data.programs.length > 0) {
+          const publishedProgs = data.programs.filter((p: any) => p.status === 'published');
+          if (publishedProgs.length > 0) {
+            const mappedCourses: CourseProgram[] = publishedProgs.map((p: any) => ({
+              id: p.id,
+              code: p.code,
+              title: p.title,
+              degreeLevel: p.degreeLevel,
+              faculty: p.faculty,
+              duration: `${p.durationYears} Years Full-time`,
+              totalCreditPoints: p.totalCredits,
+              atarRequirement: p.atarRequirement ? `ATAR ${p.atarRequirement}` : 'Competitive Entry / GPA',
+              annualFeeAud: `$${(p.annualFeeAud || 36000).toLocaleString()} AUD/year`,
+              overview: p.overview,
+              careerOutcomes: p.careerOutcomes || ['AI Engineer', 'Software Developer'],
+              majors: [{ name: 'Core Specialization', description: 'Accredited Curriculum' }],
+              coreUnits: p.unitIds || [],
+              electivesSample: [],
+              admissionRequirements: [
+                p.atarRequirement ? `Minimum ATAR: ${p.atarRequirement}` : 'Recognized previous qualification',
+                'English language proficiency'
+              ],
+              intakes: ['February (Semester 1)', 'July (Semester 2)']
+            }));
+            setCourses(mappedCourses);
+            return;
+          }
         }
+        // Fallback to sheets sync or default data
+        return fetch('/api/sheets/sync')
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.courses && d.courses.length > 0) {
+              setCourses(d.courses);
+            }
+          });
       })
       .catch((err) => console.log('Using default course catalog:', err));
   }, []);
