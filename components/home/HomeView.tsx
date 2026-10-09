@@ -60,7 +60,7 @@ const BLOG_POSTS: BlogPost[] = [
     tag: "Admissions & ATAR",
     date: "Sep 24, 2026",
     title: "How to Apply for 2026 Early Offer Schemes & Scholarships",
-    image: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=600&q=80",
+    image: "/images/early-offer-scholarships-2026.jpg",
     snippet: "Everything prospective Year 12 applicants need to know about early admissions, ATAR adjustments, and merit-based grants.",
     content: "Applications for 2026 Early Entry and Vice-Chancellor Scholarships are officially open. High school students can submit predicted year 11/12 results through our direct EduPulse application portal to lock in conditional offers before final exams. Financial aid packages including equity grants and STEM leadership awards up to $10,000 per year are available."
   },
