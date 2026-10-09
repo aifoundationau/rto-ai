@@ -1,0 +1,1704 @@
+================================================================================
+EDUPULSE AI / RTO-AI PLATFORM: COMPREHENSIVE FRONTEND DATA ENTRY AUDIT CATALOG
+================================================================================
+Generated: 2026-10-09
+Project: d:\Agy\rto-ai
+System Identifier / Discriminator: databaseCode = "rto-ai"
+Primary Storage Engine: Google Cloud Firestore (ai-foundation-firebase)
+Payment Gateway Engine: Stripe Invoicing & Payments API (AUD Parity)
+Downstream Targets: University SIS, Admissions CRM, Google Classroom, Google Calendar
+
+SCHEMA DEFINITIONS PER FIELD:
+1. Field Name & UI Label
+2. Technical State Key / Form Attribute
+3. Data Category
+4. Input Type
+5. Validation Rules & Requirements
+6. Operational Description
+7. Destination Mapping:
+   - Primary Database Table & Column
+   - Stripe Mapping
+   - Downstream App Usage
+
+================================================================================
+SECTION 1: STUDENT ADMISSIONS & INTAKE WIZARD
+Component: components/application/ApplicationPortalView.tsx
+Target Collection: /applications/{id}
+================================================================================
+
+--------------------------------------------------------------------------------
+STEP 1: PERSONAL & CONTACT INFORMATION
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Full Legal Name
+2. Technical State Key: fullName
+3. Data Category: Personal Identity
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string; trimmed; recommended 2-100 characters.
+6. Operational Description: Captures applicant's full legal name as shown on national passport or official photo ID for student identity verification, admissions correspondence, and academic transcripts.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.fullName (Firestore: /applications/{id}.fullName)
+   - Stripe Mapping: Stripe Customer Object (`name`) upon student fee or tuition invoicing; PaymentIntent metadata: `metadata.student_name`.
+   - Downstream App Usage: Transmitted to university Student Information System (SIS) core identity ledger; formatted into admissions offer letters and student campus ID badges.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Email Address
+2. Technical State Key: email
+3. Data Category: Contact Details
+4. Input Type: email
+5. Validation Rules & Requirements: Required; standard email regex (RFC 5322); converted to lower-case.
+6. Operational Description: Primary contact email for student onboarding, admissions status updates, conditional offers, portal authentication, and financial receipts.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.email (Firestore: /applications/{id}.email)
+   - Stripe Mapping: Stripe Customer Object (`email`) and `receipt_email` on Invoice / PaymentIntent.
+   - Downstream App Usage: Primary key for CRM communications (SendGrid/Mailgun); triggers automated admissions notifications and invitation links to Google Classroom.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Phone Number
+2. Technical State Key: phone
+3. Data Category: Contact Details
+4. Input Type: tel
+5. Validation Rules & Requirements: Required; national or E.164 international format (e.g. +61 400 000 000); digits, spaces, and leading plus sign allowed.
+6. Operational Description: Captures student direct mobile telephone number for SMS urgent admissions alerts, orientation interview coordination, and two-factor authentication recovery.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.phone (Firestore: /applications/{id}.phone)
+   - Stripe Mapping: Stripe Customer Object (`phone`).
+   - Downstream App Usage: Downstream SMS notification gateway (Twilio); urgent escalation by Admissions Officers during intake clearance.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Date of Birth
+2. Technical State Key: dateOfBirth
+3. Data Category: Personal Identity
+4. Input Type: date
+5. Validation Rules & Requirements: Required; ISO 8601 date format (YYYY-MM-DD); must indicate age 15 or older at commencement.
+6. Operational Description: Verifies student age compliance, legal adulthood status for domestic and international student guardianship obligations under higher education standards.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.dateOfBirth (Firestore: /applications/{id}.dateOfBirth)
+   - Stripe Mapping: Do Not Send to Stripe (Excluded from payment gateway for privacy/compliance).
+   - Downstream App Usage: SIS age demographic auditing, CRICOS compliance validation for minor welfare monitoring.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Citizenship Status
+2. Technical State Key: citizenship
+3. Data Category: Compliance/Consents & Legal Identity
+4. Input Type: select
+5. Validation Rules & Requirements: Required; predefined enumeration: ['Australian Citizen', 'Australian Permanent Resident', 'New Zealand Citizen', 'International (Student Visa Required)'].
+6. Operational Description: Determines student fee classification (Commonwealth Supported Place / domestic vs. full-fee paying international student), visa requirements, and CRICOS reporting.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.citizenship (Firestore: /applications/{id}.citizenship)
+   - Stripe Mapping: Invoice metadata: `metadata.citizenship_status` for tax classification (GST exemption eligibility on accredited tuition).
+   - Downstream App Usage: Financial billing engine (HECS-HELP vs upfront invoicing); government TCSI (Tertiary Collection of Student Information) reporting.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Country of Residence
+2. Technical State Key: countryOfResidence
+3. Data Category: Residential Address & Legal Identity
+4. Input Type: text
+5. Validation Rules & Requirements: Required; string; standard country name or ISO 3166-1 alpha-2 code.
+5. Operational Description: Captures current country where applicant physically resides prior to commencement to evaluate time zones, overseas health cover (OSHC), and visa processing lead times.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.countryOfResidence (Firestore: /applications/{id}.countryOfResidence)
+   - Stripe Mapping: Customer Object (`address.country`).
+   - Downstream App Usage: International admissions team triage, regional advisor routing in Staff Intercom.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Residential Street Address & Suburb
+2. Technical State Key: address
+3. Data Category: Residential Address
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string; minimum 5 characters; street number, street name, suburb/city, postcode.
+6. Operational Description: Captures physical residential address for formal offer documents, residency verification, and postal mailings.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.address (Firestore: /applications/{id}.address)
+   - Stripe Mapping: Customer Object (`address.line1`, `address.city`, `address.postal_code`).
+   - Downstream App Usage: Student records database, emergency locator compliance.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Application Document ID (System Hidden)
+2. Technical State Key: id
+3. Data Category: Service Intake & Record Identification
+4. Input Type: hidden / system-generated
+5. Validation Rules & Requirements: Required; immutable string prefixed with `APP-` and epoch timestamp (e.g. `APP-1728441600000`).
+6. Operational Description: Serves as unique primary key for the student application lifecycle across draft, review, and enrolled states.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.id (Firestore document key `/applications/{id}`)
+   - Stripe Mapping: Stripe Invoice / PaymentIntent metadata: `metadata.application_id`.
+   - Downstream App Usage: Primary correlation identifier across webhook listeners, admissions staff messages, and audit trail logs.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Database Discriminator Code (System Invariant)
+2. Technical State Key: databaseCode
+3. Data Category: Compliance/Consents & Multi-Tenant Partitioning
+4. Input Type: hidden / system-enforced
+5. Validation Rules & Requirements: Required; literal string constant `"rto-ai"`.
+6. Operational Description: Mandated multi-tenant isolation key to guarantee Firestore queries and downstream listeners partition data strictly to the RTO-AI tenant environment.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.databaseCode (Firestore: /applications/{id}.databaseCode)
+   - Stripe Mapping: Stripe metadata: `metadata.database_code = "rto-ai"`.
+   - Downstream App Usage: Cloud Function triggers, data warehouse ELT filters in BigQuery.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Application Creation Timestamp (System Hidden)
+2. Technical State Key: createdAt
+3. Data Category: Audit & Compliance Timestamps
+4. Input Type: hidden / system-generated
+5. Validation Rules & Requirements: Required; ISO 8601 UTC timestamp string (e.g. `2026-10-09T01:30:00.000Z`).
+6. Operational Description: Records exact date and time the student initiated or saved their intake application for admissions round deadlines and intake cutoff enforcement.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.createdAt (Firestore: /applications/{id}.createdAt)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Admissions SLA monitoring, intake round cutoff validation.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Application Modification Timestamp (System Hidden)
+2. Technical State Key: updatedAt
+3. Data Category: Audit & Compliance Timestamps
+4. Input Type: hidden / system-generated
+5. Validation Rules & Requirements: Required; ISO 8601 UTC timestamp string.
+6. Operational Description: Tracks latest modification timestamp across draft saves and admin decision updates.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.updatedAt (Firestore: /applications/{id}.updatedAt)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Concurrency conflict resolution, audit logs.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Application Review Status
+2. Technical State Key: status
+3. Data Category: Service Intake & Workflow State
+4. Input Type: hidden / controlled select by admissions officer
+5. Validation Rules & Requirements: Required; enumeration: ['Draft', 'Submitted', 'Under Review', 'Requires Additional Documents', 'Accepted', 'Conditional Offer', 'Unconditional Offer', 'Rejected']. Default on user submit: 'Submitted'.
+6. Operational Description: Tracks the state machine progress of the intake application from initial student submission to final registrar offer issuance.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.status (Firestore: /applications/{id}.status)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Triggers automated notification templates (acceptance emails, requests for supplementary docs).
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Issued University Student Number (System Generated / Registrar Controlled)
+2. Technical State Key: studentNumber
+3. Data Category: Personal Identity & University Accreditation
+4. Input Type: hidden / read-only system badge
+5. Validation Rules & Requirements: Optional on initial draft; mandatory upon offer acceptance. Format: `STU-YYYY-XXXXX` (e.g. `STU-2026-88190`).
+6. Operational Description: Unique permanent university student identification number assigned atomically upon student role assignment or offer confirmation.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.studentNumber and users.studentNumber
+   - Stripe Mapping: Customer Object (`metadata.student_number`), Invoice (`metadata.student_number`).
+   - Downstream App Usage: Primary student identifier in Google Classroom roster sync, library systems, LMS grading, and graduation parchment issuance.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Academic Department / Faculty Allocation
+2. Technical State Key: department
+3. Data Category: Service Intake & Academic Routing
+4. Input Type: hidden / derived from course choice
+5. Validation Rules & Requirements: Optional/Derived; string (e.g. "School of Computer Science & Engineering").
+6. Operational Description: Allocates student application to the correct academic faculty dean and registrar sub-committee.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.department (Firestore: /applications/{id}.department)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Routing in Staff Intercom channel `#urgent-student-cases` and faculty quota tracking.
+
+--------------------------------------------------------------------------------
+STEP 2: ACADEMIC BACKGROUND & PRIOR QUALIFICATIONS
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Highest Level of Completed Education
+2. Technical State Key: highestEducation
+3. Data Category: Academic Background
+4. Input Type: select
+5. Validation Rules & Requirements: Required; enumeration: ['High School / Year 12', 'Diploma / Advanced Diploma', "Bachelor's Degree", "Master's Degree", 'Doctorate / PhD', 'Other Recognised Qualification'].
+6. Operational Description: Identifies prerequisite qualification tier to evaluate whether applicant meets minimum Australian Qualifications Framework (AQF) entry standards.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.highestEducation (Firestore: /applications/{id}.highestEducation)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: SIS academic qualification repository; automated prerequisite validator for postgraduate courses.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Previous Secondary School or University Institution Name
+2. Technical State Key: institutionName
+3. Data Category: Academic Background
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string; maximum 150 characters.
+6. Operational Description: Captures name of previous secondary school or tertiary institution for academic credential verification and transcript cross-referencing.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.institutionName (Firestore: /applications/{id}.institutionName)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Credit transfer / Recognition of Prior Learning (RPL) assessment in admissions workflow.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Year of Graduation
+2. Technical State Key: graduationYear
+3. Data Category: Academic Background
+4. Input Type: number / text
+5. Validation Rules & Requirements: Required; 4-digit year format (YYYY); range 1970 - 2026.
+6. Operational Description: Validates currency of prior studies, recency of STEM qualifications, and eligibility for recent high school leaver early offer schemes.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.graduationYear (Firestore: /applications/{id}.graduationYear)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: High school early-entry scheme verification.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Cumulative ATAR or GPA Score
+2. Technical State Key: atarOrGpa
+3. Data Category: Academic Background
+4. Input Type: text / number
+5. Validation Rules & Requirements: Required; numeric or decimal string (e.g. ATAR 85.50 or GPA 6.2); range checked (ATAR 0.00-99.95, GPA 0.0-7.0 or 0.0-4.0).
+6. Operational Description: Primary quantitative academic merit metric used by admissions algorithm and faculty leads to calculate cutoffs and adjustment factors.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.atarOrGpa (Firestore: /applications/{id}.atarOrGpa)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Automated ranking algorithm for admissions offers, merit-based scholarship shortlisting.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: English Language Proficiency Test & Score
+2. Technical State Key: englishProficiencyTest
+3. Data Category: Academic Background & Visa Compliance
+4. Input Type: text
+5. Validation Rules & Requirements: Optional for domestic students educated in English; required for international applicants; freeform text (e.g. "IELTS 7.5 Overall (no band below 7.0)" or "PTE Academic 68").
+6. Operational Description: Captures certified English language test provider and component scores to confirm compliance with university admissions and Department of Home Affairs student visa requirements.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.englishProficiencyTest (Firestore: /applications/{id}.englishProficiencyTest)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: International Visa & CoE generation in Staff Intercom `#international-visa`.
+
+--------------------------------------------------------------------------------
+STEP 3: DEGREE & COURSE PREFERENCES
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: First Choice Course / Degree Code
+2. Technical State Key: firstChoiceCourseId
+3. Data Category: Service Intake & Program Selection
+4. Input Type: select
+5. Validation Rules & Requirements: Required; valid course identifier matching published degree catalog (e.g. `CS100`, `AI700`, `SWE200`, `DS300`, `CYB400`).
+6. Operational Description: Identifies the primary university degree program the student is applying to enrol in.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.firstChoiceCourseId (Firestore: /applications/{id}.firstChoiceCourseId)
+   - Stripe Mapping: Invoice `metadata.course_code` and line item product code.
+   - Downstream App Usage: Course Builder allocation, Google Classroom course cohort assignment, faculty quota monitoring.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: First Choice Degree Name
+2. Technical State Key: firstChoiceCourseName
+3. Data Category: Service Intake & Program Selection
+4. Input Type: text (auto-populated from course selection)
+5. Validation Rules & Requirements: Required; non-empty string matching catalog program title (e.g. "Bachelor of Computer Science (Artificial Intelligence)").
+6. Operational Description: Stores the human-readable degree program title on the application document for offer letter generation and PDF contracts.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.firstChoiceCourseName (Firestore: /applications/{id}.firstChoiceCourseName)
+   - Stripe Mapping: Invoice line item `description`.
+   - Downstream App Usage: Displayed on student portal dashboard and email confirmations.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Major or Academic Specialization
+2. Technical State Key: majorOrSpecialization
+3. Data Category: Service Intake & Program Selection
+4. Input Type: select / text
+5. Validation Rules & Requirements: Required; matches approved faculty specializations for the selected degree (e.g. "Artificial Intelligence & Autonomous Systems", "Cybersecurity", "Cloud Architecture").
+6. Operational Description: Defines student academic sub-discipline to configure appropriate core and elective unit syllabi pathways.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.majorOrSpecialization (Firestore: /applications/{id}.majorOrSpecialization)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Automatic population of first-year unit enrolment checklist in Course Builder.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Intake Semester
+2. Technical State Key: intakeSemester
+3. Data Category: Service Intake & Scheduling
+4. Input Type: select
+5. Validation Rules & Requirements: Required; enumeration: ['Semester 1 (February Intake)', 'Semester 2 (July Intake)', 'Summer Intensive'].
+6. Operational Description: Specifies academic term when student plans to commence studies to schedule orientation and tuition invoicing.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.intakeSemester (Firestore: /applications/{id}.intakeSemester)
+   - Stripe Mapping: Invoice metadata: `metadata.intake_semester`.
+   - Downstream App Usage: Class scheduling, orientation event booking calendar integration.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Study Mode Preference
+2. Technical State Key: studyMode
+3. Data Category: Service Intake & Campus Logistics
+4. Input Type: select / radio
+5. Validation Rules & Requirements: Required; enumeration: ['On-Campus Full-time', 'Online Distance / Hybrid', 'Part-time Flexible'].
+6. Operational Description: Indicates whether student requires physical campus classroom seat allocation, lab access, or pure remote access via Google Classroom.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.studyMode (Firestore: /applications/{id}.studyMode)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Physical campus facilities and building access permissions.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Commencing Academic Year
+2. Technical State Key: commencingYear
+3. Data Category: Service Intake & Scheduling
+4. Input Type: number / select
+5. Validation Rules & Requirements: Required; 4-digit year; defaults to `2026`.
+6. Operational Description: Establishes academic calendar year cohort for timetable scheduling, census dates, and curriculum versioning.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.commencingYear (Firestore: /applications/{id}.commencingYear)
+   - Stripe Mapping: Invoice metadata: `metadata.academic_year = "2026"`.
+   - Downstream App Usage: Cohort grouping in Google Classroom and SIS academic transcripts.
+
+--------------------------------------------------------------------------------
+STEP 4: STATEMENTS & DOCUMENTS VERIFICATION
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Statement of Purpose / Academic Aspirations
+2. Technical State Key: statementOfPurpose
+3. Data Category: Service Intake & Academic Evaluation
+4. Input Type: textarea
+5. Validation Rules & Requirements: Optional for basic admission, highly recommended for scholarship evaluation; recommended 100 - 1000 words.
+6. Operational Description: Captures student personal essay detailing reasons for course choice, professional career objectives, and academic background.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.statementOfPurpose (Firestore: /applications/{id}.statementOfPurpose)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Evaluated by admissions committee during holistic review for borderline ATAR approvals in Staff Intercom.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Scholarship Consideration Toggle
+2. Technical State Key: scholarshipInterest
+3. Data Category: Service Intake & Financial Aid
+4. Input Type: checkbox / toggle switch
+5. Validation Rules & Requirements: Optional; boolean (true/false).
+6. Operational Description: Indicates whether student wishes to be considered for institutional merit, equity, or STEM leadership scholarship schemes.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.scholarshipInterest (Firestore: /applications/{id}.scholarshipInterest)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Flags record for review by Scholarship Coordinator in Staff Intercom `#scholarship-awards`.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Specific Scholarship Scheme Name
+2. Technical State Key: scholarshipName
+3. Data Category: Service Intake & Financial Aid
+4. Input Type: select / text (conditionally active if scholarshipInterest is true)
+5. Validation Rules & Requirements: Optional; enumeration/string: ['Vice-Chancellor Academic Excellence Scholarship', 'Women in STEM Leadership Grant', 'Regional & Remote Equity Bursary', 'Early Offer STEM Innovation Grant'].
+6. Operational Description: Targets the specific institutional bursary or grant program the student is applying to receive.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.scholarshipName (Firestore: /applications/{id}.scholarshipName)
+   - Stripe Mapping: May trigger Stripe coupon or discount line item on subsequent tuition invoices.
+   - Downstream App Usage: Grants committee review, TokenPulse emergency fund sponsorship allocation.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Academic Transcripts Upload / Verification Checkbox
+2. Technical State Key: hasProvidedTranscripts
+3. Data Category: Compliance/Consents & Document Verification
+4. Input Type: checkbox
+5. Validation Rules & Requirements: Required; boolean; must be true before unconditional offer issuance.
+6. Operational Description: Captures applicant certification that official academic transcripts from high school or previous tertiary study have been submitted or attached.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.hasProvidedTranscripts (Firestore: /applications/{id}.hasProvidedTranscripts)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Checklist item for Admissions Registrar prior to advancing status to 'Accepted'.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Certified Passport or National Photo ID Checkbox
+2. Technical State Key: hasProvidedPassportId
+3. Data Category: Compliance/Consents & Identity Verification
+4. Input Type: checkbox
+5. Validation Rules & Requirements: Required; boolean; must be true before unconditional offer issuance.
+6. Operational Description: Captures applicant confirmation that government-issued photo identification (passport or driver license) has been provided.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.hasProvidedPassportId (Firestore: /applications/{id}.hasProvidedPassportId)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Identity verification check in university registry.
+
+--------------------------------------------------------------------------------
+STEP 5: REVIEW & FINAL LEGAL DECLARATION
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Truthfulness Declaration & Privacy Consent Agreement
+2. Technical State Key: declarationAgreed
+3. Data Category: Compliance/Consents & Legal Agreement
+4. Input Type: checkbox
+5. Validation Rules & Requirements: Strictly Required; boolean (must be explicitly true to submit form).
+6. Operational Description: Captures legally binding applicant consent affirming that all statements and attached qualifications are true and complete, authorizing university to verify credentials with issuing bodies.
+7. Destination Mapping:
+   - Primary Database Table & Column: applications.declarationAgreed (Firestore: /applications/{id}.declarationAgreed)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Audit trail, legal fraud prevention records.
+
+
+================================================================================
+SECTION 2: AUTHENTICATION, SINGLE SIGN-ON (SSO) & ACCESS CONTROL
+Components:
+- components/auth/SignInView.tsx
+- components/auth/GoogleClassroomLoginModal.tsx
+- app/setup-mfa/page.tsx
+- components/admin/AdminLoginModal.tsx
+- components/ApiKeyModal.tsx
+Target Collection: /users/{uid} and browser session state
+================================================================================
+
+--------------------------------------------------------------------------------
+CENTRALIZED GOOGLE OAUTH SSO (components/auth/SignInView.tsx)
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: "Sign in with Google" SSO Action Button
+2. Technical State Key: google_oauth_trigger (Triggers Google OAuth 2.0 popup / redirect flow)
+3. Data Category: Personal Identity & Authentication
+4. Input Type: button / OAuth trigger
+5. Validation Rules & Requirements: Required; requests OAuth scopes:
+   - https://www.googleapis.com/auth/userinfo.email
+   - https://www.googleapis.com/auth/userinfo.profile
+   - https://www.googleapis.com/auth/classroom.courses.readonly
+   - https://www.googleapis.com/auth/classroom.rosters.readonly
+   - https://www.googleapis.com/auth/calendar.events
+   - https://www.googleapis.com/auth/spreadsheets.readonly
+6. Operational Description: Initiates verified Google Federated Identity authentication for students, teachers, and university staff, obtaining OAuth access token for Google API integrations.
+7. Destination Mapping:
+   - Primary Database Table & Column: users.uid, users.email, users.displayName, users.avatarUrl
+   - Stripe Mapping: Customer Object (`email`, `name`).
+   - Downstream App Usage: Token stored in `sessionStorage: google_oauth_access_token` and Firebase Auth Client.
+
+--------------------------------------------------------------------------------
+GOOGLE CLASSROOM LOGIN & ROSTER MODAL (components/auth/GoogleClassroomLoginModal.tsx)
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Classroom Access Role Selector
+2. Technical State Key: role
+3. Data Category: Authentication & Access Control
+4. Input Type: radio / selection tiles
+5. Validation Rules & Requirements: Required; enumeration: ['STUDENT', 'TEACHER']. Default: 'STUDENT'.
+6. Operational Description: Selects whether student portal view or teacher grading view is opened upon Google Classroom OAuth handshake.
+7. Destination Mapping:
+   - Primary Database Table & Column: users.role (Firestore: /users/{uid}.role)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Controls Classroom API permission scopes and telemetry logging.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Institutional Google Workspace Email Address
+2. Technical State Key: customEmail
+3. Data Category: Contact Details & Authentication
+4. Input Type: email
+5. Validation Rules & Requirements: Optional; email format; e.g. student@edupulse.edu.au or faculty@edupulse.edu.au.
+6. Operational Description: Allows student or teacher to specify their assigned institution Google Workspace account prior to opening OAuth popup.
+7. Destination Mapping:
+   - Primary Database Table & Column: users.email (Firestore: /users/{uid}.email)
+   - Stripe Mapping: Customer Object (`email`).
+   - Downstream App Usage: Pre-fills Google OAuth account picker prompt.
+
+--------------------------------------------------------------------------------
+MULTI-FACTOR AUTHENTICATION SETUP & FALLBACK (app/setup-mfa/page.tsx)
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Staff / Student Email
+2. Technical State Key: email
+3. Data Category: Contact Details & Authentication
+4. Input Type: email
+5. Validation Rules & Requirements: Required; standard email regex.
+6. Operational Description: Fallback username for direct password/MFA credential authentication.
+7. Destination Mapping:
+   - Primary Database Table & Column: users.email
+   - Stripe Mapping: Customer Object (`email`).
+   - Downstream App Usage: Firebase Auth Email/Password credential.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Account Password
+2. Technical State Key: password
+3. Data Category: Authentication
+4. Input Type: password
+5. Validation Rules & Requirements: Required; minimum 8 characters.
+6. Operational Description: Secret password for fallback non-SSO authentication.
+7. Destination Mapping:
+   - Primary Database Table & Column: Firebase Auth Credentials (hashed with Argon2/bcrypt; never stored plaintext).
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: User authentication.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: 6-Digit TOTP Multi-Factor Authentication Code
+2. Technical State Key: code
+3. Data Category: Authentication & Security Compliance
+4. Input Type: text
+5. Validation Rules & Requirements: Required; pattern `[0-9]{6}`; exactly 6 digits; length limit 6 characters.
+6. Operational Description: Time-based One-Time Password (TOTP) generated by authenticator apps (Google Authenticator, Microsoft Authenticator) to verify MFA challenge.
+7. Destination Mapping:
+   - Primary Database Table & Column: Validated in-memory via RFC 6238 TOTP library against enrolled secret; users.mfaEnabled set to true.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Grants privileged session cookie for admin and staff portals.
+
+--------------------------------------------------------------------------------
+ADMINISTRATIVE LOGIN MODAL (components/admin/AdminLoginModal.tsx)
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Admin Username / Email
+2. Technical State Key: username
+3. Data Category: Authentication
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string.
+6. Operational Description: Authenticates university registrar, dean, or superadmin into management console.
+7. Destination Mapping:
+   - Primary Database Table & Column: users.email / auth.uid
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Admin RBAC session initialization.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Admin Password
+2. Technical State Key: password
+3. Data Category: Authentication
+4. Input Type: password
+5. Validation Rules & Requirements: Required; masked text.
+6. Operational Description: Secret password for admin console access.
+7. Destination Mapping:
+   - Primary Database Table & Column: Firebase Auth.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Privileged route authorization.
+
+--------------------------------------------------------------------------------
+GEMINI API KEY MODAL (components/ApiKeyModal.tsx)
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Google Gemini API Key
+2. Technical State Key: inputKey / apiKey
+3. Data Category: System Configuration & Security Credentials
+4. Input Type: password
+5. Validation Rules & Requirements: Required for custom Gemini AI execution; string; starts with `AIzaSy...`.
+6. Operational Description: Allows administrators to input their project Google Gemini 3.1 Pro / Flash API key to power autonomous AI agent tool calls.
+7. Destination Mapping:
+   - Primary Database Table & Column: Stored in browser `localStorage: edupulse_api_key`; passed in request header / body to `/api/chat`.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Authenticates requests to Google Generative AI SDK (`@google/genai`).
+
+
+================================================================================
+SECTION 3: ADMISSIONS EVENTS, WEBINARS & GOOGLE CALENDAR
+Components:
+- components/events/EventsCalendarView.tsx
+- components/admin/AdminEventsManager.tsx
+- components/admin/AdminCalendarManager.tsx
+Target Collection: /event_bookings/{id} and /events/{id}
+================================================================================
+
+--------------------------------------------------------------------------------
+PUBLIC EVENTS RSVP MODAL (components/events/EventsCalendarView.tsx)
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Full Name (Attendee)
+2. Technical State Key: studentName
+3. Data Category: Personal Identity
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string.
+6. Operational Description: Captures name of prospective student or attendee registering for an open day, campus tour, or webinar.
+7. Destination Mapping:
+   - Primary Database Table & Column: event_bookings.studentName (Firestore: /event_bookings/{id}.studentName)
+   - Stripe Mapping: Do Not Send to Stripe (Events are free admissions sessions).
+   - Downstream App Usage: Attendee roster generation, name badge printing, personalized confirmation emails.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Email Address (Attendee)
+2. Technical State Key: studentEmail
+3. Data Category: Contact Details
+4. Input Type: email
+5. Validation Rules & Requirements: Required; email format.
+6. Operational Description: Captures attendee email for calendar invite dispatch, Google Meet links, and reminder notifications.
+7. Destination Mapping:
+   - Primary Database Table & Column: event_bookings.studentEmail (Firestore: /event_bookings/{id}.studentEmail)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Dispatches Google Calendar `.ics` file and event reminders via email.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Selected Time Slot ID
+2. Technical State Key: selectedSlotId
+3. Data Category: Service Intake & Scheduling
+4. Input Type: radio / selection chip
+5. Validation Rules & Requirements: Required; string corresponding to available event time slot (e.g. `slot-1`, `slot-2`).
+6. Operational Description: Identifies exact time session the attendee will attend.
+7. Destination Mapping:
+   - Primary Database Table & Column: event_bookings.slotId (Firestore: /event_bookings/{id}.slotId)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Decrements available slot capacity in real-time.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Target Event ID (Hidden)
+2. Technical State Key: eventId
+3. Data Category: Service Intake & Record Identification
+4. Input Type: hidden
+5. Validation Rules & Requirements: Required; valid event identifier (e.g. `ev-1`, `ev-2`).
+6. Operational Description: Correlates booking to parent event entity.
+7. Destination Mapping:
+   - Primary Database Table & Column: event_bookings.eventId (Firestore: /event_bookings/{id}.eventId)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Aggregate attendee count calculation on event record.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Questions or Notes for the Academic Host
+2. Technical State Key: notes / specialRequests
+3. Data Category: Service Intake
+4. Input Type: textarea
+5. Validation Rules & Requirements: Optional; string.
+6. Operational Description: Captures specific degree questions or accessibility accommodations requested by the attendee.
+7. Destination Mapping:
+   - Primary Database Table & Column: event_bookings.notes (Firestore: /event_bookings/{id}.notes)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Provided to faculty host prior to event commencement.
+
+--------------------------------------------------------------------------------
+ADMIN EVENT CREATION & EDIT MODAL (components/admin/AdminEventsManager.tsx)
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Event Title
+2. Technical State Key: title
+3. Data Category: Service Intake & Content Management
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string (e.g. "2026 AI Degree Info Session & Campus Tour").
+6. Operational Description: Defines display title of admissions event.
+7. Destination Mapping:
+   - Primary Database Table & Column: events.title (Firestore: /events/{id}.title)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Public calendar display and Google Calendar event summary.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Event Category
+2. Technical State Key: category
+3. Data Category: Service Intake & Classification
+4. Input Type: select
+5. Validation Rules & Requirements: Required; enumeration: ['Open Day', 'Webinar', 'Campus Tour', 'Workshop', 'Information Session'].
+6. Operational Description: Classifies event for public filtering and marketing tags.
+7. Destination Mapping:
+   - Primary Database Table & Column: events.category (Firestore: /events/{id}.category)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Calendar filtering tabs.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Date & Start Time
+2. Technical State Key: date / time
+3. Data Category: Service Intake & Scheduling
+4. Input Type: datetime-local
+5. Validation Rules & Requirements: Required; ISO 8601 or formatted date string (YYYY-MM-DDTHH:mm).
+6. Operational Description: Sets the scheduled timestamp for event occurrence.
+7. Destination Mapping:
+   - Primary Database Table & Column: events.date and events.time
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Google Calendar event start/end datetime.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Location / Virtual Link
+2. Technical State Key: location
+3. Data Category: Service Intake & Campus Logistics
+4. Input Type: text
+5. Validation Rules & Requirements: Required; string (e.g. "Turing Hall 101 & Google Meet Livestream").
+6. Operational Description: Informs attendees of physical campus room or online video conference URL.
+7. Destination Mapping:
+   - Primary Database Table & Column: events.location (Firestore: /events/{id}.location)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Google Calendar event location attribute.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Faculty Host / Speaker Name
+2. Technical State Key: host
+3. Data Category: Personal Identity & Faculty Attribution
+4. Input Type: text
+5. Validation Rules & Requirements: Required; string (e.g. "Dr. Sarah Lin (Associate Dean)").
+6. Operational Description: Identifies leading academic or admissions officer hosting the session.
+7. Destination Mapping:
+   - Primary Database Table & Column: events.host (Firestore: /events/{id}.host)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Event promotional listing and speaker notes.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Maximum Attendee Capacity
+2. Technical State Key: capacity
+3. Data Category: Service Intake & Quota Management
+4. Input Type: number
+5. Validation Rules & Requirements: Required; integer > 0 (e.g. 50 or 250).
+6. Operational Description: Sets maximum allowable registrations before auto-closing event bookings.
+7. Destination Mapping:
+   - Primary Database Table & Column: events.capacity (Firestore: /events/{id}.capacity)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: RSVP booking throttle limit.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Detailed Event Description
+2. Technical State Key: description
+3. Data Category: Service Intake & Content Management
+4. Input Type: textarea
+5. Validation Rules & Requirements: Required; non-empty string.
+6. Operational Description: Full promotional summary and agenda for the event.
+7. Destination Mapping:
+   - Primary Database Table & Column: events.description (Firestore: /events/{id}.description)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Public calendar description and Google Calendar event description.
+
+
+================================================================================
+SECTION 4: AUTONOMOUS AI ACADEMIC ADVISOR & CHAT INTERFACE
+Components:
+- components/chat/ChatInterface.tsx
+- app/embed/page.tsx
+Target Collection: /chat_interactions/{id}
+================================================================================
+
+1. Field Name & UI Label: Student Chat Message / Inquirer Prompt Bar
+2. Technical State Key: inputText
+3. Data Category: Service Intake & AI Interaction
+4. Input Type: text / textarea
+5. Validation Rules & Requirements: Required; non-empty string; max length 2000 characters.
+6. Operational Description: Direct user prompt querying degree requirements, ATAR eligibility, unit syllabi, tuition fees, scholarships, or application status.
+7. Destination Mapping:
+   - Primary Database Table & Column: chat_interactions.messages (Firestore: /chat_interactions/{id}.messages)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Sent to `/api/chat` to drive Google Gemini 3.1 LLM reasoning and execute tool calling functions.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Voice Speech-to-Text Audio Input (Microphone)
+2. Technical State Key: isListening / transcript
+3. Data Category: Service Intake & Accessibility
+4. Input Type: audio / Web Speech API speech-to-text trigger
+5. Validation Rules & Requirements: Optional; requires browser microphone permission; converts spoken voice to UTF-8 text string.
+6. Operational Description: Allows prospective students to speak inquiries aloud for hands-free or accessible admissions counseling.
+7. Destination Mapping:
+   - Primary Database Table & Column: Converted to text and stored in `inputText` -> chat_interactions.messages.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Real-time transcript populates prompt bar.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Quick Discovery Suggestion Pills
+2. Technical State Key: suggestionText (Pill click action)
+3. Data Category: Service Intake
+4. Input Type: button / suggestion chip
+5. Validation Rules & Requirements: Predefined strings (e.g. "What ATAR is needed for CS100?", "Show 2026 Scholarships", "Check my application status").
+6. Operational Description: One-click inquiry shortcuts guiding students to highest-frequency admission questions.
+7. Destination Mapping:
+   - Primary Database Table & Column: Stored as user prompt in chat_interactions.messages.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Dispatches instant prompt to Gemini API agent.
+
+
+================================================================================
+SECTION 5: ACCREDITED COURSE & CURRICULUM BUILDER
+Component: components/admin/CourseBuilderView.tsx & lib/course-builder/types.ts
+Target Collection: /courses/{id} and /units/{id}
+================================================================================
+
+--------------------------------------------------------------------------------
+PROGRAM METADATA & ACCREDITATION
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Program Title
+2. Technical State Key: program.title
+3. Data Category: Service Intake & Curriculum Accreditation
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string (e.g. "Bachelor of Computer Science (Artificial Intelligence)").
+6. Operational Description: Official degree title as published in the university academic calendar and TEQSA/CRICOS register.
+7. Destination Mapping:
+   - Primary Database Table & Column: courses.title
+   - Stripe Mapping: Invoice line item description.
+   - Downstream App Usage: Degree catalog, student transcripts, graduation parchment.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Program Code
+2. Technical State Key: program.code
+3. Data Category: Service Intake & Academic Classification
+4. Input Type: text
+5. Validation Rules & Requirements: Required; uppercase alphanumeric (e.g. `CS100`, `AI700`).
+6. Operational Description: Unique university identifier for the qualification.
+7. Destination Mapping:
+   - Primary Database Table & Column: courses.code
+   - Stripe Mapping: Invoice line item product code.
+   - Downstream App Usage: SIS course identifier, application preference key.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Degree Level
+2. Technical State Key: program.degreeLevel
+3. Data Category: Academic Classification
+4. Input Type: select
+5. Validation Rules & Requirements: Required; enumeration: ['Undergraduate', 'Postgraduate', 'Doctoral', 'Diploma'].
+6. Operational Description: Categorizes qualification tier according to the Australian Qualifications Framework (AQF Levels 7-10).
+7. Destination Mapping:
+   - Primary Database Table & Column: courses.degreeLevel
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Public catalog filtering and admissions rule routing.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Faculty / Academic School
+2. Technical State Key: program.faculty
+3. Data Category: Academic Governance
+4. Input Type: text / select
+5. Validation Rules & Requirements: Required; string (e.g. "Faculty of Engineering & Computer Science").
+6. Operational Description: Assigns administrative and academic oversight of the degree to a university faculty.
+7. Destination Mapping:
+   - Primary Database Table & Column: courses.faculty
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Faculty reporting, Dean approvals.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Duration in Full-Time Years
+2. Technical State Key: program.durationYears
+3. Data Category: Academic Structure
+4. Input Type: number
+5. Validation Rules & Requirements: Required; numeric (e.g. 3, 4, 1.5, 2).
+6. Operational Description: Establishes standard full-time study duration for student visa validity and course completion benchmarks.
+7. Destination Mapping:
+   - Primary Database Table & Column: courses.durationYears
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Student visa CoE (Confirmation of Enrolment) duration calculation.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Total Credit Points Required
+2. Technical State Key: program.totalCredits
+3. Data Category: Academic Structure
+4. Input Type: number
+5. Validation Rules & Requirements: Required; integer (e.g. 144 for 3-year bachelor, 192 for 4-year honours).
+6. Operational Description: Cumulative credit points needed to satisfy graduation requirements.
+7. Destination Mapping:
+   - Primary Database Table & Column: courses.totalCredits
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Degree audit progress calculations.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Minimum ATAR Requirement
+2. Technical State Key: program.atarRequirement
+3. Data Category: Academic Admissions Standards
+4. Input Type: number / text
+5. Validation Rules & Requirements: Optional for postgrad, required for domestic undergrad; numeric 0.00-99.95 (e.g. 82.50).
+6. Operational Description: Guaranteed or competitive ATAR rank cutoff for high school applicant intake.
+7. Destination Mapping:
+   - Primary Database Table & Column: courses.atarRequirement
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Automated applicant qualification checker in admissions portal and chat agent.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Annual Tuition Fee (AUD)
+2. Technical State Key: program.annualFeeAud
+3. Data Category: Billing & Financial Structure
+4. Input Type: number
+5. Validation Rules & Requirements: Required; numeric currency value > 0 (e.g. 36000.00).
+6. Operational Description: Annual full-fee tuition amount in Australian Dollars.
+7. Destination Mapping:
+   - Primary Database Table & Column: courses.annualFeeAud
+   - Stripe Mapping: Stripe Price Object (`unit_amount` in cents: `3600000`, `currency: 'aud'`).
+   - Downstream App Usage: Automated tuition invoice schedule generation in Stripe Invoicing engine.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Program Overview & Description
+2. Technical State Key: program.overview
+3. Data Category: Content Management
+4. Input Type: textarea
+5. Validation Rules & Requirements: Required; detailed text summary.
+6. Operational Description: Marketing and academic description of the degree program.
+7. Destination Mapping:
+   - Primary Database Table & Column: courses.overview
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Course finder portal, Gemini AI knowledge retrieval.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Program Status
+2. Technical State Key: program.status
+3. Data Category: Publishing & Lifecycle
+4. Input Type: select
+5. Validation Rules & Requirements: Required; enumeration: ['draft', 'published', 'archived'].
+6. Operational Description: Controls whether the program is visible on public website and open for admissions.
+7. Destination Mapping:
+   - Primary Database Table & Column: courses.status
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Public catalog filter.
+
+--------------------------------------------------------------------------------
+UNIT / SUBJECT METADATA & SYLLABUS DEFINITION
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Unit Code
+2. Technical State Key: unit.code
+3. Data Category: Academic Classification
+4. Input Type: text
+5. Validation Rules & Requirements: Required; uppercase alphanumeric (e.g. `COMP1001`, `AI5001`).
+6. Operational Description: Unique subject identifier for a single semester unit.
+7. Destination Mapping:
+   - Primary Database Table & Column: units.code
+   - Stripe Mapping: Line item sku/metadata: `metadata.unit_code`.
+   - Downstream App Usage: Timetables, prerequisites checking, Google Classroom mapping.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Unit Title
+2. Technical State Key: unit.title
+3. Data Category: Curriculum Management
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string (e.g. "Introduction to Computer Science & Python Programming").
+6. Operational Description: Official subject title on course syllabus and transcript.
+7. Destination Mapping:
+   - Primary Database Table & Column: units.title
+   - Stripe Mapping: Line item description.
+   - Downstream App Usage: Unit catalog, LMS syllabus heading.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Credit Point Weight
+2. Technical State Key: unit.creditWeight
+3. Data Category: Academic Structure
+4. Input Type: number
+5. Validation Rules & Requirements: Required; integer; defaults to 6 credit points.
+6. Operational Description: Credit value of unit toward degree total.
+7. Destination Mapping:
+   - Primary Database Table & Column: units.creditWeight
+   - Stripe Mapping: Unit-tier pricing calculation.
+   - Downstream App Usage: Student workload calculation and academic transcripts.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Delivery Mode
+2. Technical State Key: unit.deliveryMode
+3. Data Category: Campus Logistics
+4. Input Type: select
+5. Validation Rules & Requirements: Required; enumeration: ['In-Person', 'Online', 'Hybrid', 'Block Intensive'].
+6. Operational Description: Delivery methodology for lectures and tutorial labs.
+7. Destination Mapping:
+   - Primary Database Table & Column: units.deliveryMode
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Timetabling system, room booking allocator.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Unit Academic Coordinator Name & Email
+2. Technical State Key: unit.coordinator.name and unit.coordinator.email
+3. Data Category: Personal Identity & Contact Details
+4. Input Type: text / email
+5. Validation Rules & Requirements: Required; faculty staff member details.
+6. Operational Description: Identifies primary lecturer and unit coordinator responsible for student consultations.
+7. Destination Mapping:
+   - Primary Database Table & Column: units.coordinator (name, email)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Google Classroom primary teacher invitation (`ownerId`).
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Prerequisite Unit Codes
+2. Technical State Key: unit.prerequisites
+3. Data Category: Academic Rules
+4. Input Type: text (comma-separated or multi-tag input)
+5. Validation Rules & Requirements: Optional; list of valid unit codes (e.g. ["MATH1001", "COMP1001"]).
+6. Operational Description: Required prior units that a student must pass before enrolling in this unit.
+7. Destination Mapping:
+   - Primary Database Table & Column: units.prerequisites
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Enrolment validation engine blocking premature student registration.
+
+--------------------------------------------------------------------------------
+ASSESSMENTS, MODULES & CONTENT BLOCKS
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Assessment Title
+2. Technical State Key: assessment.title
+3. Data Category: Academic Evaluation
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string (e.g. "Midterm Diagnostic Exam", "Lab Project 1").
+6. Operational Description: Name of graded assessment task.
+7. Destination Mapping:
+   - Primary Database Table & Column: units.assessments[].title
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Syncs to Google Classroom coursework assignments.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Assessment Type
+2. Technical State Key: assessment.type
+3. Data Category: Academic Evaluation
+4. Input Type: select
+5. Validation Rules & Requirements: Required; enumeration: ['Assignment', 'Quiz', 'Exam', 'Project', 'Presentation', 'Participation'].
+6. Operational Description: Grading format of the assessment.
+7. Destination Mapping:
+   - Primary Database Table & Column: units.assessments[].type
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Google Classroom workType mapping (`ASSIGNMENT` / `QUIZ`).
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Assessment Weight Percentage
+2. Technical State Key: assessment.weight
+3. Data Category: Academic Evaluation
+4. Input Type: number
+5. Validation Rules & Requirements: Required; integer 1-100; total unit assessments must sum to 100%.
+6. Operational Description: Percentage contribution of assessment toward final unit grade.
+7. Destination Mapping:
+   - Primary Database Table & Column: units.assessments[].weight
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: SIS grading scale.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Assessment Due Week
+2. Technical State Key: assessment.dueDateWeek
+3. Data Category: Scheduling
+4. Input Type: number
+5. Validation Rules & Requirements: Required; integer 1-14 (standard semester teaching weeks).
+6. Operational Description: Establishes academic deadline for student submissions.
+7. Destination Mapping:
+   - Primary Database Table & Column: units.assessments[].dueDateWeek
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Google Classroom dueDate synchronization.
+
+
+================================================================================
+SECTION 6: GOOGLE CLASSROOM LMS & BATCH PIPELINE
+Component: components/admin/GoogleClassroomManager.tsx
+Target Collection: /google_classroom_courses/{id} and Google Classroom API
+================================================================================
+
+--------------------------------------------------------------------------------
+COURSE CREATION & EDIT MODAL
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Classroom Course Name
+2. Technical State Key: courseFormData.name
+3. Data Category: Curriculum Management
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string (e.g. "Advanced Physics 101: Mechanics & Optics").
+6. Operational Description: Name of course as displayed to students on Google Classroom dashboard.
+7. Destination Mapping:
+   - Primary Database Table & Column: Google Classroom API (`courses.name`)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Google Classroom sync.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Course Section / Semester
+2. Technical State Key: courseFormData.section
+3. Data Category: Academic Scheduling
+4. Input Type: text
+5. Validation Rules & Requirements: Required; string (e.g. "Period 2 / Fall 2026").
+6. Operational Description: Section identifier in Google Classroom.
+7. Destination Mapping:
+   - Primary Database Table & Column: Google Classroom API (`courses.section`)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Cohort grouping.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Description Heading / Syllabus Overview
+2. Technical State Key: courseFormData.descriptionHeading
+3. Data Category: Curriculum Content
+4. Input Type: textarea
+5. Validation Rules & Requirements: Optional; string.
+6. Operational Description: Syllabus summary displayed at the top of the Classroom stream.
+7. Destination Mapping:
+   - Primary Database Table & Column: Google Classroom API (`courses.descriptionHeading`)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Classroom stream overview.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Physical Room / Hybrid Delivery URL
+2. Technical State Key: courseFormData.room
+3. Data Category: Campus Logistics
+4. Input Type: text
+5. Validation Rules & Requirements: Optional; string (e.g. "Lab 304 / Online Hybrid").
+6. Operational Description: Physical campus location or meeting link.
+7. Destination Mapping:
+   - Primary Database Table & Column: Google Classroom API (`courses.room`)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Student timetable navigation.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Primary Teacher Email / Google ID
+2. Technical State Key: courseFormData.ownerId
+3. Data Category: Personal Identity & Authentication
+4. Input Type: email
+5. Validation Rules & Requirements: Required; valid Google Workspace email (e.g. "faculty.lead@edupulse.edu").
+6. Operational Description: Designates the primary instructor and owner of the Google Classroom.
+7. Destination Mapping:
+   - Primary Database Table & Column: Google Classroom API (`courses.ownerId`)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Teacher permissions in Google Workspace.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Weekly Topics List (Line-Separated)
+2. Technical State Key: courseFormData.weeklyTopics
+3. Data Category: Curriculum Structure
+4. Input Type: textarea
+5. Validation Rules & Requirements: Optional; one topic per line (e.g. "Week 1: Kinematics\nWeek 2: Newton's Laws").
+6. Operational Description: Automatically provisions topic folders within Google Classroom Classwork tab.
+7. Destination Mapping:
+   - Primary Database Table & Column: Google Classroom API (`courses.topics.create`)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Topic hierarchy in Classroom stream.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Student Emails to Invite (Comma-Separated)
+2. Technical State Key: courseFormData.studentEmails / newStudentEmailInput
+3. Data Category: Contact Details & Roster Enrolment
+4. Input Type: textarea / text
+5. Validation Rules & Requirements: Optional; comma-separated valid student email addresses.
+6. Operational Description: Dispatches direct Google Classroom student roster invitations via API.
+7. Destination Mapping:
+   - Primary Database Table & Column: Google Classroom API (`invitations.create` / `students.create`)
+   - Stripe Mapping: Customer Object (`email`).
+   - Downstream App Usage: Roster management and student notification.
+
+--------------------------------------------------------------------------------
+COURSEWORK ASSIGNMENT / QUIZ CREATOR MODAL
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Assignment Title
+2. Technical State Key: newAssignmentForm.title
+3. Data Category: Academic Evaluation
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string.
+6. Operational Description: Title of coursework task in Google Classroom.
+7. Destination Mapping:
+   - Primary Database Table & Column: Google Classroom API (`courses.courseWork.create` -> `title`)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Assignment submission portal.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Assignment Instructions / Description
+2. Technical State Key: newAssignmentForm.description
+3. Data Category: Academic Evaluation
+4. Input Type: textarea
+5. Validation Rules & Requirements: Optional; string.
+6. Operational Description: Instructions for students on how to complete and submit work.
+7. Destination Mapping:
+   - Primary Database Table & Column: Google Classroom API (`courses.courseWork.create` -> `description`)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Student assignment view.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Work Type
+2. Technical State Key: newAssignmentForm.workType
+3. Data Category: Academic Evaluation
+4. Input Type: select
+5. Validation Rules & Requirements: Required; enumeration: ['ASSIGNMENT', 'QUIZ', 'MATERIAL'].
+6. Operational Description: Distinguishes between graded file submissions, Google Forms quizzes, and passive learning materials.
+7. Destination Mapping:
+   - Primary Database Table & Column: Google Classroom API (`workType`)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Gradebook calculation.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Maximum Points (Max Score)
+2. Technical State Key: newAssignmentForm.maxPoints
+3. Data Category: Academic Evaluation
+4. Input Type: number
+5. Validation Rules & Requirements: Required if ASSIGNMENT or QUIZ; numeric (e.g. 100 or 50).
+6. Operational Description: Denominator for grading rubric in Classroom.
+7. Destination Mapping:
+   - Primary Database Table & Column: Google Classroom API (`maxPoints`)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Gradebook sync.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Submission Due Date
+2. Technical State Key: newAssignmentForm.dueDate
+3. Data Category: Scheduling
+4. Input Type: date
+5. Validation Rules & Requirements: Optional; ISO date (YYYY-MM-DD).
+6. Operational Description: Sets submission deadline on Google Calendar and Classroom to-do list.
+7. Destination Mapping:
+   - Primary Database Table & Column: Google Classroom API (`dueDate`)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Google Calendar student task deadlines.
+
+--------------------------------------------------------------------------------
+GOOGLE SHEETS BATCH PIPELINE & AI COURSE WIZARD
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Google Spreadsheet URL / Sheet ID Input
+2. Technical State Key: sheetInputUrl / sheetInput
+3. Data Category: System Integration & Ingestion
+4. Input Type: text / url
+5. Validation Rules & Requirements: Required; valid Google Sheets URL or 44-character Sheet ID.
+6. Operational Description: Ingests batch course offerings, weekly topics, and student rosters directly from live Google Sheets into Google Classroom and Course Builder.
+7. Destination Mapping:
+   - Primary Database Table & Column: Transformed via `/api/sheets/sync` into Firestore `/courses` and `/units`.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Faculty 24/7 spreadsheet curriculum editing.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: AI Course Builder Prompt Bar
+2. Technical State Key: aiPrompt
+3. Data Category: AI Content Generation
+4. Input Type: textarea
+5. Validation Rules & Requirements: Required; non-empty prompt string.
+6. Operational Description: Instructs Gemini AI to automatically generate full 4-12 week course syllabus, weekly lecture topics, and coursework assignments.
+7. Destination Mapping:
+   - Primary Database Table & Column: Pre-populates Google Classroom creation form.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Rapid curriculum drafting for academic coordinators.
+
+
+================================================================================
+SECTION 7: TOKENPULSE COMMUNITY, EMERGENCY FUND & STRIPE LOTS
+Component: components/admin/TokenManager.tsx
+Target Collection: /tokens/{id} and /token_transactions/{id}
+Parity Invariant: 1 Token = AUD $1.00
+================================================================================
+
+--------------------------------------------------------------------------------
+STORE & LOT PURCHASE CALCULATOR
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Custom Token Lot Amount Calculator
+2. Technical State Key: customTokens
+3. Data Category: Service Intake & Financial Transactions
+4. Input Type: number
+5. Validation Rules & Requirements: Required; integer > 0; defaults to 50 tokens.
+6. Operational Description: Allows donors or students to calculate custom token purchases at 1:1 AUD parity ($1.00/token).
+7. Destination Mapping:
+   - Primary Database Table & Column: token_transactions.tokensAmount
+   - Stripe Mapping: Stripe PaymentIntent / Checkout Session `amount` (in cents: `customTokens * 100`, `currency: 'aud'`).
+   - Downstream App Usage: Credit balance added to user wallet or emergency pool.
+
+--------------------------------------------------------------------------------
+STRIPE CHECKOUT MODAL (components/admin/TokenManager.tsx)
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Token Allocation Target Radio Option
+2. Technical State Key: checkoutAllocation
+3. Data Category: Service Intake & Financial Beneficiary Routing
+4. Input Type: radio
+5. Validation Rules & Requirements: Required; enumeration: ['SELF', 'EMERGENCY_FUND', 'SPECIFIC_BENEFICIARY'].
+6. Operational Description: Dictates whether purchased tokens are credited to donor's private balance, sent to the community Emergency Token Fund, or gifted to an institution.
+7. Destination Mapping:
+   - Primary Database Table & Column: token_transactions.targetAllocation
+   - Stripe Mapping: PaymentIntent metadata: `metadata.allocation_target = checkoutAllocation`.
+   - Downstream App Usage: Automated ledger distribution upon Stripe webhook confirmation (`payment_intent.succeeded`).
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Pre-verified Institutional Beneficiary Dropdown
+2. Technical State Key: checkoutBeneficiary
+3. Data Category: Service Intake & Institutional Aid
+4. Input Type: select
+5. Validation Rules & Requirements: Conditional; required if checkoutAllocation is 'SPECIFIC_BENEFICIARY'; valid beneficiary email or 'CUSTOM'.
+6. Operational Description: Selects verified community shelter or orphanage receiving donated software access tokens.
+7. Destination Mapping:
+   - Primary Database Table & Column: token_transactions.targetAllocation
+   - Stripe Mapping: PaymentIntent metadata: `metadata.beneficiary_email`.
+   - Downstream App Usage: Token ledger transfer to beneficiary account.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Custom Beneficiary Target Email
+2. Technical State Key: customTargetEmail
+3. Data Category: Contact Details & Beneficiary Identification
+4. Input Type: email
+5. Validation Rules & Requirements: Conditional; required if checkoutBeneficiary is 'CUSTOM'; valid email.
+6. Operational Description: Enables direct token gifting to unregistered community organizations; tokens are held in pending escrow until claimed.
+7. Destination Mapping:
+   - Primary Database Table & Column: pendingGifts.targetEmail (Firestore: /pending_gifts/{id})
+   - Stripe Mapping: PaymentIntent metadata: `metadata.target_email`.
+   - Downstream App Usage: Escrow ledger; triggers automated claim email invitation.
+
+--------------------------------------------------------------------------------
+PEER-TO-PEER (P2P) DIRECT ALLOCATION FORM
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: P2P Target Destination
+2. Technical State Key: p2pTarget
+3. Data Category: Service Intake & Financial Routing
+4. Input Type: select
+5. Validation Rules & Requirements: Required; enumeration: ['EMERGENCY_FUND', '<beneficiary_email>', 'CUSTOM'].
+6. Operational Description: Specifies recipient of direct token transfer from existing wallet balance.
+7. Destination Mapping:
+   - Primary Database Table & Column: token_transactions.targetAllocation
+   - Stripe Mapping: Do Not Send to Stripe (Internal token ledger transaction).
+   - Downstream App Usage: Atomic wallet deduction and credit in database.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: P2P Custom Recipient Email
+2. Technical State Key: p2pCustomEmail
+3. Data Category: Contact Details
+4. Input Type: email
+5. Validation Rules & Requirements: Conditional; required if p2pTarget is 'CUSTOM'; valid email.
+6. Operational Description: Designates recipient email for peer transfer.
+7. Destination Mapping:
+   - Primary Database Table & Column: token_transactions.targetAllocation / pendingGifts.targetEmail
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Recipient wallet credit or escrow reservation.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Tokens to Allocate (P2P Amount)
+2. Technical State Key: p2pAmount
+3. Data Category: Financial Transactions
+4. Input Type: number
+5. Validation Rules & Requirements: Required; integer > 0; must not exceed sender's `currentUser.tokenBalance`.
+6. Operational Description: Number of tokens to transfer.
+7. Destination Mapping:
+   - Primary Database Table & Column: token_transactions.tokensAmount
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Balance adjustment.
+
+--------------------------------------------------------------------------------
+SUPER ADMIN GRANT DISBURSEMENT FORM
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Source / Type of Grant
+2. Technical State Key: adminSource
+3. Data Category: Administrative Governance
+4. Input Type: select
+5. Validation Rules & Requirements: Required; enumeration: ['EMERGENCY_POOL', 'SYSTEM_MINT'].
+6. Operational Description: Determines whether grant is funded from public donated Emergency Fund or minted directly by university as institutional sponsorship.
+7. Destination Mapping:
+   - Primary Database Table & Column: token_transactions.action ('GRANT_DISBURSED')
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Public Emergency Fund pool decrement.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Target Institution or User Email
+2. Technical State Key: adminTarget
+3. Data Category: Contact Details & Beneficiary
+4. Input Type: email
+5. Validation Rules & Requirements: Required; valid email address.
+6. Operational Description: Email of institution or student receiving administrative token grant.
+7. Destination Mapping:
+   - Primary Database Table & Column: token_transactions.targetAllocation
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Direct wallet credit.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Grant Token Amount
+2. Technical State Key: adminAmount
+3. Data Category: Financial Transactions
+4. Input Type: number
+5. Validation Rules & Requirements: Required; integer > 0.
+6. Operational Description: Number of tokens disbursed.
+7. Destination Mapping:
+   - Primary Database Table & Column: token_transactions.tokensAmount
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Audit trail and recipient balance update.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Grant Justification / Notes
+2. Technical State Key: adminReason
+3. Data Category: Compliance & Audit Trail
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string (e.g. "Q3 Emergency Grant for Youth Shelter Digital Literacy").
+6. Operational Description: Mandatory audit trail explanation for non-repudiation of institutional token disbarment.
+7. Destination Mapping:
+   - Primary Database Table & Column: token_transactions.reason (Firestore: /audit_logs/{id})
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Published to immutable audit trail.
+
+
+================================================================================
+SECTION 8: STAFF MESSAGING & ADMISSIONS SECURE INTERCOM
+Component: components/admin/StaffMessagingView.tsx
+Target Collection: /staff_messages/{id} and browser localStorage
+================================================================================
+
+1. Field Name & UI Label: Chat Search Filter
+2. Technical State Key: searchTerm
+3. Data Category: Service Intake & Search
+4. Input Type: text
+5. Validation Rules & Requirements: Optional; string.
+6. Operational Description: Filters message stream by staff sender name, content keywords, or tagged student number.
+7. Destination Mapping:
+   - Primary Database Table & Column: Client-side UI state.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Fast message triage.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Message Urgency Priority Selector
+2. Technical State Key: messagePriority
+3. Data Category: Service Intake & Case Triage
+4. Input Type: button / radio group
+5. Validation Rules & Requirements: Required; enumeration: ['normal', 'important', 'urgent']. Default: 'normal'.
+6. Operational Description: Flags admissions case urgency (e.g. ATAR cutoff waiver approval, imminent visa deadline).
+7. Destination Mapping:
+   - Primary Database Table & Column: staff_messages.priority (Firestore: /staff_messages/{id}.priority)
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Visual alert badges and escalation notifications to Dean / Registrar.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Tag Student ID / Application Number
+2. Technical State Key: linkedStudentId
+3. Data Category: Service Intake & Correlation
+4. Input Type: text
+5. Validation Rules & Requirements: Optional; string; formatted as `EP-YYYY-XXXX` or `STU-YYYY-XXXXX`.
+6. Operational Description: Attaches message thread to specific student application record for context.
+7. Destination Mapping:
+   - Primary Database Table & Column: staff_messages.linkedStudentId
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Direct deep-link to student dossier in applications view.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Intercom Message Body
+2. Technical State Key: inputMessage
+3. Data Category: Service Intake & Internal Communications
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string.
+6. Operational Description: Internal staff communication regarding student cases, visa clearance, or quota limits.
+7. Destination Mapping:
+   - Primary Database Table & Column: staff_messages.content
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Stored in Firestore `/staff_messages` and synced across active staff sessions.
+
+
+================================================================================
+SECTION 9: MEDIA & ASSET STORAGE
+Component: components/admin/ImageManager.tsx
+Target Collection: Cloud Storage / public media directory
+================================================================================
+
+1. Field Name & UI Label: Target Media Folder Selector
+2. Technical State Key: activeFolder
+3. Data Category: Content Management & File Categorization
+4. Input Type: button / selection list
+5. Validation Rules & Requirements: Required; enumeration: ['courses', 'dynamicstore', 'events', 'faqs', 'announcements', 'units', 'general'].
+6. Operational Description: Categorizes uploaded visual media into correct server directory.
+7. Destination Mapping:
+   - Primary Database Table & Column: Upload destination path: `/public/images/{activeFolder}/` or GCS bucket folder.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Asset routing.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Image Description (File Slug)
+2. Technical State Key: uploadDescription
+3. Data Category: Content Management
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string; sanitized to alphanumeric (e.g. "earlyofferschemes2026").
+6. Operational Description: Provides human-readable semantic identifier concatenated with date prefix for automatic file renaming.
+7. Destination Mapping:
+   - Primary Database Table & Column: File naming scheme: `YYYYMMDD{cleanDesc}.{ext}`.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Alt text and CDN cache key.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Select Image File
+2. Technical State Key: selectedFile
+3. Data Category: Content Management & Binary Asset
+4. Input Type: file
+5. Validation Rules & Requirements: Required; accept="image/*"; standard image formats (JPEG, PNG, WebP).
+6. Operational Description: Binary image file uploaded for courses, blog posts, or event banners.
+7. Destination Mapping:
+   - Primary Database Table & Column: Multipart upload to `/api/upload` -> static server storage / GCS.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Served across UI cards and headers.
+
+
+================================================================================
+SECTION 10: ADMINISTRATIVE GOVERNANCE, ROLES & GLOBAL SEARCH
+Component: components/admin/AdminDashboardView.tsx & components/catalog/
+Target Collection: /users/{uid} and /telemetry_events/{id}
+================================================================================
+
+--------------------------------------------------------------------------------
+USER ROLE ASSIGNMENT & STUDENT NUMBER GENERATOR (AdminDashboardView.tsx)
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Target User UID
+2. Technical State Key: roleForm.uid
+3. Data Category: Authentication & User Identification
+4. Input Type: text
+5. Validation Rules & Requirements: Required; non-empty string (Firebase Auth UID).
+6. Operational Description: Identifies target user account receiving custom claims and role assignment.
+7. Destination Mapping:
+   - Primary Database Table & Column: users.uid (Firestore: /users/{uid})
+   - Stripe Mapping: Customer Object (`metadata.user_id`).
+   - Downstream App Usage: Firebase Auth Custom Claims set via Admin SDK.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Full Name (User Management)
+2. Technical State Key: roleForm.fullName
+3. Data Category: Personal Identity
+4. Input Type: text
+5. Validation Rules & Requirements: Optional/Recommended; non-empty string.
+6. Operational Description: Human name of user.
+7. Destination Mapping:
+   - Primary Database Table & Column: users.displayName
+   - Stripe Mapping: Customer Object (`name`).
+   - Downstream App Usage: User roster display.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Email Address (User Management)
+2. Technical State Key: roleForm.email
+3. Data Category: Contact Details
+4. Input Type: email
+5. Validation Rules & Requirements: Optional/Recommended; email format.
+6. Operational Description: Contact and login email.
+7. Destination Mapping:
+   - Primary Database Table & Column: users.email
+   - Stripe Mapping: Customer Object (`email`).
+   - Downstream App Usage: Login routing and notifications.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: University Role (Auth Claim)
+2. Technical State Key: roleForm.role
+3. Data Category: Access Control & Authorization
+4. Input Type: select
+5. Validation Rules & Requirements: Required; enumeration: ['STUDENT', 'ACADEMIC_STAFF', 'REGISTRAR', 'SUPERADMIN'].
+6. Operational Description: Sets role-based access control (RBAC). When 'STUDENT' is selected, atomically generates unique `STU-YYYY-XXXXX` student number.
+7. Destination Mapping:
+   - Primary Database Table & Column: users.role and Firebase Auth Custom Claims (`customClaims.role`).
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: UI view permissions and server-side API route guards.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Department / Faculty (User Management)
+2. Technical State Key: roleForm.dept
+3. Data Category: Academic Governance
+4. Input Type: text
+5. Validation Rules & Requirements: Optional; string.
+6. Operational Description: Identifies school or department user belongs to.
+7. Destination Mapping:
+   - Primary Database Table & Column: users.dept
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Departmental directory.
+
+--------------------------------------------------------------------------------
+API KEYS CONFIGURATION PANEL (AdminDashboardView.tsx)
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Google Gemini API Key
+2. Technical State Key: apiKeys.gemini
+3. Data Category: System Configuration
+4. Input Type: text / password
+5. Validation Rules & Requirements: Optional; string starting with `AIzaSy...`.
+6. Operational Description: Configures Gemini model key for admissions chatbot.
+7. Destination Mapping:
+   - Primary Database Table & Column: Browser `localStorage: edupulse_api_key`.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Gemini AI SDK initialization.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Firebase Web API Key
+2. Technical State Key: apiKeys.firebase
+3. Data Category: System Configuration
+4. Input Type: text / password
+5. Validation Rules & Requirements: Optional; string.
+6. Operational Description: Configures client-side Firebase Auth / Firestore SDK connection.
+7. Destination Mapping:
+   - Primary Database Table & Column: Browser `localStorage: firebase_api_key`.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Firebase client app initialization.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Google Classroom API Key / Client Secret
+2. Technical State Key: apiKeys.classroom
+3. Data Category: System Configuration
+4. Input Type: text / password
+5. Validation Rules & Requirements: Optional; string.
+6. Operational Description: Configures OAuth client credentials for Google Classroom sync.
+7. Destination Mapping:
+   - Primary Database Table & Column: Browser `localStorage: classroom_api_key`.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Google Classroom API calls.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Pexels Image API Key
+2. Technical State Key: apiKeys.pexels
+3. Data Category: System Configuration
+4. Input Type: text / password
+5. Validation Rules & Requirements: Optional; string.
+6. Operational Description: Configures automated stock photo search for course thumbnail generation.
+7. Destination Mapping:
+   - Primary Database Table & Column: Browser `localStorage: pexels_api_key`.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Automated image suggestions.
+
+--------------------------------------------------------------------------------
+PUBLIC CATALOG & HOMEPAGE SEARCH BARS
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Hero Degrees & Syllabi Global Search
+2. Technical State Key: searchQuery (components/home/HomeView.tsx)
+3. Data Category: Search & Discovery
+4. Input Type: text
+5. Validation Rules & Requirements: Optional; string.
+6. Operational Description: Global search input on homepage querying degree titles, codes, and unit subjects.
+7. Destination Mapping:
+   - Primary Database Table & Column: In-memory filter; redirects to matching course or unit view.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Direct user navigation.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Degree Program Search Bar
+2. Technical State Key: searchTerm (components/catalog/CourseCatalogView.tsx)
+3. Data Category: Search & Discovery
+4. Input Type: text
+5. Validation Rules & Requirements: Optional; string.
+6. Operational Description: Real-time search filter across accredited degrees and majors.
+7. Destination Mapping:
+   - Primary Database Table & Column: In-memory filter on COURSES_DATA and published Course Builder programs.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Course catalog view rendering.
+
+--------------------------------------------------------------------------------
+
+1. Field Name & UI Label: Unit & Subject Syllabus Search Bar
+2. Technical State Key: searchTerm (components/catalog/UnitCatalogView.tsx)
+3. Data Category: Search & Discovery
+4. Input Type: text
+5. Validation Rules & Requirements: Optional; string.
+6. Operational Description: Real-time search filter across unit codes (COMP, AI, DATA), titles, and weekly topics.
+7. Destination Mapping:
+   - Primary Database Table & Column: In-memory filter on UNITS_DATA and published Course Builder units.
+   - Stripe Mapping: Do Not Send to Stripe.
+   - Downstream App Usage: Syllabus inspection display.
+
+================================================================================
+END OF EDUPULSE AI FRONTEND DATA ENTRY AUDIT CATALOG
+Total Data Entry Points Cataloged: 67 individual input parameters & attributes
+Tenant Invariant Enforced: databaseCode = "rto-ai"
+================================================================================
