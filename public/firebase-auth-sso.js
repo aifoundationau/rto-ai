@@ -16,12 +16,12 @@ import {
 } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js';
 
 export const firebaseConfig = {
-    apiKey: "AIzaSyCPeAOWQj8456TeIWDIPsyxyWT7QLrC8J8",
-    authDomain: "ai-foundation-firebase.firebaseapp.com",
-    projectId: "ai-foundation-firebase",
-    storageBucket: "ai-foundation-firebase.firebasestorage.app",
-    messagingSenderId: "614773274800",
-    appId: "1:614773274800:web:bcfa9d363de884cf9ea375"
+    apiKey: (typeof window !== 'undefined' && window.__FIREBASE_CONFIG__?.apiKey) || "",
+    authDomain: (typeof window !== 'undefined' && window.__FIREBASE_CONFIG__?.authDomain) || "ai-foundation-firebase.firebaseapp.com",
+    projectId: (typeof window !== 'undefined' && window.__FIREBASE_CONFIG__?.projectId) || "ai-foundation-firebase",
+    storageBucket: (typeof window !== 'undefined' && window.__FIREBASE_CONFIG__?.storageBucket) || "ai-foundation-firebase.firebasestorage.app",
+    messagingSenderId: (typeof window !== 'undefined' && window.__FIREBASE_CONFIG__?.messagingSenderId) || "614773274800",
+    appId: (typeof window !== 'undefined' && window.__FIREBASE_CONFIG__?.appId) || "1:614773274800:web:bcfa9d363de884cf9ea375"
 };
 
 export const DATABASE_CODE = 'rto-ai';

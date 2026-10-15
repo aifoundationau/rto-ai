@@ -27,7 +27,7 @@ const getEnv = (key, fallback = '') => {
 };
 
 const firebaseConfig = {
-  apiKey: getEnv('VITE_FIREBASE_API_KEY') || getEnv('NEXT_PUBLIC_FIREBASE_API_KEY') || 'AIzaSyC4T6H4jwgI7GKtJ4ys8qZLcykq_27kUBc',
+  apiKey: getEnv('VITE_FIREBASE_API_KEY') || getEnv('NEXT_PUBLIC_FIREBASE_API_KEY') || '',
   authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN') || getEnv('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN') || 'pro-lms-c44d1.firebaseapp.com',
   projectId: getEnv('VITE_FIREBASE_PROJECT_ID') || getEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID') || 'pro-lms-c44d1',
   storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET') || getEnv('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET') || 'pro-lms-c44d1.firebasestorage.app',
@@ -36,10 +36,14 @@ const firebaseConfig = {
 };
 
 // Support multiple Firebase apps safely if project already initialized another Firebase app
-const existingApp = getApps().find(a => a.name === 'pro-lms' || a.options.projectId === firebaseConfig.projectId);
-const app = existingApp || (getApps().length === 0 ? initializeApp(firebaseConfig) : initializeApp(firebaseConfig, 'pro-lms'));
+const existingApp = getApps().find(a => a.name === 'pro-lms' || (firebaseConfig.projectId && a.options.projectId === firebaseConfig.projectId));
+const app = existingApp || (
+  firebaseConfig.apiKey && firebaseConfig.projectId
+    ? (getApps().length === 0 ? initializeApp(firebaseConfig) : initializeApp(firebaseConfig, 'pro-lms'))
+    : null
+);
 
-export const db = getFirestore(app);
+export const db = app ? getFirestore(app) : null;
 export const CURRENT_SITE_ID = getEnv('VITE_LMS_SITE_ID') || getEnv('NEXT_PUBLIC_LMS_SITE_ID') || 'lms';
 
 // ==========================================
@@ -51,6 +55,10 @@ export const CURRENT_SITE_ID = getEnv('VITE_LMS_SITE_ID') || getEnv('NEXT_PUBLIC
  * Returns both global courses AND courses specific to this siteId.
  */
 export async function getCourses({ includeArchived = false } = {}) {
+  if (!db) {
+    console.warn('[lmsClient] Firebase DB not initialized. Missing API key or configuration.');
+    return [];
+  }
   const col = collection(db, 'lms_courses');
   const snap = await getDocs(col);
   const list = [];
@@ -72,6 +80,7 @@ export async function getCourses({ includeArchived = false } = {}) {
  * Fetch ALL global courses in the network for AI index/cross-reference.
  */
 export async function getAllNetworkCourses() {
+  if (!db) return [];
   const col = collection(db, 'lms_courses');
   const snap = await getDocs(col);
   const list = [];
@@ -90,7 +99,7 @@ export async function getAllNetworkCourses() {
  * Fetch a single course by its document ID.
  */
 export async function getCourseById(courseId) {
-  if (!courseId) return null;
+  if (!db || !courseId) return null;
   const ref = doc(db, 'lms_courses', courseId);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
@@ -101,6 +110,10 @@ export async function getCourseById(courseId) {
  * Save or publish a course into the LMS database.
  */
 export async function saveCourse(courseData) {
+  if (!db) {
+    console.warn('[lmsClient] Cannot save course: Firebase DB is not initialized.');
+    return null;
+  }
   const id = courseData.id || `CRS-${Date.now()}`;
   const ref = doc(db, 'lms_courses', id);
   const payload = {
@@ -124,6 +137,7 @@ export async function saveCourse(courseData) {
  * Note: Sensitive subcollections (lms_students/{studentId}/private/sensitive) are kept locked.
  */
 export async function getStudents({ siteId = CURRENT_SITE_ID } = {}) {
+  if (!db) return [];
   const col = collection(db, 'lms_students');
   const snap = await getDocs(col);
   const list = [];
@@ -142,7 +156,7 @@ export async function getStudents({ siteId = CURRENT_SITE_ID } = {}) {
  * Fetch a student by ID.
  */
 export async function getStudentById(studentId) {
-  if (!studentId) return null;
+  if (!db || !studentId) return null;
   const ref = doc(db, 'lms_students', studentId);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
@@ -153,6 +167,10 @@ export async function getStudentById(studentId) {
  * Save or update a student record.
  */
 export async function saveStudent(studentData) {
+  if (!db) {
+    console.warn('[lmsClient] Cannot save student: Firebase DB is not initialized.');
+    return null;
+  }
   const id = studentData.id || `STU-${Date.now()}`;
   const ref = doc(db, 'lms_students', id);
   const payload = {
@@ -174,6 +192,7 @@ export async function saveStudent(studentData) {
  * Fetch leads for the current site or network.
  */
 export async function getLeads({ siteId = CURRENT_SITE_ID } = {}) {
+  if (!db) return [];
   const col = collection(db, 'lms_leads');
   const snap = await getDocs(col);
   const list = [];
@@ -192,6 +211,10 @@ export async function getLeads({ siteId = CURRENT_SITE_ID } = {}) {
  * Save or record an incoming lead/inquiry.
  */
 export async function saveLead(leadData) {
+  if (!db) {
+    console.warn('[lmsClient] Cannot save lead: Firebase DB is not initialized.');
+    return null;
+  }
   const id = leadData.id || `LEAD-${Date.now()}`;
   const ref = doc(db, 'lms_leads', id);
   const payload = {

@@ -11,7 +11,7 @@ import { getFirestore } from 'firebase/firestore';
 
 // Initialize Firebase App using environment variables with config fallback.
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCPeAOWQj8456TeIWDIPsyxyWT7QLrC8J8",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "ai-foundation-firebase.firebaseapp.com",
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "ai-foundation-firebase",
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "ai-foundation-firebase.firebasestorage.app",
@@ -22,8 +22,9 @@ const firebaseConfig = {
 export const DATABASE_CODE = process.env.NEXT_PUBLIC_DATABASE_CODE || 'rto-ai';
 export const APP_ID = 'rto-ai';
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
+const isConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
+const app = !getApps().length ? (isConfigured ? initializeApp(firebaseConfig) : ({} as any)) : getApp();
+export const auth = isConfigured && app && 'name' in app ? getAuth(app) : ({} as any);
 
 const clientDatabaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID;
 export const db = clientDatabaseId && clientDatabaseId !== '(default)'
