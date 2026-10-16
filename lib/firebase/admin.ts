@@ -239,6 +239,7 @@ export async function assignUniversityRole(params: {
   }
 
   // 2. Prepare Firestore user profile data
+  const isSuper = role.toLowerCase() === 'superadmin' || role === 'SUPERADMIN';
   const userProfileData: Record<string, any> = {
     uid,
     databaseCode: DATABASE_CODE,
@@ -247,6 +248,10 @@ export async function assignUniversityRole(params: {
     displayName: displayName,
     role,
     dept,
+    isSuperAdmin: isSuper,
+    status: role,
+    classification: isSuper ? 'Superadmin' : (role === 'supporter' ? 'Supporter' : role),
+    tags: isSuper ? ['superadmin'] : [role.toLowerCase()],
     updatedAt: FieldValue.serverTimestamp(),
   };
 

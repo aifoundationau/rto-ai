@@ -1,0 +1,1540 @@
+diff --git a/app/api/events/route.ts b/app/api/events/route.ts
+index 459bfe8..cefcede 100644
+--- a/app/api/events/route.ts
++++ b/app/api/events/route.ts
+@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
+     const body = await req.json();
+     const { eventId, studentName, studentEmail, slotId, notes } = body;
+ 
++    if (!studentName?.trim() || !studentEmail?.trim()) {
++      return NextResponse.json({ error: 'Name and email are required' }, { status: 400 });
++    }
++
+     const event = activeEventsState.find(e => e.id === eventId);
+     if (!event) {
+       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+@@ -32,6 +36,9 @@ export async function POST(req: NextRequest) {
+     if (slotId && event.availableSlots) {
+       const slot = event.availableSlots.find(s => s.slotId === slotId);
+       if (slot) {
++        if (slot.isBooked) {
++          return NextResponse.json({ error: 'That time slot has already been booked. Please choose another.' }, { status: 409 });
++        }
+         slot.isBooked = true;
+         startTime = slot.startTime;
+         endTime = slot.endTime;
+@@ -77,6 +84,8 @@ export async function POST(req: NextRequest) {
+       startTime,
+       endTime,
+       googleCalendarUrl,
++      // EventBookingCard (shared with the chat widget) reads `googleCalUrl`
++      googleCalUrl: googleCalendarUrl,
+       icsContent
+     });
+   } catch (error: any) {
+diff --git a/app/api/tokens/route.ts b/app/api/tokens/route.ts
+index 8b16260..d3d0cbf 100644
+--- a/app/api/tokens/route.ts
++++ b/app/api/tokens/route.ts
+@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
+       metadata: metadata || {},
+     });
+ 
++    if (!result.success) {
++      return NextResponse.json({ success: false, error: String(result.error) }, { status: 500 });
++    }
+     return NextResponse.json({ success: true, id: result.id });
+   } catch (error: any) {
+     console.error('Error in /api/tokens POST:', error);
+diff --git a/app/api/upload/route.ts b/app/api/upload/route.ts
+index 4f9befa..af5dc1b 100644
+--- a/app/api/upload/route.ts
++++ b/app/api/upload/route.ts
+@@ -16,13 +16,21 @@ export async function POST(request: Request) {
+       );
+     }
+ 
++    // Only allow simple folder/file names so uploads cannot escape public/images
++    if (!/^[a-z0-9_-]+$/i.test(folder) || !/^[\w-]+\.(jpe?g|png|gif|webp|svg|avif)$/i.test(filename)) {
++      return NextResponse.json(
++        { error: 'Invalid folder or filename. Use letters, numbers, "-" or "_" and an image extension.' },
++        { status: 400 }
++      );
++    }
++
+     // Convert the File object to a Buffer
+     const arrayBuffer = await file.arrayBuffer();
+     const buffer = Buffer.from(arrayBuffer);
+ 
+     // Ensure the target directory exists
+     const publicDir = path.join(process.cwd(), 'public', 'images', folder);
+-    
++
+     try {
+       await fs.access(publicDir);
+     } catch {
+diff --git a/app/embed/page.tsx b/app/embed/page.tsx
+index 434d4c6..4b8ba04 100644
+--- a/app/embed/page.tsx
++++ b/app/embed/page.tsx
+@@ -10,7 +10,8 @@ const INITIAL_WELCOME_MESSAGE: ChatMessage = {
+   id: 'msg-welcome-embed',
+   role: 'assistant',
+   content: `👋 Hello! I am the **EduPulse AI Student Assistant**.\n\nI can help you with:\n• ❓ **University FAQs** (Scholarships, tuition fees, visas, deadlines)\n• 📚 **Degree Programs & Courses** (ATAR/GPA requirements, majors)\n• 🔬 **Individual Unit Syllabuses** (e.g. *COMP1001, COMP2004, DATA3001, AI5001*)\n• 📝 **Starting your student application form**\n• 📅 **Admissions Events & 1-Click Google Calendar RSVPs**\n\nHow can I help you today?`,
+-  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
++  // ChatInterface formats timestamps with new Date(...), so they must be ISO strings
++  timestamp: new Date().toISOString()
+ };
+ 
+ export default function EmbedPage() {
+@@ -20,15 +21,17 @@ export default function EmbedPage() {
+   const [apiKey, setApiKey] = useState<string>('');
+ 
+   const handleSendMessage = async (text: string) => {
++    if (!text.trim()) return;
+     const userMsg: ChatMessage = {
+       id: `msg-${Date.now()}`,
+       role: 'user',
+       content: text,
+-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
++      timestamp: new Date().toISOString()
+     };
+ 
+     const newMessages = [...messages, userMsg];
+     setMessages(newMessages);
++    setIsLoading(true);
+ 
+     try {
+       const res = await fetch('/api/chat', {
+@@ -48,7 +51,7 @@ export default function EmbedPage() {
+         id: `msg-${Date.now() + 1}`,
+         role: 'assistant',
+         content: data.message,
+-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
++        timestamp: new Date().toISOString(),
+         toolsExecuted: data.toolsExecuted,
+         uiWidgets: data.uiWidgets
+       };
+@@ -63,12 +66,24 @@ export default function EmbedPage() {
+         id: `msg-${Date.now() + 1}`,
+         role: 'assistant',
+         content: `I encountered an issue processing your request. Please try again.`,
+-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
++        timestamp: new Date().toISOString()
+       };
+       setMessages((prev) => [...prev, errorMsg]);
++    } finally {
++      setIsLoading(false);
+     }
+   };
+ 
++  // The embed has no portal of its own: hand the draft to the full site (same origin) and open it
++  const handleOpenFullPortal = () => {
++    try {
++      localStorage.setItem('edupulse_active_application', JSON.stringify(application));
++    } catch {
++      // ignore
++    }
++    window.open('/', '_blank', 'noopener');
++  };
++
+   return (
+     <div className="min-h-screen bg-slate-100 flex flex-col p-2 sm:p-4">
+       <div className="flex-1 max-w-2xl w-full mx-auto bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+@@ -86,10 +101,10 @@ export default function EmbedPage() {
+             currentApplication={application}
+             onSendMessage={handleSendMessage}
+             isLoading={isLoading}
+-            onOpenApplicationPortal={() => {}}
+-            onSelectCourse={() => {}}
+-            onSelectUnit={() => {}}
+-            onResetChat={() => {}}
++            onOpenApplicationPortal={handleOpenFullPortal}
++            onSelectCourse={(course: CourseProgram) => handleSendMessage(`I want to apply for ${course.title}`)}
++            onSelectUnit={(unitCode: string) => handleSendMessage(`Show me the unit syllabus, coordinator, prerequisites, and assessment breakdown for ${unitCode}.`)}
++            onResetChat={() => setMessages([INITIAL_WELCOME_MESSAGE])}
+           />
+         </div>
+       </div>
+diff --git a/app/page.tsx b/app/page.tsx
+index 4fbd77b..c9be00a 100644
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ -284,6 +284,16 @@ export default function HomePage() {
+ 
+       if (data.updatedApplication) {
+         handleUpdateApplication(data.updatedApplication);
++
++        // An application submitted through the chat must also reach the admissions
++        // database (the portal's Submit button already does this)
++        if (data.updatedApplication.status === 'Submitted' && application.status !== 'Submitted') {
++          fetch('/api/applications', {
++            method: 'POST',
++            headers: { 'Content-Type': 'application/json' },
++            body: JSON.stringify({ application: data.updatedApplication })
++          }).catch((err) => console.warn('Failed to save chat-submitted application:', err));
++        }
+       }
+     } catch (error) {
+       console.error('Error sending message:', error);
+diff --git a/app/setup-mfa/page.tsx b/app/setup-mfa/page.tsx
+index d0dfe1c..80927d9 100644
+--- a/app/setup-mfa/page.tsx
++++ b/app/setup-mfa/page.tsx
+@@ -1,26 +1,41 @@
+ "use client";
+ import React, { useEffect, useState } from 'react';
+-import Head from 'next/head';
+-import { enrollCurrentUserInTotp, auth } from '@/lib/firebase/client';
+-import { multiFactor, signInWithEmailAndPassword } from 'firebase/auth';
++import { enrollCurrentUserInTotp, finishTotpEnrollment, auth } from '@/lib/firebase/client';
++import { onAuthStateChanged, signInWithEmailAndPassword, type TotpSecret, type User } from 'firebase/auth';
+ 
+ /**
+  * Page to enroll the currently signed‑in user in TOTP (Google Authenticator) MFA.
+  * If no user is signed in, renders an email/password sign‑in form first.
+  */
+ export default function SetupMfa() {
+-  // Auth / sign‑in state
++  // Auth / sign‑in state (tracked in React state so the page re-renders after sign-in)
++  const [user, setUser] = useState<User | null>(null);
+   const [email, setEmail] = useState('');
+   const [password, setPassword] = useState('');
+   const [signInError, setSignInError] = useState<string | null>(null);
+   const [isSigningIn, setIsSigningIn] = useState(false);
+ 
+   // MFA enrollment state
+-  const [enrollment, setEnrollment] = useState<any>(null);
++  const [enrollment, setEnrollment] = useState<{ secret: TotpSecret; qrCodeUrl: string } | null>(null);
+   const [code, setCode] = useState('');
+   const [status, setStatus] = useState<'idle' | 'enrolling' | 'verifying' | 'done'>('idle');
+   const [error, setError] = useState<string | null>(null);
+ 
++  // next/head has no effect in the App Router, so set the title directly
++  useEffect(() => {
++    document.title = 'Setup MFA – Google Authenticator';
++  }, []);
++
++  useEffect(() => {
++    try {
++      return onAuthStateChanged(auth, setUser);
++    } catch (e) {
++      // Firebase is not configured in this environment
++      setSignInError('Firebase Authentication is not configured.');
++      return undefined;
++    }
++  }, []);
++
+   // Sign‑in handler
+   const handleSignIn = async (e: React.FormEvent) => {
+     e.preventDefault();
+@@ -28,7 +43,7 @@ export default function SetupMfa() {
+     setSignInError(null);
+     try {
+       await signInWithEmailAndPassword(auth, email, password);
+-      // auth.currentUser is now set – the effect below will trigger enrollment.
++      // onAuthStateChanged sets `user`, which triggers secret generation below.
+     } catch (e: any) {
+       console.error(e);
+       setSignInError(e.message || 'Sign‑in failed');
+@@ -37,10 +52,10 @@ export default function SetupMfa() {
+     }
+   };
+ 
+-  // Generate QR code when a user is present and we haven't started enrollment yet.
++  // Generate a TOTP secret when a user is present and we haven't started enrollment yet.
+   useEffect(() => {
+-    if (!auth.currentUser) return;
+-    if (enrollment) return; // already have enrollment
++    // `error` stops a failed attempt from retrying in a loop
++    if (!user || enrollment || status !== 'idle' || error) return;
+     setStatus('enrolling');
+     enrollCurrentUserInTotp()
+       .then((result) => {
+@@ -49,20 +64,18 @@ export default function SetupMfa() {
+       })
+       .catch((e) => {
+         console.error(e);
+-        setError('Failed to generate enrollment');
++        setError(`Failed to start enrollment: ${e.message || e}. TOTP MFA must be enabled for this Firebase project.`);
+         setStatus('idle');
+       });
+-  }, [auth.currentUser, enrollment]);
++  }, [user, enrollment, status, error]);
+ 
+   const handleSubmit = async (e: React.FormEvent) => {
+     e.preventDefault();
+-    if (!auth.currentUser || !enrollment) return;
++    if (!user || !enrollment) return;
+     setStatus('verifying');
+     setError(null);
+     try {
+-      // @ts-ignore – SDK typings differ between versions.
+-      await multiFactor(auth.currentUser).enroll(enrollment.secret, code);
+-      await auth.currentUser.getIdToken(true);
++      await finishTotpEnrollment(enrollment.secret, code.trim());
+       setStatus('done');
+     } catch (e: any) {
+       console.error(e);
+@@ -73,94 +86,94 @@ export default function SetupMfa() {
+ 
+   // Render UI
+   return (
+-    <>
+-      <Head>
+-        <title>Setup MFA – Google Authenticator</title>
+-        <meta name="description" content="Enroll in two‑factor authentication using Google Authenticator." />
+-      </Head>
+-      <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-800 p-4">
+-        <div className="w-full max-w-md rounded-xl bg-white/10 p-8 backdrop-blur-lg shadow-xl">
+-          <h1 className="mb-6 text-center text-3xl font-bold text-white">Enable Google Authenticator MFA</h1>
++    <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-800 p-4">
++      <div className="w-full max-w-md rounded-xl bg-white/10 p-8 backdrop-blur-lg shadow-xl">
++        <h1 className="mb-6 text-center text-3xl font-bold text-white">Enable Google Authenticator MFA</h1>
+ 
+-          {/* Sign‑in form if no user */}
+-          {!auth.currentUser && (
+-            <form onSubmit={handleSignIn} className="space-y-4">
+-              {signInError && (
+-                <div className="rounded bg-red-500/20 p-2 text-center text-red-200 mb-2">{signInError}</div>
+-              )}
+-              <input
+-                type="email"
+-                placeholder="Email"
+-                value={email}
+-                onChange={(e) => setEmail(e.target.value)}
+-                required
+-                className="w-full rounded border border-white/30 bg-white/5 px-3 py-2 text-white placeholder-gray-400 focus:outline-none"
+-              />
+-              <input
+-                type="password"
+-                placeholder="Password"
+-                value={password}
+-                onChange={(e) => setPassword(e.target.value)}
+-                required
+-                className="w-full rounded border border-white/30 bg-white/5 px-3 py-2 text-white placeholder-gray-400 focus:outline-none"
+-              />
+-              <button
+-                type="submit"
+-                disabled={isSigningIn}
+-                className="w-full rounded bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+-              >
+-                {isSigningIn ? 'Signing in…' : 'Sign In'}
+-              </button>
+-            </form>
+-          )}
++        {/* Sign‑in form if no user */}
++        {!user && (
++          <form onSubmit={handleSignIn} className="space-y-4">
++            {signInError && (
++              <div className="rounded bg-red-500/20 p-2 text-center text-red-200 mb-2">{signInError}</div>
++            )}
++            <input
++              type="email"
++              placeholder="Email"
++              value={email}
++              onChange={(e) => setEmail(e.target.value)}
++              required
++              className="w-full rounded border border-white/30 bg-white/5 px-3 py-2 text-white placeholder-gray-400 focus:outline-none"
++            />
++            <input
++              type="password"
++              placeholder="Password"
++              value={password}
++              onChange={(e) => setPassword(e.target.value)}
++              required
++              className="w-full rounded border border-white/30 bg-white/5 px-3 py-2 text-white placeholder-gray-400 focus:outline-none"
++            />
++            <button
++              type="submit"
++              disabled={isSigningIn}
++              className="w-full rounded bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
++            >
++              {isSigningIn ? 'Signing in…' : 'Sign In'}
++            </button>
++          </form>
++        )}
+ 
+-          {/* After sign‑in, enrollment UI */}
+-          {auth.currentUser && (
+-            <>
+-              {error && (
+-                <div className="mb-4 rounded bg-red-500/20 p-2 text-center text-red-200">{error}</div>
+-              )}
++        {/* After sign‑in, enrollment UI */}
++        {user && (
++          <>
++            {error && (
++              <div className="mb-4 rounded bg-red-500/20 p-2 text-center text-red-200">{error}</div>
++            )}
+ 
+-              {status === 'enrolling' && <p className="text-center text-white">Generating QR code…</p>}
++            {status === 'enrolling' && <p className="text-center text-white">Generating your secret key…</p>}
+ 
+-              {enrollment && enrollment.qrCodeUrl && (
+-                <div className="mb-6 flex flex-col items-center">
+-                  <p className="mb-2 text-sm text-white">Scan this QR code with Google Authenticator:</p>
+-                  <img src={enrollment.qrCodeUrl} alt="Google Authenticator QR code" className="rounded border border-white/20" />
+-                </div>
+-              )}
++            {enrollment && status !== 'done' && (
++              <div className="mb-6 space-y-2 text-center">
++                <p className="text-sm text-white">Add this key to Google Authenticator (Add a code → Enter a setup key):</p>
++                <p className="select-all break-all rounded border border-white/20 bg-white/5 px-3 py-2 font-mono text-lg tracking-widest text-white">
++                  {enrollment.secret.secretKey}
++                </p>
++                <a href={enrollment.qrCodeUrl} className="inline-block text-xs text-indigo-200 underline">
++                  On your phone? Tap to open in your authenticator app
++                </a>
++              </div>
++            )}
+ 
+-              {enrollment && (
+-                <form onSubmit={handleSubmit} className="space-y-4">
+-                  <label className="block">
+-                    <span className="text-white">6‑digit code</span>
+-                    <input
+-                      type="text"
+-                      value={code}
+-                      onChange={(e) => setCode(e.target.value)}
+-                      maxLength={6}
+-                      pattern="[0-9]{6}"
+-                      required
+-                      className="mt-1 block w-full rounded border border-white/30 bg-white/5 px-3 py-2 text-center text-white placeholder-gray-400 focus:outline-none"
+-                    />
+-                  </label>
+-                  <button
+-                    type="submit"
+-                    disabled={status === 'verifying'}
+-                    className="w-full rounded bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+-                  >
+-                    {status === 'verifying' ? 'Verifying…' : 'Enable MFA'}
+-                  </button>
+-                </form>
+-              )}
++            {enrollment && status !== 'done' && (
++              <form onSubmit={handleSubmit} className="space-y-4">
++                <label className="block">
++                  <span className="text-white">6‑digit code</span>
++                  <input
++                    type="text"
++                    inputMode="numeric"
++                    value={code}
++                    onChange={(e) => setCode(e.target.value)}
++                    maxLength={6}
++                    pattern="[0-9]{6}"
++                    required
++                    className="mt-1 block w-full rounded border border-white/30 bg-white/5 px-3 py-2 text-center text-white placeholder-gray-400 focus:outline-none"
++                  />
++                </label>
++                <button
++                  type="submit"
++                  disabled={status === 'verifying'}
++                  className="w-full rounded bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
++                >
++                  {status === 'verifying' ? 'Verifying…' : 'Enable MFA'}
++                </button>
++              </form>
++            )}
+ 
+-              {status === 'done' && (
+-                <p className="mt-4 text-center text-green-300">✅ MFA enabled! Your token has been refreshed.</p>
+-              )}
+-            </>
+-          )}
+-        </div>
+-      </main>
+-    </>
++            {status === 'done' && (
++              <p className="mt-4 text-center text-green-300">✅ MFA enabled! Your token has been refreshed.</p>
++            )}
++          </>
++        )}
++      </div>
++    </main>
+   );
+ }
+diff --git a/components/admin/CourseBuilderView.tsx b/components/admin/CourseBuilderView.tsx
+index e0b6613..0839544 100644
+--- a/components/admin/CourseBuilderView.tsx
++++ b/components/admin/CourseBuilderView.tsx
+@@ -625,8 +625,11 @@ export const CourseBuilderView: React.FC<CourseBuilderViewProps> = () => {
+               <button
+                 onClick={() => {
+                   if (!selectedProgram) return;
++                  // One timestamp so the starter assessment maps to the starter ULO
++                  // (two Date.now() calls could differ and leave the ULO unassessed)
++                  const stamp = Date.now();
+                   const newUnit: UnitDocument = {
+-                    id: `unit-${Date.now().toString().slice(-4)}`,
++                    id: `unit-${stamp}`,
+                     tenantId: selectedProgram.tenantId,
+                     programId: selectedProgram.id,
+                     code: `NEW${Math.floor(1000 + Math.random() * 9000)}`,
+@@ -638,7 +641,7 @@ export const CourseBuilderView: React.FC<CourseBuilderViewProps> = () => {
+                     coRequisites: [],
+                     outcomes: [
+                       {
+-                        id: `ulo-${Date.now()}-1`,
++                        id: `ulo-${stamp}-1`,
+                         code: 'ULO-1',
+                         statement: 'Analyze foundational principles of this subject area.',
+                         mappedPloIds: selectedProgram.outcomes[0]?.id ? [selectedProgram.outcomes[0].id] : []
+@@ -646,11 +649,11 @@ export const CourseBuilderView: React.FC<CourseBuilderViewProps> = () => {
+                     ],
+                     assessments: [
+                       {
+-                        id: `asmt-${Date.now()}-1`,
++                        id: `asmt-${stamp}-1`,
+                         title: 'Capstone Assessment',
+                         type: 'Summative',
+                         weight: 100,
+-                        mappedUloIds: [`ulo-${Date.now()}-1`]
++                        mappedUloIds: [`ulo-${stamp}-1`]
+                       }
+                     ],
+                     modules: [],
+diff --git a/components/admin/StaffMessagingView.tsx b/components/admin/StaffMessagingView.tsx
+index 39c8f1f..37c0af4 100644
+--- a/components/admin/StaffMessagingView.tsx
++++ b/components/admin/StaffMessagingView.tsx
+@@ -208,7 +208,8 @@ export const StaffMessagingView: React.FC = () => {
+     if (activeDirectStaffId) {
+       return (
+         (m.senderId === 'staff-current' && m.recipientId === activeDirectStaffId) ||
+-        (m.senderId === activeDirectStaffId && (m.recipientId === 'staff-current' || !m.recipientId))
++        // Only direct messages: channel posts by this person have no recipient and belong in their channel
++        (m.senderId === activeDirectStaffId && m.recipientId === 'staff-current')
+       );
+     }
+     return m.channelId === activeChannelId;
+diff --git a/components/admin/TokenManager.tsx b/components/admin/TokenManager.tsx
+index ba2a184..41ab489 100644
+--- a/components/admin/TokenManager.tsx
++++ b/components/admin/TokenManager.tsx
+@@ -300,7 +300,8 @@ export const TokenManager: React.FC = () => {
+   };
+ 
+   const simulateDailyDeduction = () => {
+-    const todayISO = "2026-09-28";
++    // Local calendar date (YYYY-MM-DD); was hard-coded, so only one deduction could ever happen
++    const todayISO = new Date().toLocaleDateString('en-CA');
+     if (currentUser.tokenBalance <= 0) {
+       showToast("Access Denied: 0 tokens remaining.", "error");
+       return;
+diff --git a/components/application/ApplicationPortalView.tsx b/components/application/ApplicationPortalView.tsx
+index ca60de8..b371c57 100644
+--- a/components/application/ApplicationPortalView.tsx
++++ b/components/application/ApplicationPortalView.tsx
+@@ -32,6 +32,19 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
+   const [activeStep, setActiveStep] = useState(1);
+   const [isSubmitting, setIsSubmitting] = useState(false);
+   const [submitSuccess, setSubmitSuccess] = useState(application.status === 'Submitted');
++  const [submitError, setSubmitError] = useState('');
++
++  // Fields marked * in the form must be filled before submission
++  const missingRequiredFields = [
++    !application.personalDetails.fullName.trim() && 'Full Legal Name',
++    !application.personalDetails.email.trim() && 'Email Address',
++    !application.personalDetails.phone.trim() && 'Contact Phone',
++    !application.personalDetails.citizenship && 'Citizenship Status',
++    !application.academicDetails.highestEducation && 'Highest Qualification',
++    !application.coursePreferences.firstChoiceCourseName && 'First Choice Degree',
++    !application.coursePreferences.intakeSemester && 'Intake Semester',
++    !application.coursePreferences.studyMode && 'Study Mode'
++  ].filter(Boolean) as string[];
+ 
+   const steps = [
+     { num: 1, title: 'Personal Details', icon: User },
+@@ -71,7 +84,12 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
+   };
+ 
+   const handleSubmitApplication = async () => {
++    if (missingRequiredFields.length > 0) {
++      setSubmitError(`Please complete: ${missingRequiredFields.join(', ')}.`);
++      return;
++    }
+     setIsSubmitting(true);
++    setSubmitError('');
+     try {
+       const updated: StudentApplication = {
+         ...application,
+@@ -83,11 +101,15 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
+         updatedAt: new Date().toISOString()
+       };
+ 
+-      await fetch('/api/applications', {
++      const res = await fetch('/api/applications', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ application: updated })
+       });
++      if (!res.ok) {
++        const data = await res.json().catch(() => ({}));
++        throw new Error(data.error || `Server responded with ${res.status}`);
++      }
+ 
+       onUpdateApplication(updated);
+       setSubmitSuccess(true);
+@@ -102,8 +124,9 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
+       } catch {
+         // ignore
+       }
+-    } catch (err) {
++    } catch (err: any) {
+       console.error('Failed to submit application:', err);
++      setSubmitError(`Submission failed: ${err?.message || 'network error'}. Your draft is saved — please try again.`);
+     } finally {
+       setIsSubmitting(false);
+     }
+@@ -642,6 +665,21 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
+               </label>
+             )}
+ 
++            {!submitSuccess && missingRequiredFields.length > 0 && (
++              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
++                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
++                <span>
++                  <strong>Required before submitting:</strong> {missingRequiredFields.join(', ')}
++                </span>
++              </div>
++            )}
++
++            {submitError && (
++              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700">
++                {submitError}
++              </div>
++            )}
++
+             {/* Action Bar */}
+             <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-200">
+               <button
+@@ -655,7 +693,7 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
+               {!submitSuccess && (
+                 <button
+                   onClick={handleSubmitApplication}
+-                  disabled={!application.statementsAndDocuments.declarationAgreed || isSubmitting}
++                  disabled={!application.statementsAndDocuments.declarationAgreed || missingRequiredFields.length > 0 || isSubmitting}
+                   className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                 >
+                   <Send className="w-4 h-4" />
+diff --git a/components/catalog/CourseCatalogView.tsx b/components/catalog/CourseCatalogView.tsx
+index 99bc01f..3e3979d 100644
+--- a/components/catalog/CourseCatalogView.tsx
++++ b/components/catalog/CourseCatalogView.tsx
+@@ -25,26 +25,32 @@ export const CourseCatalogView: React.FC<CourseCatalogViewProps> = ({
+         if (data.programs && data.programs.length > 0) {
+           const publishedProgs = data.programs.filter((p: any) => p.status === 'published');
+           if (publishedProgs.length > 0) {
++            // Course Builder unitIds are document ids (e.g. "unit-comp1001"); show unit codes instead
++            const unitCodeById = new Map<string, string>(
++              (data.units || []).map((u: any) => [u.id, u.code])
++            );
++            // Map Course Builder ProgramDocuments onto the CourseProgram shape the cards render
+             const mappedCourses: CourseProgram[] = publishedProgs.map((p: any) => ({
+               id: p.id,
+               code: p.code,
+               title: p.title,
+               degreeLevel: p.degreeLevel,
+               faculty: p.faculty,
+-              duration: `${p.durationYears} Years Full-time`,
+-              totalCreditPoints: p.totalCredits,
+-              atarRequirement: p.atarRequirement ? `ATAR ${p.atarRequirement}` : 'Competitive Entry / GPA',
+-              annualFeeAud: `$${(p.annualFeeAud || 36000).toLocaleString()} AUD/year`,
+-              overview: p.overview,
+-              careerOutcomes: p.careerOutcomes || ['AI Engineer', 'Software Developer'],
+-              majors: [{ name: 'Core Specialization', description: 'Accredited Curriculum' }],
+-              coreUnits: p.unitIds || [],
+-              electivesSample: [],
+-              admissionRequirements: [
+-                p.atarRequirement ? `Minimum ATAR: ${p.atarRequirement}` : 'Recognized previous qualification',
+-                'English language proficiency'
+-              ],
+-              intakes: ['February (Semester 1)', 'July (Semester 2)']
++              durationYears: Number(p.durationYears) || 0,
++              studyModes: ['Full-time', 'Part-time'],
++              campus: ['Main Campus'],
++              intakes: ['February (Semester 1)', 'July (Semester 2)'],
++              atarRequirement: p.atarRequirement || undefined,
++              gpaRequirement: p.gpaRequirement || undefined,
++              // Course Builder stores a single annual fee
++              annualTuitionDomestic: Number(p.annualFeeAud) || 0,
++              annualTuitionInternational: Number(p.annualFeeAud) || 0,
++              overview: p.overview || '',
++              highlights: [],
++              careerOutcomes: p.careerOutcomes || [],
++              majors: [],
++              coreUnits: (p.unitIds || []).map((id: string) => unitCodeById.get(id) || id),
++              electiveUnits: []
+             }));
+             setCourses(mappedCourses);
+             return;
+@@ -156,7 +162,9 @@ export const CourseCatalogView: React.FC<CourseCatalogViewProps> = ({
+                   <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-center">
+                     <div className="text-[10px] text-slate-500 font-medium">Entry Req</div>
+                     <div className="text-xs font-bold text-slate-800 mt-0.5">
+-                      {course.atarRequirement ? `ATAR ${course.atarRequirement}` : `GPA ${course.gpaRequirement}`}
++                      {course.atarRequirement
++                        ? `ATAR ${course.atarRequirement}`
++                        : course.gpaRequirement ? `GPA ${course.gpaRequirement}` : 'See requirements'}
+                     </div>
+                   </div>
+ 
+diff --git a/components/catalog/UnitCatalogView.tsx b/components/catalog/UnitCatalogView.tsx
+index aca7ca0..d8e5d7a 100644
+--- a/components/catalog/UnitCatalogView.tsx
++++ b/components/catalog/UnitCatalogView.tsx
+@@ -21,29 +21,43 @@ export const UnitCatalogView: React.FC<UnitCatalogViewProps> = ({ onAskAgentAbou
+         if (data.units && data.units.length > 0) {
+           const publishedUnits = data.units.filter((u: any) => u.status === 'published');
+           if (publishedUnits.length > 0) {
++            const programLevelById = new Map<string, string>(
++              (data.programs || []).map((p: any) => [p.id, p.degreeLevel])
++            );
++            // Map Course Builder UnitDocuments onto the UnitDetail shape that UnitCard renders
++            // (a mismatched shape previously crashed this tab on `semestersOffered.join`).
+             const mappedUnits: UnitDetail[] = publishedUnits.map((u: any) => ({
+               code: u.code,
+               title: u.title,
+               creditPoints: u.creditWeight || 6,
+               faculty: 'Faculty of Engineering & Computer Science',
+-              level: u.code.includes('5') ? 'Postgraduate' : 'Undergraduate',
+-              semester: ['Semester 1', 'Semester 2'],
+-              deliveryMode: u.deliveryMode || 'Hybrid',
++              level: (programLevelById.get(u.programId) || (u.code.includes('5') ? 'Postgraduate' : 'Undergraduate')) === 'Postgraduate'
++                ? 'Postgraduate'
++                : 'Undergraduate',
++              semestersOffered: ['Semester 1', 'Semester 2'],
++              deliveryMode: u.deliveryMode === 'Hybrid' ? 'Blended' : (u.deliveryMode || 'Blended'),
++              coordinator: {
++                name: u.coordinator?.name || 'Academic Faculty Team',
++                email: u.coordinator?.email || 'TBA',
++                office: u.coordinator?.room || ''
++              },
+               overview: u.overview || 'Accredited syllabus.',
+-              learningOutcomes: u.outcomes ? u.outcomes.map((o: any) => o.statement) : [],
+-              assessments: u.assessments ? u.assessments.map((a: any) => ({
+-                title: a.title,
+-                type: a.type,
+-                weight: `${a.weight}%`,
+-                dueWeek: `Week ${a.dueDateWeek || 10}`
+-              })) : [],
+-              topics: u.modules ? u.modules.map((m: any) => ({
++              learningOutcomes: (u.outcomes || []).map((o: any) => o.statement),
++              prerequisites: u.prerequisites?.length ? u.prerequisites : ['None'],
++              topics: (u.modules || []).map((m: any) => ({
+                 week: m.order,
+-                title: m.title,
+-                readings: `${m.studyHours || 8} Hours Estimated Study`
+-              })) : [],
+-              prerequisites: u.prerequisites || [],
+-              coordinator: u.coordinator ? `${u.coordinator.name} (${u.coordinator.email})` : 'Academic Faculty Team'
++                // Module titles already start with "Week N:"; UnitCard adds its own prefix
++                title: String(m.title || '').replace(/^week\s*\d+\s*[:\-–]\s*/i, ''),
++                summary: (m.learningObjectives || []).join('; ') || `${m.studyHours || 8} hours estimated study`
++              })),
++              assessments: (u.assessments || []).map((a: any) => ({
++                name: a.title,
++                weight: Number(a.weight) || 0,
++                type: a.type,
++                description: a.wordCountOrDuration || `${a.type} assessment task`,
++                dueWeek: a.dueDateWeek ? `Week ${a.dueDateWeek}` : 'TBA'
++              })),
++              prescribedResources: []
+             }));
+             setUnits(mappedUnits);
+             if (!mappedUnits.some((u) => u.code === selectedUnitCode)) {
+diff --git a/components/chat/ChatInterface.tsx b/components/chat/ChatInterface.tsx
+index 80216bd..f552015 100644
+--- a/components/chat/ChatInterface.tsx
++++ b/components/chat/ChatInterface.tsx
+@@ -53,6 +53,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
+   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+   const messagesEndRef = useRef<HTMLDivElement>(null);
+   const recognitionRef = useRef<any>(null);
++  // Message times depend on the viewer's clock and locale, so render them only after
++  // hydration (pre-rendered pages such as /embed would otherwise mismatch the server HTML)
++  const [hasMounted, setHasMounted] = useState(false);
++  useEffect(() => setHasMounted(true), []);
+ 
+   // Auto-scroll to bottom of messages
+   useEffect(() => {
+@@ -234,7 +238,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
+                   {/* Message Footer: Timestamp & Audio TTS button */}
+                   {isAssistant && (
+                     <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-slate-400 text-[11px]">
+-                      <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
++                      <span>{hasMounted ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                       <button
+                         onClick={() => handleSpeakText(msg.id, msg.content)}
+                         className="hover:text-indigo-600 p-1 rounded-md transition-colors flex items-center gap-1"
+diff --git a/components/events/EventsCalendarView.tsx b/components/events/EventsCalendarView.tsx
+index f7b8956..0f47acb 100644
+--- a/components/events/EventsCalendarView.tsx
++++ b/components/events/EventsCalendarView.tsx
+@@ -1,4 +1,4 @@
+-import React, { useState } from 'react';
++import React, { useState, useEffect } from 'react';
+ import { ProspectiveEvent, EVENTS_DATA } from '@/data/events';
+ import { EventBookingCard } from '@/components/chat/EventBookingCard';
+ import { StudentApplication } from '@/data/applications';
+@@ -36,6 +36,17 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
+   const [studentName, setStudentName] = useState(application.personalDetails.fullName || '');
+   const [studentEmail, setStudentEmail] = useState(application.personalDetails.email || '');
+   const [isSubmitting, setIsSubmitting] = useState(false);
++  const [bookingError, setBookingError] = useState('');
++
++  // Load live event state (RSVP counts and booked advisor slots) from the server
++  useEffect(() => {
++    fetch('/api/events')
++      .then((res) => res.json())
++      .then((data) => {
++        if (Array.isArray(data.events) && data.events.length > 0) setEvents(data.events);
++      })
++      .catch((err) => console.log('Using default events list:', err));
++  }, []);
+ 
+   const categories = ['All', 'Open Day', 'Advising Session', 'Workshop', 'Webinar', 'Campus Tour'];
+ 
+@@ -44,6 +55,7 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
+   );
+ 
+   const handleOpenBookingModal = (event: ProspectiveEvent) => {
++    setBookingError('');
+     setSelectedEventForModal(event);
+     if (event.availableSlots && event.availableSlots.length > 0) {
+       const firstAvailable = event.availableSlots.find((s) => !s.isBooked);
+@@ -58,6 +70,7 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
+     if (!selectedEventForModal || !studentName.trim() || !studentEmail.trim()) return;
+ 
+     setIsSubmitting(true);
++    setBookingError('');
+     try {
+       const res = await fetch('/api/events', {
+         method: 'POST',
+@@ -72,12 +85,19 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
+       });
+ 
+       const data = await res.json();
+-      if (data.success) {
++      if (res.ok && data.success) {
+         setActiveBooking(data);
+         setSelectedEventForModal(null);
++        // Reflect the new RSVP count / booked slot straight away
++        if (data.event) {
++          setEvents((prev) => prev.map((ev) => (ev.id === data.event.id ? data.event : ev)));
++        }
++      } else {
++        setBookingError(data.error || 'Registration failed. Please try again.');
+       }
+     } catch (err) {
+       console.error('Failed to book event:', err);
++      setBookingError('Could not reach the server. Please try again.');
+     } finally {
+       setIsSubmitting(false);
+     }
+@@ -307,6 +327,12 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
+                 <span>You will receive an instant 1-click Google Calendar sync link and .ics invitation!</span>
+               </div>
+ 
++              {bookingError && (
++                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700">
++                  {bookingError}
++                </div>
++              )}
++
+               <div className="flex items-center justify-end gap-2 pt-2">
+                 <button
+                   type="button"
+diff --git a/components/home/HomeView.tsx b/components/home/HomeView.tsx
+index 7b448a6..685434a 100644
+--- a/components/home/HomeView.tsx
++++ b/components/home/HomeView.tsx
+@@ -630,7 +630,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
+                     <div key={idx} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex justify-between items-center text-xs">
+                       <div>
+                         <span className="font-bold text-slate-800">{a.name}</span>
+-                        <p className="text-[10px] text-slate-400">Due: Week {a.dueWeek} • {a.type}</p>
++                        <p className="text-[10px] text-slate-400">Due: {typeof a.dueWeek === 'number' ? `Week ${a.dueWeek}` : a.dueWeek} • {a.type}</p>
+                       </div>
+                       <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 font-extrabold rounded-xl">
+                         {a.weight}%
+diff --git a/lib/agent/engine.ts b/lib/agent/engine.ts
+index 2c29de7..af8f6a7 100644
+--- a/lib/agent/engine.ts
++++ b/lib/agent/engine.ts
+@@ -1,4 +1,4 @@
+-import { AGENT_TOOLS, executeAgentTool, ToolExecutionResult } from './tools';
++import { AGENT_TOOLS, executeAgentTool, ToolExecutionResult, activeEventsState } from './tools';
+ import { StudentApplication, INITIAL_APPLICATION_STATE } from '@/data/applications';
+ import { COURSES_DATA, CourseProgram } from '@/data/courses';
+ import { UNITS_DATA, UnitDetail } from '@/data/units';
+@@ -76,7 +76,8 @@ export async function processAgentConversation(
+   // 1. Try Gemini API if API key is provided
+   if (apiKey && apiKey.trim().length > 10) {
+     try {
+-      const geminiResult = await callGeminiWithTools(messages, currentApplication, apiKey.trim());
++      // Pass the normalised draft so tools never receive a missing/partial application
++      const geminiResult = await callGeminiWithTools(messages, updatedApp, apiKey.trim());
+       if (geminiResult) {
+         return geminiResult;
+       }
+@@ -89,14 +90,29 @@ export async function processAgentConversation(
+ 
+   // A. Check for Unit Syllabus Inquiries (e.g. COMP1001, COMP2004, DATA3001, CYBR2002, AI5001, BUSS2010, "unit description", "syllabus")
+   const allUnits = getDynamicUnits();
++  // Unit-code-like tokens (e.g. COMP1001, AI5001), ignoring email addresses such as alex2024@...
++  const unitCodeTokens = (userText.replace(/[\w.-]+@[\w.-]+\.\w+/g, ' ').toUpperCase().match(/\b[A-Z]{2,4}\d{4}\b/g) || []);
+   const unitMatch = allUnits.find(u =>
+     lower.includes(u.code.toLowerCase()) ||
+     lower.includes(u.title.toLowerCase()) ||
+-    (lower.includes('syllabus') && lower.includes(u.code.toLowerCase().slice(0, 4)))
++    // Prefix fallback ("comp syllabus") only when no explicit code was given, so an
++    // unknown code such as DATA2001 is not silently answered with DATA3001
++    (unitCodeTokens.length === 0 && lower.includes('syllabus') && lower.includes(u.code.toLowerCase().slice(0, 4)))
+   );
+ 
+   const isAskingUnit = unitMatch || lower.includes('unit description') || lower.includes('syllabus') || lower.includes('assessment') || lower.includes('prerequisite');
+ 
++  if (!unitMatch && unitCodeTokens.length > 0 && /\b(unit|units|syllabus|subject|assessment|prerequisites?)\b/.test(lower)) {
++    return {
++      message: `I couldn't find **${unitCodeTokens[0]}** in the AI assistant's unit syllabus database.\n\n` +
++        `Units I can describe in detail: ${allUnits.map(u => `**${u.code}**`).join(', ')}.\n\n` +
++        `You can also browse the **Unit Syllabuses** tab for the full published list.`,
++      toolsExecuted,
++      uiWidgets,
++      updatedApplication: updatedApp
++    };
++  }
++
+   if (unitMatch) {
+     const { result } = executeAgentTool('get_unit_syllabus', { unitCode: unitMatch.code }, updatedApp);
+     toolsExecuted.push({ toolName: 'get_unit_syllabus', args: { unitCode: unitMatch.code }, output: result.output });
+@@ -135,6 +151,8 @@ export async function processAgentConversation(
+ 
+   const isAskingCourseList = lower.includes('what courses') || lower.includes('list courses') || lower.includes('degrees') || lower.includes('programs offered') || lower.includes('undergraduate programs') || lower.includes('postgraduate programs');
+   const isApplicationIntent = lower.includes('apply') || lower.includes('application') || lower.includes('fill form') || lower.includes('start application') || lower.includes('my name is') || lower.includes('my email') || lower.includes('my gpa') || lower.includes('my atar') || lower.includes('submit application') || (lower.includes('name:') && lower.includes('email:'));
++  // Questions such as "What are the application deadlines?" mention "application" but are FAQ lookups
++  const looksLikeQuestion = /\?\s*$/.test(userText.trim()) || /^(how|what|when|where|which|who|why|can|could|do|does|is|are|will|should)\b/i.test(userText.trim());
+   const isAskingEventBooking = lower.includes('register') || lower.includes('book') || lower.includes('rsvp') || lower.includes('schedule') || lower.includes('calendar') || lower.includes('open day') || lower.includes('campus tour') || lower.includes('webinar') || lower.includes('consultation') || lower.includes('advising');
+ 
+   if (courseMatch && !isAskingCourseList && !isApplicationIntent && !isAskingEventBooking) {
+@@ -190,16 +208,21 @@ export async function processAgentConversation(
+     const hasBookingIntent = lower.includes('register me') || lower.includes('book me') || lower.includes('i want to book') || lower.includes('i want to register') || lower.includes('reserve a slot');
+ 
+     if (hasBookingIntent) {
+-      // Find event
+-      let targetEvent = EVENTS_DATA[0]; // default Open Day
+-      if (lower.includes('advis') || lower.includes('consult') || lower.includes('1-on-1') || lower.includes('slot')) {
+-        targetEvent = EVENTS_DATA.find(e => e.id === 'event-advising-consultation') || EVENTS_DATA[1];
+-      } else if (lower.includes('ai') || lower.includes('workshop') || lower.includes('masterclass')) {
+-        targetEvent = EVENTS_DATA.find(e => e.id === 'event-ai-taster-workshop') || EVENTS_DATA[2];
+-      } else if (lower.includes('intl') || lower.includes('international') || lower.includes('webinar') || lower.includes('visa')) {
+-        targetEvent = EVENTS_DATA.find(e => e.id === 'event-intl-webinar') || EVENTS_DATA[3];
+-      } else if (lower.includes('tour')) {
+-        targetEvent = EVENTS_DATA.find(e => e.id === 'event-campus-tour-sep') || EVENTS_DATA[4];
++      // Find event: an exact title match wins (the Events page sends the full title),
++      // otherwise fall back to keywords. Uses the live state so booked slots are respected.
++      const findEvent = (id: string) => activeEventsState.find(e => e.id === id);
++      const titleMatch = activeEventsState.find(e => lower.includes(e.title.toLowerCase()));
++      let targetEvent = titleMatch || activeEventsState[0]; // default Open Day
++      if (!titleMatch) {
++        if (lower.includes('advis') || lower.includes('consult') || lower.includes('1-on-1') || lower.includes('slot')) {
++          targetEvent = findEvent('event-advising-consultation') || targetEvent;
++        } else if (/\bai\b/.test(lower) || lower.includes('workshop') || lower.includes('masterclass')) {
++          targetEvent = findEvent('event-ai-taster-workshop') || targetEvent;
++        } else if (lower.includes('intl') || lower.includes('international') || lower.includes('webinar') || lower.includes('visa')) {
++          targetEvent = findEvent('event-intl-webinar') || targetEvent;
++        } else if (lower.includes('tour')) {
++          targetEvent = findEvent('event-campus-tour-sep') || targetEvent;
++        }
+       }
+ 
+       // Extract email or name if provided, or use application state
+@@ -208,16 +231,25 @@ export async function processAgentConversation(
+       const studentEmail = emailMatch ? emailMatch[0] : (updatedApp?.personalDetails.email || 'prospective.student@example.com');
+ 
+       let studentName = updatedApp?.personalDetails.fullName || 'Prospective Student';
+-      const nameMatch = userText.match(/(?:my name is|i am|name:?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
++      // Case-sensitive on the name itself so "I am interested in..." is not read as a name
++      const nameMatch = userText.match(/(?:[Mm]y name is|[Nn]ame is|[Nn]ame:|I am|I'm)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
+       if (nameMatch) {
+         studentName = nameMatch[1].replace(/[,.;:]+$/, '').trim();
+       }
+ 
+       // Check slot
+       let slotId: string | undefined = undefined;
+-      if (targetEvent.availableSlots) {
++      if (targetEvent.availableSlots && targetEvent.availableSlots.length > 0) {
+         const slotMatch = targetEvent.availableSlots.find(s => !s.isBooked);
+-        if (slotMatch) slotId = slotMatch.slotId;
++        if (!slotMatch) {
++          return {
++            message: `😔 All consultation slots for **${targetEvent.title}** are fully booked. Please check the **Events & Calendar** tab for other sessions.`,
++            toolsExecuted,
++            uiWidgets,
++            updatedApplication: updatedApp
++          };
++        }
++        slotId = slotMatch.slotId;
+       }
+ 
+       const { result } = executeAgentTool('book_event_or_consultation', {
+@@ -250,7 +282,7 @@ export async function processAgentConversation(
+       if (result.uiWidget) uiWidgets.push(result.uiWidget);
+ 
+       let msg = `### 📅 Upcoming Prospective Student Events & Consultations\n\nHere are our upcoming admissions sessions:\n\n`;
+-      for (const ev of EVENTS_DATA) {
++      for (const ev of activeEventsState) {
+         const dateStr = new Date(ev.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+         msg += `• **${ev.title}** (${ev.category})\n  *Date*: ${dateStr} | *Location*: ${ev.location}\n`;
+       }
+@@ -266,8 +298,45 @@ export async function processAgentConversation(
+   }
+ 
+   // D. Conversational Student Application Form Filling
+-  if (isApplicationIntent) {
+-    if (lower.includes('submit') || lower.includes('finalize') || lower.includes('send application')) {
++  // Extract fields from user message
++  const updates: Record<string, any> = {};
++
++  // Case-sensitive on the name itself so "I am interested in..." is not read as a name
++  const appNameMatch = userText.match(/(?:[Mm]y name is|[Nn]ame is|[Nn]ame:|I am|I'm)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/);
++  if (appNameMatch) {
++    updates.fullName = appNameMatch[1].replace(/[,.;:]+$/, '').trim();
++  }
++
++  const appEmailMatch = userText.match(/[\w.-]+@[\w.-]+\.\w+/);
++  if (appEmailMatch) updates.email = appEmailMatch[0].replace(/[,.;:]+$/, '').trim();
++
++  const phoneMatch = userText.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
++  if (phoneMatch) updates.phone = phoneMatch[0];
++
++  const gpaMatch = userText.match(/(?:gpa|atar|score|wam|grade)(?:\s+is|\s*:|\s+of)?\s*([0-9]+(?:\.[0-9]+)?)/i);
++  if (gpaMatch) updates.atarOrGpa = gpaMatch[1];
++
++  const hasPersonalData = Boolean(updates.fullName || updates.email || updates.phone || updates.atarOrGpa);
++  const isFaqQuestion = isApplicationIntent && looksLikeQuestion && !hasPersonalData &&
++    Boolean(executeAgentTool('search_faq', { query: userText }, updatedApp).result.output.matched);
++
++  if (isApplicationIntent && !isFaqQuestion) {
++    if ((lower.includes('submit') || lower.includes('finalize') || lower.includes('send application')) && !/^how\b/i.test(userText.trim())) {
++      // Do not submit an incomplete application
++      const { result: statusResult } = executeAgentTool('get_application_status', {}, updatedApp);
++      const missing: string[] = statusResult.output.missingFields || [];
++      if (missing.length > 0) {
++        toolsExecuted.push({ toolName: 'get_application_status', args: {}, output: statusResult.output });
++        if (statusResult.uiWidget) uiWidgets.push(statusResult.uiWidget);
++        return {
++          message: `⚠️ **Your application isn't ready to submit yet.**\n\nPlease provide: **${missing.join(', ')}**.\n\n` +
++            `You can tell me these details here, or complete them in the **Live Application Form** tab.`,
++          toolsExecuted,
++          uiWidgets,
++          updatedApplication: updatedApp
++        };
++      }
++
+       const { result, updatedApplication: finalApp } = executeAgentTool('submit_student_application', { declarationConfirmed: true }, updatedApp);
+       toolsExecuted.push({ toolName: 'submit_student_application', args: { declarationConfirmed: true }, output: result.output });
+       if (result.uiWidget) uiWidgets.push(result.uiWidget);
+@@ -289,37 +358,22 @@ export async function processAgentConversation(
+       };
+     }
+ 
+-    // Extract fields from user message
+-    const updates: Record<string, any> = {};
+-
+-    const nameMatch = userText.match(/(?:my name is|i am|name is|name:)\s+([A-Za-z]+(?:\s+[A-Za-z]+)+)/i);
+-    if (nameMatch) {
+-      updates.fullName = nameMatch[1].replace(/[,.;:]+$/, '').trim();
+-    }
+-
+-    const emailMatch = userText.match(/[\w.-]+@[\w.-]+\.\w+/);
+-    if (emailMatch) updates.email = emailMatch[0].replace(/[,.;:]+$/, '').trim();
+-
+-    const phoneMatch = userText.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+-    if (phoneMatch) updates.phone = phoneMatch[0];
+-
+     if (lower.includes('domestic') || lower.includes('australian citizen') || lower.includes('permanent resident')) {
+       updates.citizenship = 'Domestic';
+     } else if (lower.includes('international') || lower.includes('overseas')) {
+       updates.citizenship = 'International';
+     }
+ 
++    // The degree being applied for ("apply for Master of AI") is not the applicant's own qualification
++    const ownEducationText = lower.replace(/\b(apply(ing)?|enrol(l)?(ing)?|study(ing)?|interested in)\b[^.!?]*?\b(bachelor|master)('?s)?\b/g, ' ');
+     if (lower.includes('high school') || lower.includes('year 12') || lower.includes('atar')) {
+       updates.highestEducation = 'High School';
+-    } else if (lower.includes('bachelor') || lower.includes('undergrad degree')) {
++    } else if (/\bbachelor/.test(ownEducationText) || ownEducationText.includes('undergrad degree')) {
+       updates.highestEducation = 'Bachelor Degree';
+-    } else if (lower.includes('master')) {
++    } else if (/\bmaster('?s)?\b/.test(ownEducationText)) {
+       updates.highestEducation = 'Master Degree';
+     }
+ 
+-    const gpaMatch = userText.match(/(?:gpa|atar|score|wam|grade)(?:\s+is|\s*:|\s+of)?\s*([0-9]+(?:\.[0-9]+)?)/i);
+-    if (gpaMatch) updates.atarOrGpa = gpaMatch[1];
+-
+     if (lower.includes('computer science') || lower.includes('b-cs') || lower.includes('cs100')) {
+       updates.courseId = 'b-cs';
+     } else if (lower.includes('artificial intelligence') || lower.includes('m-ai') || lower.includes('ai700') || lower.includes('machine learning')) {
+@@ -370,8 +424,9 @@ export async function processAgentConversation(
+   const { result: faqResult } = executeAgentTool('search_faq', { query: userText }, updatedApp);
+   toolsExecuted.push({ toolName: 'search_faq', args: { query: userText }, output: faqResult.output });
+ 
++  // search_faq falls back to the first few FAQs when nothing matches; only answer from real matches
+   const matchedFaqs = faqResult.output.faqs;
+-  if (matchedFaqs && matchedFaqs.length > 0) {
++  if (faqResult.output.matched && matchedFaqs && matchedFaqs.length > 0) {
+     const topFaq = matchedFaqs[0];
+     let msg = `### 💡 ${topFaq.question}\n\n${topFaq.answer}\n\n`;
+ 
+@@ -415,12 +470,17 @@ async function callGeminiWithTools(
+   currentApplication: StudentApplication,
+   apiKey: string
+ ): Promise<AgentProcessResult | null> {
+-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+-
+-  const geminiContents = messages.map(m => ({
+-    role: m.role === 'assistant' ? 'model' : 'user',
+-    parts: [{ text: m.content }]
+-  }));
++  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
++
++  // Gemini conversations must start with a user turn, so drop the leading welcome message(s)
++  const firstUserIdx = messages.findIndex(m => m.role === 'user');
++  const geminiContents: any[] = (firstUserIdx >= 0 ? messages.slice(firstUserIdx) : [])
++    .filter(m => m.role !== 'system' && m.content)
++    .map(m => ({
++      role: m.role === 'assistant' ? 'model' : 'user',
++      parts: [{ text: m.content }]
++    }));
++  if (geminiContents.length === 0) return null;
+ 
+   const systemInstruction = {
+     parts: [{
+@@ -434,59 +494,71 @@ Always be polite, structured, and use markdown formatting.`
+     }]
+   };
+ 
+-  const body = {
+-    contents: geminiContents,
+-    systemInstruction,
+-    tools: [
+-      {
+-        functionDeclarations: AGENT_TOOLS.map(t => ({
+-          name: t.name,
+-          description: t.description,
+-          parameters: t.parameters
+-        }))
+-      }
+-    ]
+-  };
+-
+-  const res = await fetch(url, {
+-    method: 'POST',
+-    headers: { 'Content-Type': 'application/json' },
+-    body: JSON.stringify(body)
+-  });
+-
+-  if (!res.ok) {
+-    const errorText = await res.text();
+-    console.error('Gemini API returned error:', errorText);
+-    return null;
+-  }
+-
+-  const data = await res.json();
+-  const candidate = data.candidates?.[0];
+-  if (!candidate) return null;
++  const functionDeclarations = AGENT_TOOLS.map(t => ({
++    name: t.name,
++    description: t.description,
++    parameters: t.parameters
++  }));
+ 
+-  const contentParts = candidate.content?.parts || [];
+   const toolsExecuted: { toolName: string; args: any; output: any }[] = [];
+   const uiWidgets: { type: any; data: any }[] = [];
+-  let updatedApp = currentApplication ? JSON.parse(JSON.stringify(currentApplication)) : undefined;
++  let updatedApp: StudentApplication = JSON.parse(JSON.stringify(currentApplication));
+   let textResponse = '';
+ 
+-  for (const part of contentParts) {
+-    if (part.text) {
+-      textResponse += part.text;
++  // Function-calling loop: execute requested tools, send their results back,
++  // and let the model write the final answer (bounded to avoid runaway loops).
++  const MAX_ROUNDS = 3;
++  for (let round = 0; round < MAX_ROUNDS; round++) {
++    const res = await fetch(url, {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
++      body: JSON.stringify({ contents: geminiContents, systemInstruction, tools: [{ functionDeclarations }] })
++    });
++
++    if (!res.ok) {
++      const errorText = await res.text();
++      console.error('Gemini API returned error:', errorText);
++      // Keep any tool results from earlier rounds rather than discarding them
++      if (toolsExecuted.length > 0) break;
++      return null;
+     }
+-    if (part.functionCall) {
+-      const { name, args } = part.functionCall;
+-      const { result, updatedApplication: newApp } = executeAgentTool(name, args || {}, updatedApp);
+-      toolsExecuted.push({ toolName: name, args: args || {}, output: result.output });
+-      if (result.uiWidget) uiWidgets.push(result.uiWidget);
+-      if (newApp) updatedApp = newApp;
++
++    const data = await res.json();
++    const candidate = data.candidates?.[0];
++    if (!candidate) {
++      if (toolsExecuted.length > 0) break;
++      return null;
+     }
++
++    const contentParts: any[] = candidate.content?.parts || [];
++    const functionResponses: any[] = [];
++    textResponse = '';
++
++    for (const part of contentParts) {
++      if (part.text && !part.thought) {
++        textResponse += part.text;
++      }
++      if (part.functionCall) {
++        const { name, args } = part.functionCall;
++        const { result, updatedApplication: newApp } = executeAgentTool(name, args || {}, updatedApp);
++        toolsExecuted.push({ toolName: name, args: args || {}, output: result.output });
++        if (result.uiWidget) uiWidgets.push(result.uiWidget);
++        if (newApp) updatedApp = newApp;
++        functionResponses.push({ functionResponse: { name, response: { result: result.output } } });
++      }
++    }
++
++    if (functionResponses.length === 0) break;
++
++    geminiContents.push(candidate.content);
++    geminiContents.push({ role: 'user', parts: functionResponses });
+   }
+ 
+-  // If only function call was returned without prose text, provide synthesized summary
++  // If the model never produced prose after calling tools, provide a short summary
+   if (!textResponse && toolsExecuted.length > 0) {
+     textResponse = `I have executed the requested action for you.`;
+   }
++  if (!textResponse) return null;
+ 
+   return {
+     message: textResponse,
+diff --git a/lib/agent/tools.ts b/lib/agent/tools.ts
+index 5c8bfd1..9f512f8 100644
+--- a/lib/agent/tools.ts
++++ b/lib/agent/tools.ts
+@@ -147,6 +147,13 @@ export interface ToolExecutionResult {
+   };
+ }
+ 
++const FAQ_STOPWORDS = new Set([
++  'the', 'and', 'for', 'are', 'what', 'which', 'how', 'can', 'does', 'with', 'about', 'tell',
++  'you', 'your', 'there', 'this', 'that', 'have', 'has', 'any', 'all', 'our', 'from', 'when',
++  'where', 'who', 'why', 'will', 'would', 'could', 'should', 'into', 'more', 'some', 'please',
++  'want', 'need', 'like', 'know', 'get', 'give', 'show', 'info', 'information', 'university'
++]);
++
+ export function executeAgentTool(
+   toolName: string,
+   args: Record<string, any>,
+@@ -154,23 +161,39 @@ export function executeAgentTool(
+ ): { result: ToolExecutionResult; updatedApplication?: StudentApplication } {
+   switch (toolName) {
+     case 'search_faq': {
+-      const q = (args.query || '').toLowerCase();
++      const q = (args.query || '').toLowerCase().trim();
+       const cat = args.category;
+       const allFaqs = getDynamicFaqs();
+-      const matches = allFaqs.filter(faq => {
+-        const matchesQuery =
+-          faq.question.toLowerCase().includes(q) ||
+-          faq.answer.toLowerCase().includes(q) ||
+-          faq.keywords.some(k => k.toLowerCase().includes(q));
+-        const matchesCat = !cat || faq.category.toLowerCase() === cat.toLowerCase();
+-        return matchesQuery && matchesCat;
+-      });
+-
+-      const results = matches.length > 0 ? matches : allFaqs.slice(0, 3);
++      const words = q.split(/[^a-z0-9]+/).filter((w: string) => w.length > 2 && !FAQ_STOPWORDS.has(w));
++
++      // Score each FAQ: whole-query phrase match, keyword phrases found in the query,
++      // and individual query words found in the question. Natural-language questions
++      // rarely match a whole FAQ verbatim, so ranking is needed to find anything.
++      const matches = allFaqs
++        .filter(faq => !cat || faq.category.toLowerCase() === cat.toLowerCase())
++        .map(faq => {
++          const question = faq.question.toLowerCase();
++          let score = 0;
++          if (q && (question.includes(q) || faq.answer.toLowerCase().includes(q))) score += 10;
++          for (const k of faq.keywords) {
++            const kl = k.toLowerCase().trim();
++            if (kl && q.includes(kl)) score += 3;
++          }
++          for (const w of words) {
++            if (question.includes(w)) score += 1;
++          }
++          return { faq, score };
++        })
++        .filter(m => m.score >= 2)
++        .sort((a, b) => b.score - a.score)
++        .map(m => m.faq);
++
++      const matched = matches.length > 0;
++      const results = matched ? matches : allFaqs.slice(0, 3);
+       return {
+         result: {
+           toolName,
+-          output: { query: args.query, count: results.length, faqs: results },
++          output: { query: args.query, matched, count: results.length, faqs: results },
+           uiWidget: {
+             type: 'faq_list',
+             data: results
+@@ -274,6 +297,14 @@ export function executeAgentTool(
+ 
+       if (args.slotId && targetEvent.availableSlots) {
+         const slot = targetEvent.availableSlots.find(s => s.slotId === args.slotId);
++        if (slot && slot.isBooked) {
++          return {
++            result: {
++              toolName,
++              output: { status: 'Unavailable', error: `Slot ${slot.slotId} is already booked. Choose another slot.` }
++            }
++          };
++        }
+         if (slot) {
+           slot.isBooked = true;
+           startTime = slot.startTime;
+diff --git a/lib/calendar/googleCalendar.ts b/lib/calendar/googleCalendar.ts
+index f218e4b..8a3f546 100644
+--- a/lib/calendar/googleCalendar.ts
++++ b/lib/calendar/googleCalendar.ts
+@@ -56,9 +56,13 @@ export function createIcsContent(event: CalendarEventPayload): string {
+   const now = formatGoogleCalendarDate(new Date());
+   const uid = `edupulse-${Date.now()}-${Math.random().toString(36).substring(2, 9)}@university.edu.au`;
+ 
+-  let description = event.description.replace(/\n/g, '\\n');
++  // RFC 5545 TEXT values must escape backslashes, commas, semicolons and newlines
++  const escapeText = (value: string) =>
++    value.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
++
++  let description = escapeText(event.description);
+   if (event.meetingLink) {
+-    description += `\\n\\nMeeting Link: ${event.meetingLink}`;
++    description += `\\n\\nMeeting Link: ${escapeText(event.meetingLink)}`;
+   }
+ 
+   return [
+@@ -72,9 +76,9 @@ export function createIcsContent(event: CalendarEventPayload): string {
+     `DTSTAMP:${now}`,
+     `DTSTART:${start}`,
+     `DTEND:${end}`,
+-    `SUMMARY:${event.title}`,
++    `SUMMARY:${escapeText(event.title)}`,
+     `DESCRIPTION:${description}`,
+-    `LOCATION:${event.location}`,
++    `LOCATION:${escapeText(event.location)}`,
+     `STATUS:CONFIRMED`,
+     event.organizerEmail ? `ORGANIZER;CN=University Admissions:MAILTO:${event.organizerEmail}` : 'ORGANIZER;CN=University Admissions:MAILTO:admissions@university.edu.au',
+     event.attendeeEmail ? `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN=${event.attendeeEmail}:MAILTO:${event.attendeeEmail}` : '',
+diff --git a/lib/course-builder/service.ts b/lib/course-builder/service.ts
+index b3d935b..1408983 100644
+--- a/lib/course-builder/service.ts
++++ b/lib/course-builder/service.ts
+@@ -586,7 +586,8 @@ export async function getUnits(programId?: string): Promise<UnitDocument[]> {
+     if (!snap.empty) {
+       const items: UnitDocument[] = [];
+       snap.forEach((d: any) => items.push({ id: d.id, ...d.data() } as UnitDocument));
+-      cachedUnits = items;
++      // Only a full (unfiltered) read may replace the cache; a per-program read would drop other programs' units
++      if (!programId) cachedUnits = items;
+       return items;
+     }
+   } catch (e) {
+diff --git a/lib/firebase/admin.ts b/lib/firebase/admin.ts
+index 68a97b9..a1fba53 100644
+--- a/lib/firebase/admin.ts
++++ b/lib/firebase/admin.ts
+@@ -109,13 +109,19 @@ try {
+   // already configured
+ }
+ 
++function isPlainObject(v: unknown): v is Record<string, any> {
++  if (typeof v !== 'object' || v === null) return false;
++  const proto = Object.getPrototypeOf(v);
++  return proto === Object.prototype || proto === null;
++}
++
++// Only recurse into plain objects: arrays, Dates and FieldValue sentinels
++// (e.g. serverTimestamp()) must reach Firestore untouched.
+ function cleanUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+   const cleaned: Record<string, any> = {};
+   for (const [k, v] of Object.entries(obj)) {
+     if (v !== undefined) {
+-      cleaned[k] = (typeof v === 'object' && v !== null && !(v instanceof Date))
+-        ? cleanUndefined(v)
+-        : v;
++      cleaned[k] = isPlainObject(v) ? cleanUndefined(v) : v;
+     }
+   }
+   return cleaned as Partial<T>;
+@@ -415,7 +421,7 @@ export async function saveChatInteraction(interaction: {
+       metadata: {
+         interactionId: docRef.id,
+         queryPreview: interaction.userMessage.slice(0, 100),
+-        toolsUsed: interaction.toolsExecuted?.map((t: any) => t.tool) || [],
++        toolsUsed: interaction.toolsExecuted?.map((t: any) => t.toolName) || [],
+       },
+     });
+ 
+diff --git a/lib/firebase/client.ts b/lib/firebase/client.ts
+index 8af4197..ff8f7aa 100644
+--- a/lib/firebase/client.ts
++++ b/lib/firebase/client.ts
+@@ -6,8 +6,8 @@
+  */
+ 
+ import { initializeApp, getApps, getApp } from 'firebase/app';
+-import { getAuth, multiFactor, TotpSecret, TotpMultiFactorGenerator, EmailAuthProvider, signInWithEmailAndPassword } from 'firebase/auth';
+-import { getFirestore } from 'firebase/firestore';
++import { getAuth, multiFactor, TotpSecret, TotpMultiFactorGenerator, signInWithEmailAndPassword, type Auth } from 'firebase/auth';
++import { getFirestore, type Firestore } from 'firebase/firestore';
+ 
+ // Initialize Firebase App using environment variables with config fallback.
+ const firebaseConfig = {
+@@ -24,39 +24,47 @@ export const APP_ID = 'rto-ai';
+ 
+ const isConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
+ const app = !getApps().length ? (isConfigured ? initializeApp(firebaseConfig) : ({} as any)) : getApp();
+-export const auth = isConfigured && app && 'name' in app ? getAuth(app) : ({} as any);
++// When Firebase is not configured these are empty placeholders; callers already wrap usage in try/catch.
++export const auth: Auth = isConfigured && app && 'name' in app ? getAuth(app) : ({} as Auth);
+ 
+ const clientDatabaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID;
+-export const db = clientDatabaseId && clientDatabaseId !== '(default)'
+-  ? getFirestore(app, clientDatabaseId)
+-  : getFirestore(app);
++export const db: Firestore = !isConfigured
++  ? ({} as Firestore)
++  : clientDatabaseId && clientDatabaseId !== '(default)'
++    ? getFirestore(app, clientDatabaseId)
++    : getFirestore(app);
+ 
+ /**
+- * Enroll the signed‑in user in TOTP MFA using Google Authenticator.
++ * Step 1 of TOTP (Google Authenticator) MFA enrollment for the signed‑in user.
+  *
+- * This flow follows the Firebase Auth client‑side enrollment process:
+- *   1. The user signs in with a primary provider (e.g., email/password).
+- *   2. Call `multiFactor(auth.currentUser!).enroll` with a `TotpSecret`
+- *      generated by the server (via the admin SDK) or by the client using
+- *      `TotpMultiFactorGenerator.generateSecret()`.
+- *   3. Display the QR code to the user and verify the TOTP code.
++ * Generates a TOTP secret for the current multi-factor session. Show the user
++ * `secret.secretKey` (or open the otpauth:// `qrCodeUrl`) so they can add it to
++ * their authenticator app, then call `finishTotpEnrollment` with the 6‑digit code.
++ *
++ * Requires TOTP MFA to be enabled for the project (Identity Platform).
+  */
+-export async function enrollCurrentUserInTotp() {
++export async function enrollCurrentUserInTotp(): Promise<{ secret: TotpSecret; qrCodeUrl: string }> {
+   if (!auth.currentUser) {
+     throw new Error('No user is currently signed in');
+   }
+ 
+-  // Generate a new TOTP secret (the secret can also be fetched from the server).
+-  const secret: TotpSecret = await TotpMultiFactorGenerator.generateSecret(auth);
+-
+-  // Enroll the user with the secret.
+-  const assertion = TotpMultiFactorGenerator.assertionForEnrollment(secret, '000000');
+-  const enrollment = await multiFactor(auth.currentUser).enroll(assertion, 'Google Authenticator');
++  const session = await multiFactor(auth.currentUser).getSession();
++  const secret = await TotpMultiFactorGenerator.generateSecret(session);
++  const qrCodeUrl = secret.generateQrCodeUrl(auth.currentUser.email || undefined, 'EduPulse AI');
++  return { secret, qrCodeUrl };
++}
+ 
+-  // The `enrollment` contains a `verificationCode` that the user must provide.
+-  // The UI should prompt the user to enter the 6‑digit code generated by the
+-  // authenticator app. Once verified, the MFA factor is active.
+-  return enrollment;
++/**
++ * Step 2 of TOTP enrollment: verify the code from the authenticator app and
++ * activate the factor on the current user.
++ */
++export async function finishTotpEnrollment(secret: TotpSecret, verificationCode: string) {
++  if (!auth.currentUser) {
++    throw new Error('No user is currently signed in');
++  }
++  const assertion = TotpMultiFactorGenerator.assertionForEnrollment(secret, verificationCode);
++  await multiFactor(auth.currentUser).enroll(assertion, 'Google Authenticator');
++  await auth.currentUser.getIdToken(true);
+ }
+ 
+ /**
+diff --git a/lib/sheets/googleSheetsSync.ts b/lib/sheets/googleSheetsSync.ts
+index 6c17dcc..ce392aa 100644
+--- a/lib/sheets/googleSheetsSync.ts
++++ b/lib/sheets/googleSheetsSync.ts
+@@ -100,7 +100,7 @@ export function parseCoursesFromCsv(csvText: string): CourseProgram[] {
+     const title = getVal('title');
+     if (!title) continue; // skip empty rows
+ 
+-    const degreeLevel = (getVal('degreelevel') || getVal('level') || 'Undergraduate').includes('Post')
++    const degreeLevel = (getVal('degreelevel') || getVal('level') || 'Undergraduate').toLowerCase().includes('post')
+       ? 'Postgraduate'
+       : 'Undergraduate';
+ 
+@@ -118,8 +118,10 @@ export function parseCoursesFromCsv(csvText: string): CourseProgram[] {
+ 
+     const atar = parseFloat(getVal('atar')) || undefined;
+     const gpa = parseFloat(getVal('gpa')) || undefined;
+-    const annualTuitionDomestic = parseInt(getVal('domesticfee') || getVal('tuitiondomestic')) || 9500;
+-    const annualTuitionInternational = parseInt(getVal('intlfee') || getVal('tuitionintl') || getVal('internationalfee')) || 42000;
++    // Accept "44,500" / "$44500" style values; the template header is annualTuitionInternational
++    const parseAmount = (val: string) => parseInt(val.replace(/[^0-9.]/g, ''));
++    const annualTuitionDomestic = parseAmount(getVal('domesticfee') || getVal('tuitiondomestic')) || 9500;
++    const annualTuitionInternational = parseAmount(getVal('intlfee') || getVal('tuitionintl') || getVal('tuitioninternational') || getVal('internationalfee')) || 42000;
+     const overview = getVal('overview') || `${title} degree program at the university.`;
+ 
+     const highlightsRaw = getVal('highlight') || '';
+@@ -197,7 +199,7 @@ export function parseUnitsFromCsv(csvText: string): UnitDetail[] {
+     if (!code || !title) continue;
+ 
+     const faculty = getVal('faculty') || 'Faculty of Science & Engineering';
+-    const level = (getVal('level') || 'Undergraduate').includes('Post') ? 'Postgraduate' : 'Undergraduate';
++    const level = (getVal('level') || 'Undergraduate').toLowerCase().includes('post') ? 'Postgraduate' : 'Undergraduate';
+     const creditPoints = parseInt(getVal('credit')) || 6;
+ 
+     const semestersRaw = getVal('semester') || 'Semester 1, Semester 2';
+@@ -226,6 +228,8 @@ export function parseUnitsFromCsv(csvText: string): UnitDetail[] {
+       const topicParts = topicsRaw.split('|');
+       topicParts.forEach((part, idx) => {
+         const segs = part.split(':');
++        // Drop a leading week label ("W1", "Week 1") so the title is the topic itself
++        if (segs.length > 1 && /^\s*w(eek)?\s*\d+\s*$/i.test(segs[0])) segs.shift();
+         const tTitle = segs[0]?.trim() || `Week ${idx + 1} Lecture`;
+         const tSum = segs[1]?.trim() || 'Core theoretical and practical session';
+         topics.push({ week: idx + 1, title: tTitle, summary: tSum });
+@@ -395,6 +399,14 @@ export async function syncFromGoogleSheet(sheetIdOrUrl: string): Promise<{
+       }
+     }
+ 
++    // A private sheet (or wrong tab names) returns a login page / unusable CSV with HTTP 200.
++    // Report that instead of claiming success while the old data stays in place.
++    if (loadedCoursesCount + loadedUnitsCount + loadedFaqsCount === 0) {
++      const message = 'No courses, units or FAQs could be read from that sheet. Check it is shared as "Anyone with the link can view" and has tabs named Courses, Units and FAQs with a header row.';
++      setGoogleSheetsSyncStatus({ status: 'error', errorMessage: message });
++      return { success: false, coursesCount: 0, unitsCount: 0, faqsCount: 0, message };
++    }
++
+     const nowIso = new Date().toISOString();
+     setGoogleSheetsSyncStatus({
+       sheetId,

@@ -1,0 +1,289 @@
+EDUPULSE AI (rto-ai) - FUNCTION CHECK: WHAT WORKS
+=================================================
+Checked 15-16 Oct 2026 against commit b916114 plus your uncommitted changes
+(server.js, package.json, next.config.js).
+
+
+SUMMARY
+-------
+Every page, tab, main button flow and API route was exercised on a
+production build. 30 problems that stopped features working properly were
+found and fixed in a patch (22 files). Nothing was redesigned: same pages,
+same look, same data, same features.
+
+                                   YOUR CODE NOW        WITH THE PATCH
+  TypeScript check                 2 errors             0 errors
+  `npm run build` (next build)     FAILS (type error)   succeeds
+  API checks (65)                  47 pass              64 pass (*)
+  Browser walkthrough (80 checks)  Units tab crashes    80 pass, 0 browser
+                                   the whole app        errors
+  Gemini path, mocked API (5)      0 pass               5 pass
+
+  (*) the remaining one is an upload limitation, see E4 below.
+
+Four problems are outside the code and need you (section "ENVIRONMENT").
+
+
+READ THIS FIRST - THE FIXES ARE NOT IN YOUR CODE YET
+----------------------------------------------------
+Claude Code's automatic safety check would not approve edits to the
+project, so the fixes were made and tested in a separate copy and saved as
+a patch. Until you apply it, everything under "FIXED" is still broken in
+D:\Agy\rto-ai.
+
+  Patch:   rto-ai-fixes.patch (next to this file) - 22 files, +573 / -286
+  Apply:   cd D:\Agy\rto-ai
+           git apply --3way rto-ai-fixes.patch
+           (this stages the changes; review with `git diff --cached`)
+  Undo:    git apply -R --index rto-ai-fixes.patch
+
+Note: the patch was once applied to your project by accident during this
+session and then fully reverted (same content, same line endings, nothing
+staged). Your files are exactly as you left them.
+
+
+=====================================================================
+ENVIRONMENT - NEEDS YOU (cannot be fixed in code)
+=====================================================================
+E1. The project is on a failing-health USB stick
+    D: is a 58 GB FAT32 removable drive ("API1USB") that Windows reports
+    with health status "Warning". Two effects:
+    - `next build` FAILS there even with correct code:
+        Error: EISDIR: illegal operation on a directory, readlink
+        '...\node_modules\next\dist\pages\_app.js'
+      (FAT32 has no symlink support; webpack needs it). The same code
+      built in 1 min 39 s on C:.
+    - Disk reads average ~286 ms (C: ~6 ms), so installs, type checks and
+      builds take 10-60+ minutes.
+    Action: move the project to an NTFS drive (e.g. C:\Projects\rto-ai)
+    and run `npm ci` there.
+
+E2. The Gemini API key is dead, so "AI mode" never runs
+    Google rejects the key with:
+      401 UNAUTHENTICATED - "The bound service account is deleted or
+      disabled. The service account bound to the API key must be active."
+    The same key is in .env.local (GEMINI_API_KEY), .env (GEMINI_API_KEY)
+    and .env (VITE_GEMINI_API_KEY). Every chat message silently falls back
+    to the built-in keyword engine.
+    Action: create a new key in Google AI Studio and update .env.local.
+
+E3. Backup
+    Local `main` is 1 commit ahead of GitHub (b916114 is not pushed) and
+    server.js / package.json / next.config.js are uncommitted. Given E1,
+    push soon.
+
+E4. Uploaded images 404 until the server restarts (production only)
+    `next start` only serves files that were in /public when it started.
+    Tested: upload -> 404; restart -> 200. Works immediately in dev mode.
+    See cleanup.txt item 9 for the proper fix (cloud storage).
+
+
+=====================================================================
+HOW IT WAS TESTED
+=====================================================================
+- A copy of the project on C:, `npm ci` from your lockfile, then a real
+  production build (`next build` + `next start`).
+- Firestore was pointed at a database that does not exist, so NOTHING was
+  written to your production data. Firestore-backed features were checked
+  for correct fallback / error reporting.
+- 65 API checks (every route, valid + invalid input), 80 headless-Chrome
+  checks (every public tab, every admin tab, main buttons and forms),
+  5 checks of the Gemini code path against a mocked Google API, and a full
+  TypeScript check.
+- The same tests were run against your original code for the before/after
+  numbers above.
+
+
+=====================================================================
+FIXED - WAS BROKEN, NOW WORKS (once the patch is applied)
+=====================================================================
+
+Pages the public sees
+---------------------
+1.  Unit Syllabuses tab crashed the whole site
+    Confirmed on your code: "TypeError: Cannot read properties of undefined
+    (reading 'join')" - after this every tab is dead until reload.
+    Cause: Course Builder units were reshaped wrongly (no semestersOffered;
+    assessments showed "40%%", coordinator "undefined").
+    File: components/catalog/UnitCatalogView.tsx
+
+2.  Degree Programs tab showed "$NaNk/yr" fees and "undefined Years";
+    unit buttons showed internal ids ("unit-comp1001")
+    File: components/catalog/CourseCatalogView.tsx
+
+3.  Events page: "Add to Google Calendar" button had no link
+    Cause: API returned `googleCalendarUrl`, the card reads `googleCalUrl`.
+    File: app/api/events/route.ts
+
+4.  Events: the same advisor slot could be booked twice; bookings without
+    name/email were accepted; RSVP counts / booked slots never refreshed;
+    failures were silent
+    Files: app/api/events/route.ts, components/events/EventsCalendarView.tsx
+
+5.  Application form could be "submitted" with required fields empty, and
+    showed success even if the server rejected it
+    Now lists missing required (*) fields and shows real errors.
+    File: components/application/ApplicationPortalView.tsx
+
+6.  Applications submitted through the AI chat never reached the admin
+    Applications list
+    File: app/page.tsx
+
+7.  Home page syllabus pop-up showed "Due: Week Week 10" and
+    "Due: Week Exam Period"
+    File: components/home/HomeView.tsx
+
+8.  Embed page (/embed): every message time showed "Invalid Date"; no
+    "thinking" indicator (multiple sends possible); reset, unit, apply and
+    "open application form" buttons did nothing
+    Files: app/embed/page.tsx, components/chat/ChatInterface.tsx (times are
+    shown after the page loads, which avoids a React hydration error)
+
+AI chat assistant - built-in engine (used whenever Gemini is off/fails)
+----------------------------------------------------------------------
+9.  FAQ search almost never matched a real question
+    It only matched if the WHOLE sentence appeared in an FAQ, so most
+    questions ("what accommodation is there?", "can international students
+    work?", even "hello") got the same "admission requirements" answer.
+    File: lib/agent/tools.ts (ranked keyword/word matching)
+
+10. "Scholarships & Deadlines" button and "How do I apply...?" started an
+    empty application draft instead of answering
+    File: lib/agent/engine.ts
+
+11. "I am interested in computer science" saved the applicant's NAME as
+    "interested in applying for computer science"; "apply for Master of AI"
+    saved their own highest education as "Master Degree"
+    File: lib/agent/engine.ts
+
+12. Chat submitted incomplete applications - now lists what is missing
+
+13. Asking about an unknown unit (e.g. DATA2001, shown in the Units tab)
+    answered with a different unit (DATA3001) - now says it can't find it
+
+14. Chat bookings: a message containing "ai" inside any word (e.g. the
+    email "maria@...") booked the AI workshop instead of the requested
+    webinar; booked advisor slots could be re-booked; event list showed
+    stale RSVP counts
+
+AI chat assistant - Gemini mode (verified with a mocked Google API)
+--------------------------------------------------------------------
+15. After any tool use the reply was just "I have executed the requested
+    action for you." - tool results are now sent back so Gemini writes a
+    real answer (up to 3 rounds)
+16. Updating/submitting an application through Gemini crashed into the
+    fallback when no application object was sent; the conversation
+    started with the bot's welcome message instead of the user's
+17. The API key was sent in the URL (ends up in logs) - now a header
+    File for 15-17: lib/agent/engine.ts
+
+Admin panel
+-----------
+18. Google Sheets sync said "Successfully synchronized 0 courses, 0 unit
+    syllabuses, and 0 FAQs" and switched the site to "Google Sheets
+    Connected" when nothing could be read - now reports a clear error and
+    keeps the existing data
+19. Sheets import ignored the template's International Fee column (always
+    $42,000), read "44,500" as 44, and titled every weekly topic "W1"
+    File for 18-19: lib/sheets/googleSheetsSync.ts
+20. Course Builder "Add Unit": the starter assessment could point at a
+    different outcome (shown as a compliance "Gap"); unit ids used only 4
+    digits and could overwrite another unit
+    File: components/admin/CourseBuilderView.tsx
+21. Course Builder: viewing one program could drop other programs' units
+    from the server cache (lib/course-builder/service.ts)
+22. Staff Messages: a direct-message thread also showed that person's
+    channel posts (components/admin/StaffMessagingView.tsx)
+23. Tokens: "Simulate Active Day Use" used a fixed date (28 Sep 2026), so it
+    could only ever deduct once (components/admin/TokenManager.tsx)
+24. Tokens API answered success:true even when nothing was saved
+    (app/api/tokens/route.ts)
+
+Behind the scenes
+-----------------
+25. Every telemetry / chat / booking record written to Firestore got
+    createdAt = {} (an empty map) instead of a timestamp, and arrays in
+    metadata were turned into objects. Confirmed by test. Existing records
+    keep the empty value. (lib/firebase/admin.ts)
+26. Chat logs recorded the tools used as [undefined, ...]
+    (lib/firebase/admin.ts)
+27. Calendar (.ics) files were not escaped, so locations with commas were
+    cut short in some calendar apps (lib/calendar/googleCalendar.ts)
+28. Image upload let anyone write any file on the server. Confirmed: on
+    your original code one test request replaced server.js (in the test
+    copy) with the single character "x". Now only simple folder names and
+    image file names are accepted (app/api/upload/route.ts). The endpoint
+    still has no login check - see cleanup.txt item 1.
+29. /setup-mfa (Google Authenticator) could never work: wrong Firebase TOTP
+    calls, a hard-coded "000000" code, an otpauth link shown as an image,
+    and the page did not update after sign-in. Now uses the correct
+    two-step enrollment and shows the setup key.
+    (app/setup-mfa/page.tsx, lib/firebase/client.ts)
+    Also needed: enable TOTP MFA in the Firebase / Identity Platform
+    console (could not be checked from here).
+30. Two TypeScript errors (AdminCalendarManager.tsx,
+    GoogleClassroomManager.tsx) - these make `npm run build` fail with
+    "Failed to compile", i.e. the site cannot currently be deployed.
+    Fixed by typing the Firebase exports in lib/firebase/client.ts.
+
+
+=====================================================================
+WORKS - VERIFIED, NO CHANGE NEEDED
+=====================================================================
+Public site
+- Navigation between all tabs
+- Home: live search, shuffle buttons, syllabus and blog pop-ups
+- Unit Syllabuses: list, detail card, 12-week schedule, "Discuss with AI"
+- Chat: suggestion buttons, typed questions, course details, course list,
+  unit syllabus card, event list, Open Day booking with calendar link,
+  application intake from a message, reset
+- Application form: 5 steps, field editing, course selection, saved in the
+  browser between visits
+- Events: RSVP modal, booking card, .ics content, category filter (API)
+Admin panel
+- Course Builder: all 5 sub-tabs, add/edit/save program and unit, outcome
+  and assessment mapping, compliance matrix, version cloning, database sync
+- API keys tab, Firebase Telemetry tab (+ test ping), Student & Staff IDs
+  list and role dialog, Applications list / inspect / status change,
+  Google Sheets tab and CSV template downloads, Images upload, Embed code,
+  Events & RSVPs add/delete, Knowledge & FAQs, Tokens purchase / usage,
+  Google Calendar tab, Log out
+API routes
+- /api/applications, /api/events, /api/course-builder (all actions),
+  /api/users, /api/telemetry, /api/tokens, /api/sheets/sync, /api/upload,
+  /api/chat - valid input works, invalid input is rejected with 400/404
+
+
+=====================================================================
+WORKS ONLY AS A DEMO / WITH LIMITS (not changed - see cleanup.txt)
+=====================================================================
+- Admin "Events & RSVPs": changes stay in that browser tab; the public
+  Events page and chatbot never see them.
+- Admin "Google Classroom": simulated, no real Classroom API calls.
+- Admin "Tokens": balances reset on reload; Stripe checkout is simulated.
+- Admin "Staff Messages": stored in this browser only; replies automatic.
+- Admin "Images Folders": lists only this session's uploads; see E4.
+- Course Builder attachments: only the file name/size is stored.
+- Events, booked slots, the applications list and Sheets data live in
+  server memory and reset when the server restarts.
+- The chatbot doesn't know Course Builder units/programs (two separate
+  data sources - cleanup.txt item 11).
+- Admin access is not really protected: any Google account, or a
+  localStorage flag, opens it (cleanup.txt items 1-2). Not changed because
+  it changes who can log in - your decision.
+
+
+=====================================================================
+NOT TESTED HERE (and why)
+=====================================================================
+- Google sign-in buttons, Google Calendar connect, Classroom OAuth: need a
+  real Google login in a visible browser. Code reviewed only.
+- Real Firestore writes: deliberately disabled to protect production data
+  (see "How it was tested").
+- /api/assign-role (valid request), "prepare_superadmin", scripts/*.ts and
+  the Cloud Function: they change real Firebase Auth users, so only input
+  validation was tested; the code was reviewed.
+- Microphone input and "Listen" (text-to-speech), copy-to-clipboard
+  buttons, and the JSON / .ics file downloads: need a real desktop browser
+  session with permissions.
+- `npm run lint`: there is no ESLint config, so it only prompts for setup.

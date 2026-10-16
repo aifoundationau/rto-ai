@@ -253,7 +253,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   };
 
   const filteredUsers = users.filter((u) => {
-    const matchesRole = roleFilter === 'ALL' || u.role === roleFilter;
+    const matchesRole = roleFilter === 'ALL' || (u.role && u.role.toLowerCase() === roleFilter.toLowerCase());
     const term = userSearchTerm.toLowerCase().trim();
     if (!term) return matchesRole;
 
@@ -310,6 +310,17 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               Executive control over LMS Course Builder, admissions telemetry, 24/7 Google Sheets synchronization, and student identifiers.
             </p>
           </div>
+
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 hover:text-white border border-rose-400/30 transition-all flex items-center gap-2 shrink-0 cursor-pointer shadow-sm"
+              title="Log out from Admin Portal"
+            >
+              <LogOut className="w-4 h-4 text-rose-300" />
+              <span>Log Out</span>
+            </button>
+          )}
 
           <div className="flex flex-wrap items-center gap-1.5 bg-white/10 p-1.5 rounded-2xl">
           <button
@@ -714,7 +725,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
-              {['ALL', 'STUDENT', 'ACADEMIC_STAFF', 'REGISTRAR', 'SUPERADMIN'].map((role) => (
+              {['ALL', 'superadmin', 'supporter', 'STUDENT', 'ACADEMIC_STAFF', 'REGISTRAR'].map((role) => (
                 <button
                   key={role}
                   onClick={() => setRoleFilter(role)}
@@ -784,16 +795,18 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                       <td className="p-3.5 whitespace-nowrap">
                         <span
                           className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                            u.role === 'STUDENT'
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                              : u.role === 'SUPERADMIN'
+                            (u.role || '').toLowerCase() === 'superadmin' || u.isSuperAdmin
                               ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                              : u.role === 'REGISTRAR'
+                              : (u.role || '').toLowerCase() === 'supporter'
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : (u.role || '').toUpperCase() === 'STUDENT'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : (u.role || '').toUpperCase() === 'REGISTRAR'
                               ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                              : 'bg-blue-100 text-blue-800 border border-blue-200'
+                              : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
                           }`}
                         >
-                          {u.role || 'STUDENT'}
+                          {u.role || 'supporter'}
                         </span>
                       </td>
                       <td className="p-3.5 text-slate-600 max-w-[200px] truncate">
@@ -1293,10 +1306,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                   onChange={(e) => setRoleForm({ ...roleForm, role: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-bold"
                 >
+                  <option value="superadmin">superadmin (Complete Website Admin Access)</option>
+                  <option value="supporter">supporter (First-time Registration Default)</option>
                   <option value="STUDENT">STUDENT (Auto-generates STU-2026-XXXXX)</option>
                   <option value="ACADEMIC_STAFF">ACADEMIC_STAFF</option>
                   <option value="REGISTRAR">REGISTRAR</option>
-                  <option value="SUPERADMIN">SUPERADMIN</option>
                 </select>
                 {roleForm.role === 'STUDENT' && (
                   <p className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">

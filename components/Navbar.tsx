@@ -17,6 +17,7 @@ interface NavbarProps {
   onOpenSettings: () => void;
   currentUser?: any;
   onGoogleSignIn?: () => void;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -25,6 +26,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSettings,
   currentUser,
   onGoogleSignIn,
+  onLogout,
 }) => {
   const navItems = [
     { id: 'home' as NavTab, label: 'Home', icon: Home },
@@ -82,23 +84,25 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Right Action Icons */}
         <div className="flex items-center gap-2">
           {currentUser ? (
-            <button
-              onClick={() => onSelectTab('admin')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer border ${activeTab === 'admin'
-                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm ring-2 ring-indigo-500/20'
-                  : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200/80'
-                }`}
-              title="Open Admin Panel"
-            >
-              <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-5 h-5 rounded-full object-cover ring-1 ring-white/50" />
-              <span className="hidden sm:inline text-[11px] truncate max-w-[120px]">
-                {currentUser.name}
-              </span>
-              <span className={`px-1.5 py-0.5 text-[9px] font-black rounded-md uppercase tracking-wider ${activeTab === 'admin' ? 'bg-white/20 text-white' : 'bg-indigo-600 text-white'
-                }`}>
-                Admin
-              </span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => onSelectTab('admin')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer border ${activeTab === 'admin'
+                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm ring-2 ring-indigo-500/20'
+                    : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200/80'
+                  }`}
+                title="Open Admin Panel"
+              >
+                <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-5 h-5 rounded-full object-cover ring-1 ring-white/50" />
+                <span className="hidden sm:inline text-[11px] truncate max-w-[120px]">
+                  {currentUser.name}
+                </span>
+                <span className={`px-1.5 py-0.5 text-[9px] font-black rounded-md uppercase tracking-wider ${activeTab === 'admin' ? 'bg-white/20 text-white' : (currentUser.isSuperAdmin || (currentUser.role || '').toLowerCase() === 'superadmin') ? 'bg-purple-600 text-white' : 'bg-emerald-600 text-white'
+                  }`}>
+                  {(currentUser.isSuperAdmin || (currentUser.role || '').toLowerCase() === 'superadmin') ? 'Superadmin' : (currentUser.role || 'Supporter')}
+                </span>
+              </button>
+            </div>
           ) : (
             <button
               onClick={onGoogleSignIn ? onGoogleSignIn : () => onSelectTab('signin')}
@@ -138,6 +142,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             );
           })}
+          {currentUser && (
+            <button
+              onClick={() => onSelectTab('admin')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'admin'
+                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                  : 'bg-indigo-50 text-indigo-900 border border-indigo-200'
+              }`}
+            >
+              <img src={currentUser.avatarUrl} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+              <span>Admin</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

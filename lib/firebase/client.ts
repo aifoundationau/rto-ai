@@ -27,9 +27,11 @@ const app = !getApps().length ? (isConfigured ? initializeApp(firebaseConfig) : 
 export const auth = isConfigured && app && 'name' in app ? getAuth(app) : ({} as any);
 
 const clientDatabaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID;
-export const db = clientDatabaseId && clientDatabaseId !== '(default)'
-  ? getFirestore(app, clientDatabaseId)
-  : getFirestore(app);
+export const db = isConfigured && app && 'name' in app
+  ? (clientDatabaseId && clientDatabaseId !== '(default)'
+      ? getFirestore(app, clientDatabaseId)
+      : getFirestore(app))
+  : ({} as any);
 
 /**
  * Enroll the signed‑in user in TOTP MFA using Google Authenticator.

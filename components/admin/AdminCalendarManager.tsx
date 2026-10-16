@@ -54,13 +54,17 @@ export const AdminCalendarManager: React.FC = () => {
     }
   };
 
-  const handleDisconnect = async () => {
-    try {
-      const { auth } = await import('@/lib/firebase/client');
-      const { signOut } = await import('firebase/auth');
-      await signOut(auth);
-    } catch (e) {}
+  const handleDisconnect = () => {
     setCalendarUser(null);
+    (async () => {
+      try {
+        const { auth } = await import('@/lib/firebase/client');
+        const { signOut } = await import('firebase/auth');
+        if (auth && typeof auth === 'object' && auth.name) {
+          await signOut(auth);
+        }
+      } catch (e) {}
+    })();
   };
 
   return (

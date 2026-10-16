@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduPulse - LMS Admin Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f5f3ff',
+                            100: '#ede9fe',
+                            500: '#8b5cf6',
+                            600: '#7c3aed',
+                            700: '#6d28d9',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .active-nav-item {
+            background-color: #f3e8ff !important;
+            color: #7c3aed !important;
+            border-right: 4px solid #7c3aed;
+            font-weight: 600;
+        }
+        .section-anchor {
+            scroll-margin-top: 0px;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col overflow-hidden text-slate-800 antialiased selection:bg-purple-500 selection:text-white">
+
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Main Container -->
+    <div class="flex h-screen w-full overflow-hidden">
+
+        <!-- LEFT SIDEBAR -->
+        <aside class="w-64 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 z-20 shadow-sm">
+            <!-- Branding Header -->
+            <div class="h-16 px-6 flex items-center gap-3 border-b border-slate-100 flex-shrink-0">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 flex items-center justify-center text-white shadow-md shadow-purple-200">
+                    <i class="fa-solid font-bold text-xl fa-bolt"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-purple-700 via-indigo-600 to-pink-600 bg-clip-text text-transparent">EduPulse</h1>
+                    <p class="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">LMS Admin Platform</p>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="flex-1 overflow-y-auto custom-scrollbar py-4 px-3 space-y-1">
+                <p class="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Main Menu</p>
+
+                <a href="#admin-overview" onclick="scrollToSection(event, 'admin-overview')" class="nav-btn group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150 active-nav-item" data-section="admin-overview">
+                    <i class="fa-solid fa-chart-pie w-6 text-center text-slate-400 group-hover:text-purple-600 transition-colors"></i>
+                    <span class="ml-2">Admin Overview</span>
+                </a>
+
+                <a href="#student-enquiries" onclick="scrollToSection(event, 'student-enquiries')" class="nav-btn group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150" data-section="student-enquiries">
+                    <i class="fa-solid fa-user-graduate w-6 text-center text-slate-400 group-hover:text-purple-600 transition-colors"></i>
+                    <span class="ml-2">Student Enquiries</span>
+                    <span class="ml-auto bg-purple-100 text-purple-700 text-xs font-bold px-2 py-0.5 rounded-full">4</span>
+                </a>
+
+                <a href="#teacher-admin-requests" onclick="scrollToSection(event, 'teacher-admin-requests')" class="nav-btn group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150" data-section="teacher-admin-requests">
+                    <i class="fa-solid fa-chalkboard-user w-6 text-center text-slate-400 group-hover:text-purple-600 transition-colors"></i>
+                    <span class="ml-2">Teacher Requests</span>
+                    <span class="ml-auto bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full">3</span>
+                </a>
+
+                <a href="#parent-enquiries" onclick="scrollToSection(event, 'parent-enquiries')" class="nav-btn group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150" data-section="parent-enquiries">
+                    <i class="fa-solid fa-people-roof w-6 text-center text-slate-400 group-hover:text-purple-600 transition-colors"></i>
+                    <span class="ml-2">Parent Enquiries</span>
+                </a>
+
+                <a href="#accounts-due" onclick="scrollToSection(event, 'accounts-due')" class="nav-btn group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150" data-section="accounts-due">
+                    <i class="fa-solid fa-file-invoice-dollar w-6 text-center text-slate-400 group-hover:text-purple-600 transition-colors"></i>
+                    <span class="ml-2">Accounts Due</span>
+                    <span class="ml-auto bg-rose-100 text-rose-700 text-xs font-bold px-2 py-0.5 rounded-full">Due</span>
+                </a>
+
+                <p class="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mt-6 mb-2">Management</p>
+
+                <a href="#calendar-events" onclick="scrollToSection(event, 'calendar-events')" class="nav-btn group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150" data-section="calendar-events">
+                    <i class="fa-regular fa-calendar-check w-6 text-center text-slate-400 group-hover:text-purple-600 transition-colors"></i>
+                    <span class="ml-2">Calendar Events</span>
+                </a>
+
+                <a href="#action-feed" onclick="scrollToSection(event, 'action-feed')" class="nav-btn group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150" data-section="action-feed">
+                    <i class="fa-solid fa-rss w-6 text-center text-slate-400 group-hover:text-purple-600 transition-colors"></i>
+                    <span class="ml-2">Action Feed</span>
+                </a>
+
+                <a href="#notice-board" onclick="scrollToSection(event, 'notice-board')" class="nav-btn group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl text-slate-600 hover:bg-purple-50 hover:text-purple-700 transition-all duration-150" data-section="notice-board">
+                    <i class="fa-regular fa-clipboard w-6 text-center text-slate-400 group-hover:text-purple-600 transition-colors"></i>
+                    <span class="ml-2">Notice Board</span>
+                </a>
+            </nav>
+
+            <!-- Bottom User Profile snippet in sidebar -->
+            <div class="p-3 border-t border-slate-100 bg-slate-50/50">
+                <div class="flex items-center gap-3 p-2 rounded-xl bg-white border border-slate-200/80 shadow-xs">
+                    <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80" alt="Avatar" class="w-9 h-9 rounded-lg object-cover ring-2 ring-purple-100">
+                    <div class="overflow-hidden">
+                        <h4 class="text-xs font-bold text-slate-800 truncate">Priscilla Lily</h4>
+                        <p class="text-[10px] text-purple-600 font-semibold truncate">System Admin</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- RIGHT MAIN CONTENT PANEL -->
+        <div class="flex-1 flex flex-col h-full overflow-hidden">
+
+            <!-- HEADER BAR -->
+            <header class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between flex-shrink-0 z-10">
+                <div class="flex items-center gap-4 flex-1 max-w-md">
+                    <div class="relative w-full">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        <input type="text" placeholder="What do you want to find? (Search students, requests, files...)" class="w-full pl-10 pr-4 py-2 bg-slate-100/80 border border-transparent rounded-xl text-xs text-slate-700 placeholder-slate-400 focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none transition-all">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <button onclick="showToast('No new unread system warnings', 'info')" class="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors relative">
+                        <i class="fa-regular fa-bell text-sm"></i>
+                        <span class="absolute top-2 right-2 w-2 h-2 bg-purple-600 rounded-full ring-2 ring-white"></span>
+                    </button>
+
+                    <button onclick="showToast('Direct messaging panel opened', 'info')" class="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors">
+                        <i class="fa-regular fa-comment-dots text-sm"></i>
+                    </button>
+
+                    <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
+                    <div class="flex items-center gap-3 cursor-pointer group" onclick="showToast('Admin profile settings', 'info')">
+                        <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80" alt="Profile" class="w-9 h-9 rounded-xl object-cover ring-2 ring-purple-500/20 group-hover:ring-purple-500 transition-all">
+                        <div class="hidden sm:block text-left">
+                            <span class="block text-xs font-bold text-slate-800 leading-tight">Priscilla Lily</span>
+                            <span class="block text-[10px] text-slate-400 font-medium">Super Administrator</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-down text-slate-400 text-[10px]"></i>
+                    </div>
+                </div>
+            </header>
+
+            <!-- MAIN SCROLLABLE CONTENT AREA -->
+            <main id="main-content" class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-12 bg-slate-50 scroll-smooth">
+
+                <!-- SECTION 1: ADMIN OVERVIEW -->
+                <section id="admin-overview" class="section-anchor space-y-6 pt-2">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Admin Overview</h2>
+                            <p class="text-xs text-slate-500 font-medium">Welcome back, Priscilla! Here is what's happening at EduPulse today.</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-semibold text-slate-500">Academic Term:</span>
+                            <select class="text-xs font-bold bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 shadow-xs focus:ring-2 focus:ring-purple-200 outline-none cursor-pointer">
+                                <option>Fall Semester 2026</option>
+                                <option>Spring Semester 2026</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Pastel KPI Cards Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Card 1 -->
+                        <div class="p-5 rounded-2xl bg-purple-50/80 border border-purple-100 flex items-center justify-between shadow-xs hover:shadow-md transition-shadow">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-wider text-purple-600 mb-1">Students</p>
+                                <h3 class="text-2xl font-black text-purple-950">15.00K</h3>
+                                <p class="text-[11px] text-emerald-600 font-bold mt-1 flex items-center gap-1">
+                                    <i class="fa-solid fa-arrow-trend-up"></i> +12% this month
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-purple-500 text-white flex items-center justify-center text-xl shadow-md shadow-purple-200">
+                                <i class="fa-solid fa-user-graduate"></i>
+                            </div>
+                        </div>
+
+                        <!-- Card 2 -->
+                        <div class="p-5 rounded-2xl bg-sky-50/80 border border-sky-100 flex items-center justify-between shadow-xs hover:shadow-md transition-shadow">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-wider text-sky-600 mb-1">Teachers</p>
+                                <h3 class="text-2xl font-black text-sky-950">2.00K</h3>
+                                <p class="text-[11px] text-emerald-600 font-bold mt-1 flex items-center gap-1">
+                                    <i class="fa-solid fa-arrow-trend-up"></i> +4 new this week
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-sky-500 text-white flex items-center justify-center text-xl shadow-md shadow-sky-200">
+                                <i class="fa-solid fa-chalkboard-user"></i>
+                            </div>
+                        </div>
+
+                        <!-- Card 3 -->
+                        <div class="p-5 rounded-2xl bg-amber-50/80 border border-amber-100 flex items-center justify-between shadow-xs hover:shadow-md transition-shadow">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-wider text-amber-600 mb-1">Parents</p>
+                                <h3 class="text-2xl font-black text-amber-950">5.60K</h3>
+                                <p class="text-[11px] text-amber-700 font-bold mt-1 flex items-center gap-1">
+                                    <i class="fa-solid fa-check-double"></i> 94% Portal Active
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-amber-500 text-white flex items-center justify-center text-xl shadow-md shadow-amber-200">
+                                <i class="fa-solid fa-people-roof"></i>
+                            </div>
+                        </div>
+
+                        <!-- Card 4 -->
+                        <div class="p-5 rounded-2xl bg-emerald-50/80 border border-emerald-100 flex items-center justify-between shadow-xs hover:shadow-md transition-shadow">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">Earnings</p>
+                                <h3 class="text-2xl font-black text-emerald-950">$19.3K</h3>
+                                <p class="text-[11px] text-emerald-600 font-bold mt-1 flex items-center gap-1">
+                                    <i class="fa-solid fa-circle-up"></i> +8.4% target met
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-xl shadow-md shadow-emerald-200">
+                                <i class="fa-solid fa-wallet"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- All Exam Results Line Chart -->
+                        <div class="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 class="font-bold text-slate-800 text-base">All Exam Results Trend</h3>
+                                    <p class="text-xs text-slate-400">Teacher evaluations vs Student performance grades</p>
+                                </div>
+                                <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+                                    <button onclick="updateChartData('weekly')" class="text-xs font-semibold px-3 py-1 rounded-lg bg-white shadow-xs text-purple-700 transition-all">Weekly</button>
+                                    <button onclick="updateChartData('monthly')" class="text-xs font-semibold px-3 py-1 rounded-lg text-slate-500 hover:text-slate-800 transition-all">Monthly</button>
+                                </div>
+                            </div>
+                            <div class="h-64 relative w-full">
+                                <canvas id="examResultsChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Student Demographics Chart -->
+                        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-base">Student Demographics</h3>
+                                <p class="text-xs text-slate-400">Gender distribution across all enrolled years</p>
+                            </div>
+                            <div class="h-52 relative my-2 flex items-center justify-center">
+                                <canvas id="demographicsChart"></canvas>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 text-center">
+                                <div class="p-2 rounded-xl bg-purple-50">
+                                    <span class="text-[10px] uppercase font-bold text-purple-600 block">Female</span>
+                                    <span class="text-base font-black text-purple-900">8,250 (55%)</span>
+                                </div>
+                                <div class="p-2 rounded-xl bg-indigo-50">
+                                    <span class="text-[10px] uppercase font-bold text-indigo-600 block">Male</span>
+                                    <span class="text-base font-black text-indigo-900">6,750 (45%)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Star Students Interactive Table -->
+                    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+                        <div class="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-base">Star Performing Students</h3>
+                                <p class="text-xs text-slate-400">Top ranked academic performers for current semester</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="relative">
+                                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                    <input type="text" id="star-search" oninput="filterStarStudents()" placeholder="Search student..." class="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-purple-500">
+                                </div>
+                                <button onclick="showToast('Exporting student list CSV...', 'success')" class="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors flex items-center gap-1.5">
+                                    <i class="fa-solid fa-download"></i> Export
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50/70 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                        <th class="p-4 w-10 text-center"><input type="checkbox" class="rounded text-purple-600"></th>
+                                        <th class="p-4">Student</th>
+                                        <th class="p-4">Grade / Class</th>
+                                        <th class="p-4">GPA Score</th>
+                                        <th class="p-4">Attendance</th>
+                                        <th class="p-4 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="star-students-body" class="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+                                    <tr class="hover:bg-purple-50/30 transition-colors">
+                                        <td class="p-4 text-center"><input type="checkbox" class="rounded text-purple-600"></td>
+                                        <td class="p-4 flex items-center gap-3">
+                                            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" class="w-8 h-8 rounded-full object-cover">
+                                            <div>
+                                                <div class="font-bold text-slate-900">Sophia Martinez</div>
+                                                <div class="text-[10px] text-slate-400">ID: STU-2026-089</div>
+                                            </div>
+                                        </td>
+                                        <td class="p-4"><span class="bg-purple-100 text-purple-700 px-2.5 py-1 rounded-md text-[11px] font-bold">Grade 11-A</span></td>
+                                        <td class="p-4 font-extrabold text-emerald-600">3.98 / 4.0</td>
+                                        <td class="p-4">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-16 bg-slate-100 h-2 rounded-full overflow-hidden">
+                                                    <div class="bg-emerald-500 h-full w-[98%]"></div>
+                                                </div>
+                                                <span class="text-[11px]">98%</span>
+                                            </div>
+                                        </td>
+                                        <td class="p-4 text-right">
+                                            <button onclick="showToast('Viewing Sophia Martinez report card', 'info')" class="text-purple-600 hover:text-purple-800 font-bold text-xs bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors">View Profile</button>
+                                        </td>
+                                    </tr>
+                                    <tr class="hover:bg-purple-50/30 transition-colors">
+                                        <td class="p-4 text-center"><input type="checkbox" class="rounded text-purple-600"></td>
+                                        <td class="p-4 flex items-center gap-3">
+                                            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80" class="w-8 h-8 rounded-full object-cover">
+                                            <div>
+                                                <div class="font-bold text-slate-900">Liam Chen</div>
+                                                <div class="text-[10px] text-slate-400">ID: STU-2026-112</div>
+                                            </div>
+                                        </td>
+                                        <td class="p-4"><span class="bg-purple-100 text-purple-700 px-2.5 py-1 rounded-md text-[11px] font-bold">Grade 12-B</span></td>
+                                        <td class="p-4 font-extrabold text-emerald-600">3.95 / 4.0</td>
+                                        <td class="p-4">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-16 bg-slate-100 h-2 rounded-full overflow-hidden">
+                                                    <div class="bg-emerald-500 h-full w-[95%]"></div>
+                                                </div>
+                                                <span class="text-[11px]">95%</span>
+                                            </div>
+                                        </td>
+                                        <td class="p-4 text-right">
+                                            <button onclick="showToast('Viewing Liam Chen report card', 'info')" class="text-purple-600 hover:text-purple-800 font-bold text-xs bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors">View Profile</button>
+                                        </td>
+                                    </tr>
+                                    <tr class="hover:bg-purple-50/30 transition-colors">
+                                        <td class="p-4 text-center"><input type="checkbox" class="rounded text-purple-600"></td>
+                                        <td class="p-4 flex items-center gap-3">
+                                            <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80" class="w-8 h-8 rounded-full object-cover">
+                                            <div>
+                                                <div class="font-bold text-slate-900">Emma Watson</div>
+                                                <div class="text-[10px] text-slate-400">ID: STU-2026-045</div>
+                                            </div>
+                                        </td>
+                                        <td class="p-4"><span class="bg-purple-100 text-purple-700 px-2.5 py-1 rounded-md text-[11px] font-bold">Grade 10-C</span></td>
+                                        <td class="p-4 font-extrabold text-emerald-600">3.91 / 4.0</td>
+                                        <td class="p-4">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-16 bg-slate-100 h-2 rounded-full overflow-hidden">
+                                                    <div class="bg-emerald-500 h-full w-[96%]"></div>
+                                                </div>
+                                                <span class="text-[11px]">96%</span>
+                                            </div>
+                                        </td>
+                                        <td class="p-4 text-right">
+                                            <button onclick="showToast('Viewing Emma Watson report card', 'info')" class="text-purple-600 hover:text-purple-800 font-bold text-xs bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors">View Profile</button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECTION 2: STUDENT ENQUIRIES -->
+                <section id="student-enquiries" class="section-anchor bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-user-graduate text-purple-600"></i> Student Enquiries
+                            </h3>
+                            <p class="text-xs text-slate-400">Active support and administration requests submitted by students</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="toggleAllExpandables('student-enquiries', true)" class="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors">Expand All</button>
+                            <button onclick="toggleAllExpandables('student-enquiries', false)" class="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors">Collapse All</button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <!-- Student Item 1 -->
+                        <div class="border border-slate-200 rounded-xl overflow-hidden expandable-item transition-all">
+                            <div onclick="toggleExpandable(this)" class="p-4 bg-slate-50 hover:bg-purple-50/40 cursor-pointer flex items-center justify-between transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs">1</div>
+                                    <div>
+                                        <h4 class="font-bold text-sm text-slate-800">Advanced Chemistry Elective Course Switch</h4>
+                                        <p class="text-xs text-slate-500">Submitted by <span class="font-semibold text-slate-700">Alex Johnson</span> (ID: #4092) &bull; 2 hours ago</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">Pending</span>
+                                    <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200 icon-arrow"></i>
+                                </div>
+                            </div>
+                            <div class="hidden p-4 bg-white border-t border-slate-100 text-xs space-y-3">
+                                <p class="text-slate-600 leading-relaxed">
+                                    "I would like to request a change from Organic Chemistry Lab B to Advanced Organic Chemistry Lecture A due to a schedule overlap with my Physics Honors seminar."
+                                </p>
+                                <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                                    <button onclick="showToast('Student enquiry approved!', 'success')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold transition-colors">Approve Request</button>
+                                    <button onclick="showToast('Reply modal opened', 'info')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold transition-colors">Reply Student</button>
+                                    <button onclick="showToast('Enquiry dismissed', 'warning')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg font-bold transition-colors">Dismiss</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Student Item 2 -->
+                        <div class="border border-slate-200 rounded-xl overflow-hidden expandable-item transition-all">
+                            <div onclick="toggleExpandable(this)" class="p-4 bg-slate-50 hover:bg-purple-50/40 cursor-pointer flex items-center justify-between transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs">2</div>
+                                    <div>
+                                        <h4 class="font-bold text-sm text-slate-800">Late Assignment Submission Waiver - History 101</h4>
+                                        <p class="text-xs text-slate-500">Submitted by <span class="font-semibold text-slate-700">Maria Garcia</span> (ID: #3310) &bull; 5 hours ago</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">Under Review</span>
+                                    <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200 icon-arrow"></i>
+                                </div>
+                            </div>
+                            <div class="hidden p-4 bg-white border-t border-slate-100 text-xs space-y-3">
+                                <p class="text-slate-600 leading-relaxed">
+                                    "Attached is my medical certificate for missing the midterm essay deadline on March 12th. Requesting standard deadline extension without point penalty."
+                                </p>
+                                <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                                    <button onclick="showToast('Medical waiver granted', 'success')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold transition-colors">Grant Waiver</button>
+                                    <button onclick="showToast('Enquiry rejected', 'warning')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg font-bold transition-colors">Reject</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Student Item 3 -->
+                        <div class="border border-slate-200 rounded-xl overflow-hidden expandable-item transition-all">
+                            <div onclick="toggleExpandable(this)" class="p-4 bg-slate-50 hover:bg-purple-50/40 cursor-pointer flex items-center justify-between transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs">3</div>
+                                    <div>
+                                        <h4 class="font-bold text-sm text-slate-800">Library Computer Lab After-Hours Access Keycard</h4>
+                                        <p class="text-xs text-slate-500">Submitted by <span class="font-semibold text-slate-700">David Kim</span> (ID: #5541) &bull; Yesterday</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">Approved</span>
+                                    <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200 icon-arrow"></i>
+                                </div>
+                            </div>
+                            <div class="hidden p-4 bg-white border-t border-slate-100 text-xs space-y-3">
+                                <p class="text-slate-600 leading-relaxed">
+                                    "Requesting extended badge access for the Engineering CAD Lab during final project week."
+                                </p>
+                                <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                                    <span class="text-emerald-600 font-bold"><i class="fa-solid fa-check"></i> Badge Activated</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECTION 3: TEACHER ADMIN REQUESTS -->
+                <section id="teacher-admin-requests" class="section-anchor bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-chalkboard-user text-indigo-600"></i> Teacher Admin Requests
+                            </h3>
+                            <p class="text-xs text-slate-400">Curriculum changes, leave applications, and budget requests from faculty</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="toggleAllExpandables('teacher-admin-requests', true)" class="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors">Expand All</button>
+                            <button onclick="toggleAllExpandables('teacher-admin-requests', false)" class="text-xs font-semibold px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors">Collapse All</button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <!-- Teacher Item 1 -->
+                        <div class="border border-slate-200 rounded-xl overflow-hidden expandable-item transition-all">
+                            <div onclick="toggleExpandable(this)" class="p-4 bg-slate-50 hover:bg-indigo-50/40 cursor-pointer flex items-center justify-between transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80" class="w-9 h-9 rounded-full object-cover">
+                                    <div>
+                                        <h4 class="font-bold text-sm text-slate-800">Prof. Sarah Jenkins &bull; Paid Academic Leave Application</h4>
+                                        <p class="text-xs text-slate-500">Department of Computer Science &bull; Requested for Oct 12 - Oct 18</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">Action Needed</span>
+                                    <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200 icon-arrow"></i>
+                                </div>
+                            </div>
+                            <div class="hidden p-4 bg-white border-t border-slate-100 text-xs space-y-3">
+                                <p class="text-slate-600 leading-relaxed">
+                                    "Attending the International AI in Education Symposium in San Francisco as keynote presenter. Substitute teacher coverage arranged with Dr. Miller."
+                                </p>
+                                <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                                    <button onclick="showToast('Leave request approved for Prof. Jenkins', 'success')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors">Approve Leave</button>
+                                    <button onclick="showToast('Request declined', 'warning')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg font-bold transition-colors">Decline</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Teacher Item 2 -->
+                        <div class="border border-slate-200 rounded-xl overflow-hidden expandable-item transition-all">
+                            <div onclick="toggleExpandable(this)" class="p-4 bg-slate-50 hover:bg-indigo-50/40 cursor-pointer flex items-center justify-between transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&auto=format&fit=crop&q=80" class="w-9 h-9 rounded-full object-cover">
+                                    <div>
+                                        <h4 class="font-bold text-sm text-slate-800">Dr. Robert Vance &bull; Physics Lab Equipment Purchase Order ($1,250)</h4>
+                                        <p class="text-xs text-slate-500">Department of Physics &bull; Equipment Budget</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="bg-purple-100 text-purple-800 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">Pending Finance</span>
+                                    <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200 icon-arrow"></i>
+                                </div>
+                            </div>
+                            <div class="hidden p-4 bg-white border-t border-slate-100 text-xs space-y-3">
+                                <p class="text-slate-600 leading-relaxed">
+                                    "Requisition for 5 new Digital Oscilloscopes for senior electronics lab coursework."
+                                </p>
+                                <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                                    <button onclick="showToast('Purchase Order forwarded to Finance Department', 'success')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors">Forward to Finance</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECTION 4: PARENT ENQUIRIES -->
+                <section id="parent-enquiries" class="section-anchor bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-people-roof text-amber-600"></i> Parent Enquiries
+                            </h3>
+                            <p class="text-xs text-slate-400">Direct communications and appointment requests from parent portal</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="border border-slate-200 rounded-xl overflow-hidden expandable-item transition-all">
+                            <div onclick="toggleExpandable(this)" class="p-4 bg-slate-50 hover:bg-amber-50/40 cursor-pointer flex items-center justify-between transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs"><i class="fa-solid fa-envelope"></i></div>
+                                    <div>
+                                        <h4 class="font-bold text-sm text-slate-800">Mr. Arthur Pendelton &bull; Fee Installment Plan Request</h4>
+                                        <p class="text-xs text-slate-500">Parent of <span class="font-semibold text-slate-700">Lucas Pendelton (Grade 9)</span></p>
+                                    </div>
+                                </div>
+                                <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform duration-200 icon-arrow"></i>
+                            </div>
+                            <div class="hidden p-4 bg-white border-t border-slate-100 text-xs space-y-3">
+                                <p class="text-slate-600 leading-relaxed">
+                                    "Would like to arrange a split payment plan for the term 2 tuition fee over 3 equal monthly installments."
+                                </p>
+                                <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                                    <button onclick="showToast('Payment plan agreement email sent!', 'success')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold transition-colors">Send Agreement Plan</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECTION 5: ACCOUNTS DUE -->
+                <section id="accounts-due" class="section-anchor bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fa-solid fa-file-invoice-dollar text-rose-600"></i> Accounts Due & Tuition Balances
+                            </h3>
+                            <p class="text-xs text-slate-400">Manage outstanding student tuition fees and issue payment reminders</p>
+                        </div>
+                        <button onclick="showToast('Bulk payment reminders dispatched to 14 parents', 'info')" class="text-xs font-bold px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg transition-colors flex items-center gap-2">
+                            <i class="fa-solid fa-paper-plane"></i> Send Bulk Reminders
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <th class="p-3">Invoice ID</th>
+                                    <th class="p-3">Student Name</th>
+                                    <th class="p-3">Amount Due</th>
+                                    <th class="p-3">Due Date</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+                                <tr class="hover:bg-rose-50/20 transition-colors">
+                                    <td class="p-3 font-mono font-bold text-slate-800">#INV-2026-001</td>
+                                    <td class="p-3 font-semibold">Benjamin Wright</td>
+                                    <td class="p-3 font-bold text-rose-600">$1,450.00</td>
+                                    <td class="p-3">Mar 30, 2026</td>
+                                    <td class="p-3"><span class="bg-rose-100 text-rose-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase">Overdue</span></td>
+                                    <td class="p-3 text-right flex justify-end gap-2">
+                                        <button onclick="showToast('Payment reminder email sent', 'success')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-semibold">Reminder</button>
+                                        <button onclick="markAsPaid(this)" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-semibold">Mark Paid</button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-rose-50/20 transition-colors">
+                                    <td class="p-3 font-mono font-bold text-slate-800">#INV-2026-004</td>
+                                    <td class="p-3 font-semibold">Chloe Bennett</td>
+                                    <td class="p-3 font-bold text-amber-600">$820.00</td>
+                                    <td class="p-3">Apr 05, 2026</td>
+                                    <td class="p-3"><span class="bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase">Pending</span></td>
+                                    <td class="p-3 text-right flex justify-end gap-2">
+                                        <button onclick="showToast('Payment reminder email sent', 'success')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-semibold">Reminder</button>
+                                        <button onclick="markAsPaid(this)" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-semibold">Mark Paid</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- SECTION 6: CALENDAR EVENTS -->
+                <section id="calendar-events" class="section-anchor bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fa-regular fa-calendar-check text-sky-600"></i> Google Calendar Scheduled Events
+                            </h3>
+                            <p class="text-xs text-slate-400">Institutional calendar items, exam timetables, and staff assemblies</p>
+                        </div>
+                        <button onclick="syncGoogleCalendar()" class="text-xs font-bold px-3.5 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl shadow-xs transition-all flex items-center gap-2">
+                            <i class="fa-brands fa-google"></i> Sync Google Calendar
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Event Card 1 -->
+                        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-sky-300 transition-all space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Exam Schedule</span>
+                                <span class="text-[10px] text-slate-400 font-semibold"><i class="fa-regular fa-clock"></i> 09:00 AM</span>
+                            </div>
+                            <h4 class="font-bold text-sm text-slate-800">Mid-Term STEM Examinations</h4>
+                            <p class="text-xs text-slate-500">Main Campus Assembly Hall & Classrooms</p>
+                            <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-400 flex justify-between items-center">
+                                <span>Oct 15 - Oct 19</span>
+                                <span class="text-emerald-600 font-bold"><i class="fa-solid fa-check-circle"></i> Synced</span>
+                            </div>
+                        </div>
+
+                        <!-- Event Card 2 -->
+                        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-sky-300 transition-all space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Faculty Meeting</span>
+                                <span class="text-[10px] text-slate-400 font-semibold"><i class="fa-regular fa-clock"></i> 02:30 PM</span>
+                            </div>
+                            <h4 class="font-bold text-sm text-slate-800">All-Faculty Academic Review</h4>
+                            <p class="text-xs text-slate-500">Conference Room B & Zoom Link</p>
+                            <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-400 flex justify-between items-center">
+                                <span>Oct 22, 2026</span>
+                                <span class="text-emerald-600 font-bold"><i class="fa-solid fa-check-circle"></i> Synced</span>
+                            </div>
+                        </div>
+
+                        <!-- Event Card 3 -->
+                        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-sky-300 transition-all space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase">Parent Portal Event</span>
+                                <span class="text-[10px] text-slate-400 font-semibold"><i class="fa-regular fa-clock"></i> 05:00 PM</span>
+                            </div>
+                            <h4 class="font-bold text-sm text-slate-800">Annual Parent-Teacher Orientation</h4>
+                            <p class="text-xs text-slate-500">Auditorium Main Stage</p>
+                            <div class="pt-2 border-t border-slate-100 text-[11px] text-slate-400 flex justify-between items-center">
+                                <span>Nov 02, 2026</span>
+                                <span class="text-emerald-600 font-bold"><i class="fa-solid fa-check-circle"></i> Synced</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECTION 7: ACTION FEED -->
+                <section id="action-feed" class="section-anchor bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                    <div class="border-b border-slate-100 pb-4">
+                        <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-rss text-purple-600"></i> Real-Time Platform Action Feed
+                        </h3>
+                        <p class="text-xs text-slate-400">Live system audit logs and automated background activities</p>
+                    </div>
+
+                    <div class="relative border-l-2 border-purple-100 ml-3 space-y-6 pl-6 py-2">
+                        <!-- Feed Item 1 -->
+                        <div class="relative">
+                            <div class="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-purple-600 ring-4 ring-purple-100"></div>
+                            <div class="text-xs">
+                                <span class="font-bold text-slate-800">System Administrator Priscilla Lily</span> updated term schedule for
+                                <span class="font-semibold text-purple-700">Fall Semester 2026</span>.
+                                <p class="text-[10px] text-slate-400 mt-0.5">10 minutes ago</p>
+                            </div>
+                        </div>
+
+                        <!-- Feed Item 2 -->
+                        <div class="relative">
+                            <div class="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-emerald-500 ring-4 ring-emerald-100"></div>
+                            <div class="text-xs">
+                                <span class="font-bold text-slate-800">Batch CSV Import</span> successfully processed 48 new student enrollments.
+                                <p class="text-[10px] text-slate-400 mt-0.5">1 hour ago</p>
+                            </div>
+                        </div>
+
+                        <!-- Feed Item 3 -->
+                        <div class="relative">
+                            <div class="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-blue-500 ring-4 ring-blue-100"></div>
+                            <div class="text-xs">
+                                <span class="font-bold text-slate-800">Automated Database Backup</span> completed successfully (Size: 1.4 GB).
+                                <p class="text-[10px] text-slate-400 mt-0.5">3 hours ago</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SECTION 8: NOTICE BOARD -->
+                <section id="notice-board" class="section-anchor bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i class="fa-regular fa-clipboard text-indigo-600"></i> Notice Board & Announcements
+                            </h3>
+                            <p class="text-xs text-slate-400">Campus notices broadcasted across the entire EduPulse network</p>
+                        </div>
+                        <button onclick="showToast('Create Notice modal opened', 'info')" class="text-xs font-bold px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i> Post Announcement
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-4 rounded-xl bg-purple-50/50 border border-purple-100 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold text-purple-700 uppercase tracking-wider">Campus Announcement</span>
+                                <span class="text-[10px] text-slate-400">Posted Sept 24</span>
+                            </div>
+                            <h4 class="font-bold text-sm text-slate-800">Annual Science Fair 2026 Registration Open</h4>
+                            <p class="text-xs text-slate-600 line-clamp-2">Students from grades 9 through 12 can now register project proposals through the student portal dashboard.</p>
+                            <button onclick="openNoticeModal('Annual Science Fair 2026 Registration Open', 'Students from grades 9 through 12 can now register project proposals through the student portal dashboard before October 15th. Project grants up to $500 available for top proposals.')" class="text-xs font-bold text-purple-700 hover:underline inline-block pt-1">Read Full Notice &rarr;</button>
+                        </div>
+
+                        <div class="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">IT Infrastructure</span>
+                                <span class="text-[10px] text-slate-400">Posted Sept 20</span>
+                            </div>
+                            <h4 class="font-bold text-sm text-slate-800">Scheduled LMS Portal Maintenance Window</h4>
+                            <p class="text-xs text-slate-600 line-clamp-2">EduPulse portal will undergo scheduled server database optimization on Sunday between 02:00 AM and 04:00 AM EST.</p>
+                            <button onclick="openNoticeModal('Scheduled LMS Portal Maintenance Window', 'EduPulse portal will undergo scheduled server database optimization on Sunday between 02:00 AM and 04:00 AM EST. Access may be intermittently interrupted during this timeframe.')" class="text-xs font-bold text-indigo-700 hover:underline inline-block pt-1">Read Full Notice &rarr;</button>
+                        </div>
+                    </div>
+                </section>
+
+                <footer class="pt-6 pb-2 text-center text-xs text-slate-400 border-t border-slate-200/60">
+                    &copy; 2026 EduPulse LMS Platform. All Rights Reserved. SPIK UI Dashboard Architecture.
+                </footer>
+            </main>
+        </div>
+    </div>
+
+    <!-- Notice Modal -->
+    <div id="notice-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h3 id="modal-title" class="text-lg font-bold text-slate-900"></h3>
+            <p id="modal-content" class="text-xs text-slate-600 leading-relaxed"></p>
+            <div class="flex justify-end pt-2">
+                <button onclick="closeNoticeModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors">Close Notice</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Core Chart Variables
+        let examChartInstance = null;
+        let demoChartInstance = null;
+
+        // Auto-Scroll to Section & Snap to Top
+        function scrollToSection(event, sectionId) {
+            if (event) {
+                event.preventDefault();
+            }
+
+            const targetSection = document.getElementById(sectionId);
+            const container = document.getElementById('main-content');
+
+            if (targetSection && container) {
+                // Ensure target section scrolls cleanly to the top of the container
+                targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+                // Update nav highlight active status
+                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active-nav-item'));
+                const activeBtn = document.querySelector(`.nav-btn[data-section="${sectionId}"]`);
+                if (activeBtn) {
+                    activeBtn.classList.add('active-nav-item');
+                }
+            }
+        }
+
+        // Initialize Observer to highlight active sidebar item on manual scroll
+        function setupIntersectionObserver() {
+            const sections = document.querySelectorAll('.section-anchor');
+            const navButtons = document.querySelectorAll('.nav-btn');
+
+            const observerOptions = {
+                root: document.getElementById('main-content'),
+                rootMargin: '0px 0px -70% 0px',
+                threshold: 0
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const id = entry.target.getAttribute('id');
+                        navButtons.forEach(btn => {
+                            if (btn.getAttribute('data-section') === id) {
+                                btn.classList.add('active-nav-item');
+                            } else {
+                                btn.classList.remove('active-nav-item');
+                            }
+                        });
+                    }
+                });
+            }, observerOptions);
+
+            sections.forEach(section => observer.observe(section));
+        }
+
+        // Expandable list items
+        function toggleExpandable(headerEl) {
+            const parent = headerEl.parentElement;
+            const content = parent.querySelector('div:nth-child(2)');
+            const arrow = headerEl.querySelector('.icon-arrow');
+
+            if (content) {
+                content.classList.toggle('hidden');
+                if (arrow) {
+                    arrow.classList.toggle('rotate-180');
+                }
+            }
+        }
+
+        function toggleAllExpandables(sectionId, expand) {
+            const section = document.getElementById(sectionId);
+            if (!section) return;
+
+            const items = section.querySelectorAll('.expandable-item');
+            items.forEach(item => {
+                const content = item.querySelector('div:nth-child(2)');
+                const arrow = item.querySelector('.icon-arrow');
+                if (expand) {
+                    content.classList.remove('hidden');
+                    if (arrow) arrow.classList.add('rotate-180');
+                } else {
+                    content.classList.add('hidden');
+                    if (arrow) arrow.classList.remove('rotate-180');
+                }
+            });
+        }
+
+        // Toast Notifications
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            let typeClasses = 'bg-slate-900 text-white';
+            let icon = 'fa-circle-info';
+
+            if (type === 'success') {
+                typeClasses = 'bg-emerald-600 text-white';
+                icon = 'fa-circle-check';
+            } else if (type === 'warning') {
+                typeClasses = 'bg-amber-600 text-white';
+                icon = 'fa-triangle-exclamation';
+            }
+
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold ${typeClasses} transition-all duration-300 transform translate-y-2 opacity-0`;
+            toast.innerHTML = `<i class="fa-solid ${icon} text-sm"></i> <span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Table Action: Mark Paid
+        function markAsPaid(button) {
+            const row = button.closest('tr');
+            const statusBadge = row.querySelector('span');
+            statusBadge.className = "bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase";
+            statusBadge.innerText = "Paid";
+            button.remove();
+            showToast('Invoice marked as paid!', 'success');
+        }
+
+        // Star Student Search Filter
+        function filterStarStudents() {
+            const input = document.getElementById('star-search').value.toLowerCase();
+            const rows = document.querySelectorAll('#star-students-body tr');
+
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(input) ? '' : 'none';
+            });
+        }
+
+        // Sync Google Calendar Simulator
+        function syncGoogleCalendar() {
+            showToast('Syncing with Google Calendar API...', 'info');
+            setTimeout(() => {
+                showToast('Google Calendar synced successfully!', 'success');
+            }, 1200);
+        }
+
+        // Notice Modal
+        function openNoticeModal(title, content) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-content').innerText = content;
+            document.getElementById('notice-modal').classList.remove('hidden');
+        }
+
+        function closeNoticeModal() {
+            document.getElementById('notice-modal').classList.add('hidden');
+        }
+
+        // Initialize Chart.js Graphs
+        function initCharts() {
+            // Exam Results Line Chart
+            const ctxExam = document.getElementById('examResultsChart').getContext('2d');
+            examChartInstance = new Chart(ctxExam, {
+                type: 'line',
+                data: {
+                    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'],
+                    datasets: [
+                        {
+                            label: 'Student Pass Rate (%)',
+                            data: [82, 85, 88, 84, 91, 95],
+                            borderColor: '#8b5cf6',
+                            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'Teacher Grading Completeness (%)',
+                            data: [75, 78, 82, 89, 93, 97],
+                            borderColor: '#38bdf8',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11, family: 'Plus Jakarta Sans' } } }
+                    },
+                    scales: {
+                        y: { min: 60, max: 100, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // Demographics Donut Chart
+            const ctxDemo = document.getElementById('demographicsChart').getContext('2d');
+            demoChartInstance = new Chart(ctxDemo, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Female Students', 'Male Students'],
+                    datasets: [{
+                        data: [8250, 6750],
+                        backgroundColor: ['#8b5cf6', '#6366f1'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function updateChartData(filter) {
+            if (!examChartInstance) return;
+            if (filter === 'weekly') {
+                examChartInstance.data.labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'];
+                examChartInstance.data.datasets[0].data = [82, 85, 88, 84, 91, 95];
+            } else {
+                examChartInstance.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+                examChartInstance.data.datasets[0].data = [78, 81, 85, 89, 92, 96];
+            }
+            examChartInstance.update();
+        }
+
+        // Window Load Setup
+        window.onload = function () {
+            initCharts();
+            setupIntersectionObserver();
+        };
+    </script>
+</body>
+</html>

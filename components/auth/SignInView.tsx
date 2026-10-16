@@ -66,10 +66,36 @@ export const SignInView: React.FC<SignInViewProps> = ({
         console.log('[Auth] Google OAuth Token saved in sessionStorage');
       }
 
-      const superadminUser: ClassroomUser = {
-        name: result.user.displayName || 'Superadmin User',
+      // Sync user profile with Firestore database (/api/users)
+      let finalRole = 'supporter';
+      let isSuper = false;
+      try {
+        const syncRes = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: result.user.uid,
+            email: result.user.email,
+            displayName: result.user.displayName,
+            photoURL: result.user.photoURL,
+          }),
+        });
+        if (syncRes.ok) {
+          const syncData = await syncRes.json();
+          if (syncData.user) {
+            finalRole = syncData.user.role || 'supporter';
+            isSuper = syncData.user.isSuperAdmin === true || finalRole.toLowerCase() === 'superadmin';
+          }
+        }
+      } catch (syncErr) {
+        console.warn('[Auth] Could not sync user profile with /api/users:', syncErr);
+      }
+
+      const authenticatedUser: ClassroomUser = {
+        name: result.user.displayName || 'User',
         email: result.user.email || '',
-        role: 'SUPERADMIN',
+        role: finalRole,
+        isSuperAdmin: isSuper,
         avatarUrl: result.user.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
         googleWorkspaceId: result.user.uid,
         scopesGranted: [
@@ -85,17 +111,18 @@ export const SignInView: React.FC<SignInViewProps> = ({
       // Telemetry log
       trackClientEvent({
         category: 'AUTH',
-        action: 'GOOGLE_SSO_SUPERADMIN_SUCCESS',
-        userId: superadminUser.googleWorkspaceId,
-        userEmail: superadminUser.email,
-        userRole: 'SUPERADMIN',
+        action: isSuper ? 'GOOGLE_SSO_SUPERADMIN_SUCCESS' : 'GOOGLE_SSO_SUPPORTER_SUCCESS',
+        userId: authenticatedUser.googleWorkspaceId,
+        userEmail: authenticatedUser.email,
+        userRole: finalRole,
         metadata: {
           provider: 'google.com',
-          displayName: superadminUser.name
+          displayName: authenticatedUser.name,
+          role: finalRole,
         }
       });
 
-      onLoginSuccess(superadminUser);
+      onLoginSuccess(authenticatedUser);
     } catch (err: any) {
       console.error('[Google SSO Error]', err);
       setErrorMessage(err.message || 'Google sign in was cancelled or failed.');
@@ -104,24 +131,35 @@ export const SignInView: React.FC<SignInViewProps> = ({
     }
   };
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
     try {
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('google_oauth_access_token');
+        sessionStorage.clear();
       }
-      const { auth } = await import('@/lib/firebase/client');
-      const { signOut } = await import('firebase/auth');
-      await signOut(auth);
-
-      trackClientEvent({
-        category: 'AUTH',
-        action: 'USER_SIGNOUT',
-        userEmail: currentUser?.email
-      });
-    } catch (e) {
-      console.warn('Sign out warning:', e);
-    }
+    } catch {}
     onLogout();
+
+    (async () => {
+      try {
+        const { auth } = await import('@/lib/firebase/client');
+        const { signOut } = await import('firebase/auth');
+        if (auth && typeof auth === 'object' && auth.name) {
+          await Promise.race([
+            signOut(auth),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Sign out timeout')), 2500))
+          ]);
+        }
+
+        trackClientEvent({
+          category: 'AUTH',
+          action: 'USER_SIGNOUT',
+          userEmail: currentUser?.email
+        });
+      } catch (e) {
+        console.warn('Sign out warning:', e);
+      }
+    })();
   };
 
   return (
@@ -137,12 +175,18 @@ export const SignInView: React.FC<SignInViewProps> = ({
           </span>
         </div>
         <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-          {currentUser ? 'Admin Account Active' : 'Sign In with Google'}
+          {currentUser
+            ? ((currentUser.role || '').toLowerCase() === 'superadmin' || currentUser.isSuperAdmin)
+              ? 'Superadmin Account Active'
+              : 'Supporter Account Active'
+            : 'Sign In with Google'}
         </h1>
         <p className="text-sm text-slate-300 mt-2 max-w-2xl leading-relaxed">
           {currentUser
-            ? 'Your Google account is verified with full Admin privileges across EduPulse AI.'
-            : 'Authenticate securely using your Google account to access all systems and the Admin Panel.'}
+            ? ((currentUser.role || '').toLowerCase() === 'superadmin' || currentUser.isSuperAdmin)
+              ? 'Your Google account is verified with complete Superadmin privileges across EduPulse AI.'
+              : 'You are signed in with the Supporter role. Complete Website Admin Panel features are reserved for Superadmin accounts.'
+            : 'Authenticate securely using your Google account. All first-time registrations receive the Supporter role; Superadmins receive full admin control.'}
         </p>
       </div>
 
@@ -165,8 +209,12 @@ export const SignInView: React.FC<SignInViewProps> = ({
                 </div>
                 <p className="text-xs font-mono text-slate-500 mt-0.5">{currentUser.email}</p>
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="px-2.5 py-0.5 bg-indigo-600 text-white text-[11px] font-black rounded-lg uppercase tracking-wide">
-                    ADMIN
+                  <span className={`px-2.5 py-0.5 text-white text-[11px] font-black rounded-lg uppercase tracking-wide ${
+                    ((currentUser.role || '').toLowerCase() === 'superadmin' || currentUser.isSuperAdmin)
+                      ? 'bg-purple-600'
+                      : 'bg-emerald-600'
+                  }`}>
+                    {((currentUser.role || '').toLowerCase() === 'superadmin' || currentUser.isSuperAdmin) ? 'SUPERADMIN' : 'SUPPORTER'}
                   </span>
                   <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[11px] font-semibold rounded-lg flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -177,13 +225,19 @@ export const SignInView: React.FC<SignInViewProps> = ({
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => onNavigateTab('admin')}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-2 shadow-md shadow-indigo-200 cursor-pointer"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Go to Admin Panel</span>
-              </button>
+              {((currentUser.role || '').toLowerCase() === 'superadmin' || currentUser.isSuperAdmin) ? (
+                <button
+                  onClick={() => onNavigateTab('admin')}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-2 shadow-md shadow-indigo-200 cursor-pointer"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Go to Admin Panel</span>
+                </button>
+              ) : (
+                <div className="px-4 py-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-semibold">
+                  Admin Panel requires Superadmin
+                </div>
+              )}
               <button
                 onClick={handleSignOut}
                 className="px-5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs transition-colors flex items-center gap-2 border border-rose-200/60 cursor-pointer"

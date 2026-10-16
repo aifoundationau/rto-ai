@@ -1,0 +1,367 @@
+EDUPULSE AI (rto-ai) - CODE AUDIT & CLEANUP LIST
+================================================
+Prepared: 16 Oct 2026, against commit b916114 + your uncommitted changes
+(server.js, package.json "dev" script, next.config.js).
+
+Nothing in this list has been changed. It is for you to review and decide.
+Bugs that stopped features from working are covered separately in working.txt
+(with a ready-to-apply patch); they are NOT repeated here except where a
+deeper clean-up is still needed.
+
+Before any clean-up, see working.txt "ENVIRONMENT": the project sits on a
+FAT32 USB stick with a Windows health warning (production builds fail
+there), the Gemini API key is rejected by Google, and the latest commit is
+not pushed to GitHub.
+
+How to read this file
+---------------------
+  Priority:  P1 = fix before real users / real data
+             P2 = should fix (correctness, cost, maintainability)
+             P3 = tidy-up (dead code, naming, cosmetics)
+  Effort:    S = under 1 hour, M = half a day, L = 1+ days
+  Each item: where it is -> what is wrong -> suggested clean-up.
+
+
+=====================================================================
+P1 - SECURITY AND DATA PROTECTION
+=====================================================================
+
+1. API routes have no authentication or authorisation  [Effort: M]
+   Where: every file in app/api/*
+   What:  All routes use the Firebase Admin SDK (which bypasses
+          firestore.rules) and none check who is calling. Anyone who can
+          reach the site can:
+          - POST /api/assign-role     -> give any account SUPERADMIN claims
+          - POST /api/course-builder  -> action "prepare_superadmin" grants
+                                         SUPERADMIN to hard-coded accounts;
+                                         save_program / save_unit /
+                                         init_database / create_version
+          - GET  /api/users           -> every user's name, email, student no.
+          - GET  /api/applications    -> every applicant's name, email, phone,
+                                         DOB and address
+          - POST /api/applications    -> overwrite any application by id,
+                                         including setting status "Accepted"
+          - GET  /api/telemetry       -> activity log incl. emails, IPs,
+                                         user agents
+          - POST /api/tokens          -> write fake token transactions
+          - POST /api/sheets/sync     -> replace the live course/unit/FAQ data
+                                         the chatbot serves
+          - POST /api/upload          -> write files into /public
+   Clean-up: add one helper (e.g. lib/auth/requireUser.ts) that reads an
+          "Authorization: Bearer <Firebase ID token>" header, calls
+          adminAuth.verifyIdToken(), and checks the role claim. Use it in
+          every admin route. Client side, send
+          `await auth.currentUser.getIdToken()` with admin fetches.
+          Keep public only: POST /api/chat, GET+POST /api/events,
+          POST /api/applications (own application only), POST /api/telemetry.
+
+2. Admin access is decided in the browser only  [Effort: M]
+   Where: app/page.tsx (onAuthStateChanged ~line 100, handleGoogleSignInDirect
+          ~line 155, localStorage check ~line 92); components/auth/SignInView.tsx
+   What:  - Signing in with ANY Google account gives role 'SUPERADMIN'
+            (hard-coded in four places). SignInView even says "All accounts
+            ... receive instant Admin panel access".
+          - Setting localStorage "edupulse_is_admin" = "true" opens the admin
+            panel without signing in at all.
+   Clean-up: after sign-in call `user.getIdTokenResult()` and use the real
+          role claim; drop the localStorage admin flag; enforce on the server
+          too (item 1).
+
+3. Cloud Function lets any signed-in user assign any role  [Effort: S]
+   Where: functions/src/index.ts, assignUniversityRole (~line 63)
+   What:  Only checks `context.auth` exists, not that the caller is an admin.
+   Clean-up: require context.auth.token.role === 'SUPERADMIN' (or REGISTRAR)
+          before doing anything.
+
+4. Firestore rules expose personal data to any signed-in user  [Effort: S]
+   Where: firestore.rules
+   What:  - Default rule `match /{document=**} { allow read: if isSignedIn(); }`
+            lets any signed-in user read applications, activity_logs,
+            chat_interactions, token_transactions, event_bookings.
+          - isAdmin() treats every @aifoundation.net.au / .com.au email as
+            admin.
+          - Mix of 'admin' / 'ADMIN' / 'SUPERADMIN' role spellings.
+   Clean-up: deny by default; add explicit rules per collection; decide one
+          role vocabulary.
+
+5. Role-setting script wipes existing claims  [Effort: S]
+   Where: scripts/set-admin-role.ts -> lib/firebase/admin.ts setUserRoles()
+   What:  setCustomUserClaims(uid, { roles }) REPLACES all claims, so running
+          it deletes the `role`, `dept` and `studentNumber` claims the rest of
+          the app relies on. It also writes `roles: ['admin']`, a different
+          claim from the `role` field used everywhere else.
+   Clean-up: merge with existing claims (as assignUniversityRole does) or
+          delete the script in favour of /api/assign-role (once secured).
+
+6. Hard-coded identities and project details  [Effort: S]
+   Where: app/api/course-builder/route.ts (superadmin UID + emails),
+          scripts/prepare-superadmin.ts, scripts/set-admin-role.ts,
+          lib/firebase/client.ts (authDomain/projectId/senderId/appId
+          fallbacks), lib/firebase/admin.ts (project id + service-account
+          email fallbacks), components/admin/FirebaseTelemetryView.tsx
+          (project id + service account shown in UI, fake ping email),
+          public/firebase-auth-sso.js.
+   What:  Not secrets, but commit b916114 says these fallbacks were removed.
+          They also make a mis-configured deployment silently talk to the
+          production project.
+   Clean-up: read from env only; fail loudly when missing.
+
+7. lib/firebase/admin.ts parses .env.local by hand  [Effort: S]
+   Where: lib/firebase/admin.ts getCredentials()
+   What:  Duplicates Next.js env loading and can pick up a different key
+          than the environment you think you deployed with.
+   Clean-up: remove the file-reading fallback; rely on process.env.
+
+8. API keys stored in localStorage  [Effort: S]
+   Where: components/admin/AdminDashboardView.tsx (API tab), app/page.tsx
+   What:  Gemini / Firebase / Classroom / Pexels keys are saved in plain text
+          in localStorage, and the user's Gemini key is sent to the server in
+          every chat request. The Firebase, Classroom and Pexels keys are never
+          read by any code (dead settings).
+   Clean-up: keep keys server-side (env); remove the unused key fields.
+
+9. Uploads are unauthenticated and stored on local disk  [Effort: M]
+   Where: app/api/upload/route.ts
+   What:  Path traversal is fixed in the patch (on the original code one
+          request overwrote server.js in a test copy), but anyone can still
+          upload. Files written to /public are not served by `next start`
+          until the server restarts, and do not persist on serverless
+          hosts (Vercel, Firebase App Hosting) or across deploys.
+   Clean-up: require admin auth; store in Firebase Storage / Cloud Storage.
+
+10. Dev server listens on all network interfaces  [Effort: S]
+   Where: server.js (uncommitted)
+   What:  hostname '0.0.0.0' exposes the dev server (and the unauthenticated
+          admin APIs above) to everyone on the same network. Port is
+          hard-coded to 3000.
+   Clean-up: use 'localhost' unless LAN access is intended; read PORT from
+          env; or go back to "dev": "next dev".
+
+
+=====================================================================
+P2 - ARCHITECTURE, DATA AND CORRECTNESS
+=====================================================================
+
+11. Two separate course/unit databases that disagree  [Effort: L]
+   Where: data/*.ts + data/dynamicStore.ts (Google Sheets)  vs
+          lib/course-builder/* (Firestore "programs"/"units")
+   What:  - Chatbot, Home page and Application form use the static/Sheets
+            data (4 degrees, 6 units).
+          - Degree Programs and Unit Syllabuses tabs use Course Builder
+            (currently 1 published program, 3 published units).
+          - So the Degree Programs tab shows a different catalogue from the
+            rest of the site, and the chatbot cannot answer about Course
+            Builder units such as DATA2001 or AI3001 (after the patch it says
+            so honestly instead of describing DATA3001).
+   Clean-up: pick one source of truth (Course Builder looks intended) and
+          make the chat tools, Home page and Application form read from it.
+
+12. Important state lives only in server memory  [Effort: M]
+   Where: app/api/applications/route.ts (applicationsDatabase),
+          lib/agent/tools.ts (activeEventsState: RSVP counts, booked slots),
+          data/dynamicStore.ts (Sheets data), lib/course-builder/service.ts
+          (cache)
+   What:  Lost on every restart/deploy and not shared between serverless
+          instances. Advisor slot bookings reset to "available" on restart.
+   Clean-up: persist events/slots and the synced catalogue in Firestore;
+          treat memory only as a cache.
+
+13. Admin screens that only simulate  [Effort: L, decide per screen]
+   These look functional but do not change anything real:
+   - Events & RSVPs (AdminEventsManager): edits stay in component state;
+     the public Events page and chatbot never see them.
+   - Google Classroom (GoogleClassroomManager): no Classroom API calls.
+     Course list, batch "pipeline" and AI deploy are timers + local state;
+     the pipeline log lines are hard-coded.
+   - Tokens / Emergency Fund (TokenManager): balances reset on reload; the
+     Stripe checkout is simulated; only an audit record is posted.
+   - Staff Messages: stored in this browser's localStorage only; replies are
+     auto-generated.
+   - Images Folders: only lists images uploaded in the current session.
+   - Course Builder attachments: only the file name/size is saved; the file
+     itself is never uploaded.
+   - RBAC "Simulate Authorization" switches in Events/Classroom managers.
+   Clean-up: either connect each to a real backend or label it clearly as a
+          demo so staff do not rely on it.
+
+14. Demo / placeholder content in live paths  [Effort: S-M]
+   - /api/users falls back to sample users; /api/applications always merges
+     two fake applicants (Emma Watson, Rajesh Kumar) into real results.
+   - Home page stats "14 Programs", "120+ Units", "96%", "5,000+ Students"
+     are hard-coded and do not match the data (4 degrees, 6 units).
+   - "Powered by Gemini 3.1" text; the code calls gemini-2.5-flash.
+   - All 5 admissions events are dated Sept 2026 (in the past) but are
+     presented as "upcoming"; blog posts dated Sept 2026.
+   - Admin header badge "Staff Messages 2" is hard-coded.
+   - Embed snippets use https://your-domain.com (could use
+     window.location.origin).
+   - INITIAL_APPLICATION_STATE (data/applications.ts) gives every applicant
+     the same placeholder studentNumber 'STU-2026-00001', and its id/createdAt
+     are fixed when the module first loads.
+
+15. Telemetry write on every keystroke  [Effort: S]
+   Where: app/page.tsx handleUpdateApplication -> trackClientEvent
+   What:  Every character typed in the Application form sends POST
+          /api/telemetry, i.e. two Firestore writes per keystroke
+          (activity_logs + metrics). Costly and noisy.
+   Clean-up: debounce, or only log step changes / submission.
+   Also:  records written before the patch have createdAt = {} (see
+          working.txt item 25). activity_logs also store an ISO `timestamp`
+          field, so a one-off script could backfill createdAt from it.
+
+16. Course Builder logic gaps  [Effort: M]
+   Where: lib/course-builder/service.ts, components/admin/CourseBuilderView.tsx
+   - createProgramVersion copies the program but not its units, so every new
+     version starts empty and non-compliant.
+   - A program can be set to "published" even when the compliance audit fails.
+   - saveProgram / saveUnit / initializeCourseBuilderDatabase return
+     success: true even when the Firestore write failed (they silently fall
+     back to memory), so staff think changes are saved when they are not.
+   - auditProgramCompliance returns a hard-coded totalAssessmentWeight: 100.
+   - The editor mutates state objects in place (updated[idx].title = ...),
+     so unsaved edits leak into the unit list; use immutable updates.
+
+17. Chat engine (local mode) is keyword based and brittle  [Effort: M]
+   Where: lib/agent/engine.ts
+   - "business" anywhere selects the Business degree; "atar" anywhere sets
+     highest education to High School.
+   - Chat requires 5 fields to submit; the Application form requires 8.
+   - ChatInterface strips markdown characters (* # _ ` [ ]) instead of
+     rendering markdown, so headings and bold text appear as plain text.
+   - The "event_list" widget is produced but never rendered.
+   Clean-up: share one completeness rule; render markdown (e.g.
+          react-markdown); consider Gemini-only intent detection.
+
+18. Sheets sync edge cases  [Effort: S]
+   Where: lib/sheets/googleSheetsSync.ts
+   - Google's gviz endpoint returns the FIRST tab when a named tab is
+     missing, so a sheet without a "Units" tab gets its Courses tab parsed
+     as units.
+   - Header matching uses substring "includes", so column names can collide
+     (e.g. any header containing "id" or "code").
+   Clean-up: request tabs by gid or verify the returned header row.
+
+19. Applications admin actions are fire-and-forget  [Effort: S]
+   Where: components/admin/AdminDashboardView.tsx handleUpdateAppStatus
+   What:  Status changes are shown as done even if the save fails.
+   Also:  getApplicationsFromFirestore orders by updatedAt, which silently
+          drops documents without that field.
+
+20. Auth listeners / sign-in side effects  [Effort: S]
+   Where: AdminCalendarManager.tsx, GoogleClassroomManager.tsx
+   - onAuthStateChanged is subscribed after an async import; if the tab is
+     left before it resolves, the listener is never removed.
+   - Calendar "Disconnect" signs the whole app out of Firebase while the
+     admin panel stays open.
+
+21. Small UI state bugs  [Effort: S]
+   - EventBookingCard fires confetti every time it mounts (including when
+     you switch back to the chat tab); the .ics object URL is never revoked.
+   - TokenManager: buying for a listed beneficiary creates a second user
+     record with a copied balance, so the two balances drift apart; toast
+     ids can collide.
+   - Toast timers in AdminEventsManager / GoogleClassroomManager /
+     TokenManager can clear a newer toast early.
+   - HomeView useEffect is missing dependencies; shuffle uses a biased
+     sort(() => 0.5 - Math.random()).
+
+
+=====================================================================
+P3 - DEAD CODE, DUPLICATION AND TIDY-UP
+=====================================================================
+
+22. Unused files (safe to delete after a quick check)  [Effort: S]
+   - index.html (root, 1,137 lines) - standalone page, not served by Next.js
+   - public/legacy_dashboard.html (1,056 lines)
+   - public/admin-demo.html.bak (untracked backup, same size as above)
+   - public/firebase-auth-sso.js - not referenced; loads Firebase from CDN
+   - public/courses_template.csv - not referenced (templates are generated
+     by /api/sheets/sync?template=...)
+   - src/services/lmsClient.js, src/services/lmsAiService.js - Vite-era
+     services, not imported anywhere
+   - components/admin/AdminLoginModal.tsx - unused; accepted any password
+   - components/ApiKeyModal.tsx - imported in app/page.tsx but never rendered
+   - components/auth/GoogleClassroomLoginModal.tsx - rendered but can never
+     open (isClassroomLoginOpen is never set to true); its "Workspace email"
+     field is ignored
+   - lib/firebase/admin.cjs.js - ts-node shim only used by
+     scripts/set-admin-role.ts (see item 5)
+
+23. Unused dependencies  [Effort: S]
+   - @google/genai: only used by the unused src/services/lmsAiService.js
+   - clsx, tailwind-merge: not imported anywhere
+   - ts-node: only for the shim above
+
+24. Unused functions / imports  [Effort: S]
+   - lib/firebase/admin.ts: enrollTotpMfa() is an empty stub; setUserRoles()
+     only used by the script in item 5
+   - lib/firebase/client.ts: signInAndRefreshToken() unused
+   - lib/agent/engine.ts: COURSES_DATA, UNITS_DATA, EVENTS_DATA, FAQS_DATA,
+     CourseProgram, UnitDetail, ProspectiveEvent, FAQItem,
+     ToolExecutionResult, getDynamicFaqs imported but unused; isAskingUnit
+     computed but unused
+   - app/page.tsx: ApiKeyModal, COURSES_DATA and 6 lucide icons unused
+   - CourseBuilderView accepts an apiKey prop it ignores
+   - FAQ relatedLinks "actions" are never handled
+   - Many components import lucide icons they never use (run ESLint with
+     no-unused-vars to list them)
+
+25. Duplicated code  [Effort: M]
+   - Google sign-in + "superadmin user" object built in 4 places
+     (app/page.tsx x2, SignInView, GoogleClassroomLoginModal); extract one
+     hook (useAdminSession).
+   - assignUniversityRole and generateStudentNumber exist twice
+     (lib/firebase/admin.ts and functions/src/index.ts).
+   - Event booking logic exists twice (app/api/events/route.ts and the
+     book_event_or_consultation tool).
+   - Welcome message duplicated (app/page.tsx, app/embed/page.tsx).
+   - Google "G" SVG logo pasted 5 times (Navbar, SignInView,
+     GoogleClassroomLoginModal, AdminLoginModal, AdminCalendarManager);
+     make a <GoogleLogo /> component.
+   - JSON.parse(JSON.stringify(x)) used for cloning; use structuredClone.
+
+26. Tailwind classes that do nothing  [Effort: S]
+   58 occurrences in 17 files use Tailwind v4-only names (shadow-2xs,
+   shadow-xs, outline-hidden, backdrop-blur-xs) or plugin classes that are
+   not installed (animate-in, fade-in, animate-fade-in, no-scrollbar), plus
+   invalid py-0.2. The project uses Tailwind 3.4, so these are ignored.
+   Either switch to v3 equivalents (shadow-sm, outline-none, backdrop-blur-sm)
+   or add tailwindcss-animate / a no-scrollbar utility.
+
+27. Repository hygiene  [Effort: S]
+   - tsconfig.tsbuildinfo and next-env.d.ts are tracked although
+     .gitignore lists them (git rm --cached both).
+   - Root-level working docs (AUDIT_FRONTEND_DATA_ENTRY_CATALOG.txt,
+     FUTURE_FIREBASE_AUTH_AND_GOOGLE_SSO_PROMPT.txt, data-contracts.md)
+     could move to /docs.
+   - .agent/skills/course-builder-skill/SKILLS.md.txt has an odd name
+     (others are SKILL.md).
+   - Decide whether to commit or discard the uncommitted server.js /
+     package.json / next.config.js changes.
+
+28. Tooling  [Effort: S]
+   - `npm run lint` runs `next lint`, but there is no ESLint config or
+     eslint dependency, so it only prompts for setup.
+   - functions/package.json targets Node 18 (deprecated for Cloud Functions)
+     and its lint script uses tslint, which is deprecated and not installed.
+   - No automated tests. The API and UI checks used for working.txt could be
+     turned into a small test suite.
+
+29. Accessibility (quick wins)  [Effort: S-M]
+   - Several clickable <div>s (Navbar logo, Home stat cards, unit list items,
+     course cards in the form) are not keyboard accessible; use <button>.
+   - Icon-only buttons (close X, chat reset) need aria-labels.
+
+30. Logging noise  [Effort: S]
+   Many console.log/console.warn calls on hot paths (e.g. every Firestore
+   fallback, "OAuth token saved"). Consider a small logger with levels.
+
+
+=====================================================================
+SUGGESTED ORDER
+=====================================================================
+  1. Items 1-5 (security) - before any real applicant data is collected.
+  2. Item 15 (keystroke telemetry) - quick, saves Firestore cost.
+  3. Item 11 + 12 (one data source, persisted state).
+  4. Item 13 (decide: connect or label each simulated admin screen).
+  5. P3 tidy-up in one cleanup commit (items 22-28).

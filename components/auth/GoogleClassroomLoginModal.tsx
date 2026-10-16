@@ -17,10 +17,11 @@ import {
 export interface ClassroomUser {
   name: string;
   email: string;
-  role: 'TEACHER' | 'STUDENT' | 'SUPERADMIN' | 'ADMIN';
+  role: 'TEACHER' | 'STUDENT' | 'SUPERADMIN' | 'ADMIN' | 'superadmin' | 'supporter' | string;
   avatarUrl: string;
   googleWorkspaceId: string;
   scopesGranted: string[];
+  isSuperAdmin?: boolean;
 }
 
 interface GoogleClassroomLoginModalProps {
@@ -127,27 +128,38 @@ export const GoogleClassroomLoginModal: React.FC<GoogleClassroomLoginModalProps>
   const handleTeacherLogin = () => performLogin('TEACHER');
   const handleStudentLogin = () => performLogin('STUDENT');
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
     try {
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('google_oauth_access_token');
+        sessionStorage.clear();
       }
-      const email = activeSession?.email;
-      const { auth } = await import('@/lib/firebase/client');
-      const { signOut } = await import('firebase/auth');
-      await signOut(auth);
-
-      const { trackClientEvent } = await import('@/lib/firebase/telemetry');
-      trackClientEvent({
-        category: 'AUTH',
-        action: 'GOOGLE_CLASSROOM_SIGNOUT',
-        userEmail: email,
-      });
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
+    } catch {}
+    const email = activeSession?.email;
     setActiveSession(null);
     if (onLogout) onLogout();
+
+    (async () => {
+      try {
+        const { auth } = await import('@/lib/firebase/client');
+        const { signOut } = await import('firebase/auth');
+        if (auth && typeof auth === 'object' && auth.name) {
+          await Promise.race([
+            signOut(auth),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Sign out timeout')), 2500))
+          ]);
+        }
+
+        const { trackClientEvent } = await import('@/lib/firebase/telemetry');
+        trackClientEvent({
+          category: 'AUTH',
+          action: 'GOOGLE_CLASSROOM_SIGNOUT',
+          userEmail: email,
+        });
+      } catch (error) {
+        console.warn("Logout background task:", error);
+      }
+    })();
   };
 
   return (
