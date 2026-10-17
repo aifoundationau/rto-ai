@@ -67,28 +67,27 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div className="max-w-[1536px] w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4 xl:gap-8">
         {/* Brand */}
         <div
           onClick={() => onSelectTab('home')}
-          className="flex items-center gap-2.5 cursor-pointer group shrink-0"
+          className="flex items-center gap-3 cursor-pointer group shrink-0"
         >
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-primary-600 to-purple-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-primary-600 to-purple-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform shrink-0">
             <Sparkles className="w-5 h-5" />
           </div>
-          <div className="notranslate" translate="no">
-            <div className="font-extrabold text-base tracking-tight text-slate-900 flex items-center gap-1.5">
-              <span>EduPulse</span>
-              <span className="text-indigo-600">AI</span>
-            </div>
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+          <div className="notranslate flex flex-col justify-center" translate="no">
+            <div className="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 leading-tight">
               University Admissions & Student Agent
+            </div>
+            <p className="text-[10px] sm:text-[11px] font-extrabold text-indigo-600 uppercase tracking-wider leading-tight mt-0.5">
+              EduPulse AI
             </p>
           </div>
         </div>
 
         {/* Navigation Tabs (Desktop) */}
-        <nav className="hidden lg:flex items-center gap-1 bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60">
+        <nav className="hidden lg:flex items-center gap-1 xl:gap-2.5 bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/70 shadow-xs shrink-0">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -97,17 +96,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 key={item.id}
                 onClick={() => onSelectTab(item.id)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${isActive
-                  ? 'bg-white text-indigo-950 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                className={`px-3.5 xl:px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 whitespace-nowrap shrink-0 ${isActive
+                  ? 'bg-white text-indigo-950 shadow-xs font-bold ring-1 ring-slate-200/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                   }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
-                <span>{item.label}</span>
+                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
+                <span className="whitespace-nowrap">{item.label}</span>
               </button>
             );
           })}
-
         </nav>
 
         {/* Right Action Icons */}
@@ -239,13 +237,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 key={item.id}
                 onClick={() => onSelectTab(item.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${isActive
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${isActive
                   ? 'bg-indigo-600 text-white shadow-xs font-bold'
                   : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
                   }`}
               >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{item.label}</span>
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span className="whitespace-nowrap">{item.label}</span>
               </button>
             );
           })}
