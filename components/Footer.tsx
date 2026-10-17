@@ -25,6 +25,7 @@ import {
   Search
 } from 'lucide-react';
 import { setGoogleTranslateLanguage, getActiveGoogleTranslateLanguage } from '@/components/GoogleTranslate';
+import { WeatherModal } from '@/components/weather/WeatherModal';
 
 export interface LanguageOption {
   code: string;
@@ -82,7 +83,7 @@ function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: num
   return Math.round(R * c);
 }
 
-interface GeoLocationData {
+export interface GeoLocationData {
   suburb: string;
   city: string;
   state: string;
@@ -94,13 +95,38 @@ interface GeoLocationData {
   accuracyMeters?: number;
 }
 
-interface WeatherData {
+export interface HourlyWeatherPoint {
+  time: string;
+  timeFormatted: string;
+  isCurrentHour?: boolean;
+  temperature: number;
+  apparentTemperature?: number;
+  humidity?: number;
+  precipitationProbability?: number;
+  precipitation?: number;
+  weatherCode: number;
+  condition: string;
+  iconType: 'sun' | 'cloud-sun' | 'cloud' | 'rain' | 'storm' | 'snow';
+  windSpeed: number;
+}
+
+export interface WeatherData {
   temperature: number;
   condition: string;
   weatherCode: number;
   humidity?: number;
   windSpeed?: number;
+  apparentTemperature?: number;
+  precipitation?: number;
+  surfacePressure?: number;
+  windDirection?: number;
+  tempMax?: number;
+  tempMin?: number;
+  uvIndexMax?: number;
+  sunrise?: string;
+  sunset?: string;
   iconType: 'sun' | 'cloud-sun' | 'cloud' | 'rain' | 'storm' | 'snow';
+  hourly?: HourlyWeatherPoint[];
 }
 
 interface BrowserInfo {
@@ -116,6 +142,7 @@ export const Footer: React.FC = () => {
   const [currentDateTime, setCurrentDateTime] = useState<Date | null>(null);
   const [location, setLocation] = useState<GeoLocationData | null>(null);
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [isWeatherModalOpen, setIsWeatherModalOpen] = useState(false);
   const [browserInfo, setBrowserInfo] = useState<BrowserInfo | null>(null);
   const [isLoadingGeo, setIsLoadingGeo] = useState<boolean>(false);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -299,22 +326,67 @@ export const Footer: React.FC = () => {
     return { condition: 'Fair', iconType: 'cloud-sun' };
   };
 
+  // Helper to format hour string e.g. "2026-10-18T10:00" -> "10 AM"
+  const formatHourString = (timeStr: string): string => {
+    const parts = timeStr.split('T')[1]?.split(':');
+    if (!parts || parts.length < 2) return timeStr;
+    const hour = parseInt(parts[0], 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+    return `${displayHour} ${ampm}`;
+  };
+
   // 3. Fetch Weather from Open-Meteo
   const fetchWeather = useCallback(async (lat: number, lon: number) => {
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max&forecast_days=2&timezone=auto`;
       const res = await fetch(url);
       if (!res.ok) return;
       const data = await res.json();
       if (data && data.current) {
         const { condition, iconType } = parseWeatherCode(data.current.weather_code);
+
+        const times: string[] = data.hourly?.time || [];
+        const currentIsoHour = (data.current?.time || '').slice(0, 13);
+        let startIndex = times.findIndex((t: string) => t.startsWith(currentIsoHour));
+        if (startIndex === -1) startIndex = 0;
+
+        const hourly: HourlyWeatherPoint[] = times.slice(startIndex, startIndex + 24).map((t: string, idx: number) => {
+          const i = startIndex + idx;
+          const code = data.hourly?.weather_code?.[i] ?? 0;
+          const { condition: hCondition, iconType: hIcon } = parseWeatherCode(code);
+          return {
+            time: t,
+            timeFormatted: idx === 0 ? 'Now' : formatHourString(t),
+            isCurrentHour: idx === 0,
+            temperature: Math.round((data.hourly?.temperature_2m?.[i] ?? 0) * 10) / 10,
+            apparentTemperature: Math.round((data.hourly?.apparent_temperature?.[i] ?? 0) * 10) / 10,
+            humidity: data.hourly?.relative_humidity_2m?.[i],
+            precipitationProbability: data.hourly?.precipitation_probability?.[i] ?? 0,
+            weatherCode: code,
+            condition: hCondition,
+            iconType: hIcon,
+            windSpeed: Math.round(data.hourly?.wind_speed_10m?.[i] ?? 0),
+          };
+        });
+
         setWeather({
           temperature: Math.round(data.current.temperature_2m * 10) / 10,
           condition,
           weatherCode: data.current.weather_code,
           humidity: data.current.relative_humidity_2m,
           windSpeed: Math.round(data.current.wind_speed_10m || 0),
+          apparentTemperature: Math.round((data.current.apparent_temperature ?? data.current.temperature_2m) * 10) / 10,
+          precipitation: data.current.precipitation ?? 0,
+          surfacePressure: data.current.surface_pressure,
+          windDirection: data.current.wind_direction_10m,
+          tempMax: data.daily?.temperature_2m_max?.[0] !== undefined ? Math.round(data.daily.temperature_2m_max[0] * 10) / 10 : undefined,
+          tempMin: data.daily?.temperature_2m_min?.[0] !== undefined ? Math.round(data.daily.temperature_2m_min[0] * 10) / 10 : undefined,
+          uvIndexMax: data.daily?.uv_index_max?.[0] !== undefined ? Math.round(data.daily.uv_index_max[0] * 10) / 10 : undefined,
+          sunrise: data.daily?.sunrise?.[0],
+          sunset: data.daily?.sunset?.[0],
           iconType,
+          hourly,
         });
       }
     } catch (e) {
@@ -505,16 +577,33 @@ export const Footer: React.FC = () => {
           </div>
 
           {/* 2. Weather Information */}
-          <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3.5 flex items-start gap-3 shadow-inner hover:border-amber-500/30 transition-all notranslate" translate="no">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 mt-0.5">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setIsWeatherModalOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsWeatherModalOpen(true);
+              }
+            }}
+            className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-3.5 flex items-start gap-3 shadow-inner hover:border-amber-500/50 hover:bg-slate-800/90 cursor-pointer transition-all notranslate group relative focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+            translate="no"
+            title="Click for detailed weather forecast & hourly breakdown"
+          >
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
               {weather ? renderWeatherIcon(weather.iconType) : <CloudSun className="w-4 h-4" />}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-1 mb-0.5">
-                <span className="font-semibold text-slate-200 tracking-wide uppercase text-[10px] text-amber-400">
+                <span className="font-semibold tracking-wide uppercase text-[10px] text-amber-400 flex items-center gap-1.5">
                   Local Weather
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono">Live Meteo</span>
+                <span className="text-[10px] text-slate-400 font-mono flex items-center gap-0.5 group-hover:text-amber-300 transition-colors">
+                  <span>Live Meteo</span>
+                  <span className="text-amber-400 group-hover:translate-x-0.5 transition-transform">&rarr;</span>
+                </span>
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-white font-bold text-base">
@@ -841,6 +930,20 @@ export const Footer: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Centered Responsive Weather Details & Hourly Breakdown Modal */}
+      <WeatherModal
+        isOpen={isWeatherModalOpen}
+        onClose={() => setIsWeatherModalOpen(false)}
+        weather={weather}
+        location={location}
+        onRefresh={() => {
+          if (location?.latitude && location?.longitude) {
+            fetchWeather(location.latitude, location.longitude);
+          }
+        }}
+        isLoading={isLoadingGeo}
+      />
     </footer>
   );
 };
