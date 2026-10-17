@@ -16,16 +16,35 @@ export const KNOWLEDGE_COLLECTION = 'knowledge_embeddings';
  */
 function searchSeedDocuments(
   queryVector: number[],
-  options: { topK?: number; minScore?: number; category?: string } = {}
+  options: { topK?: number; minScore?: number; category?: string; rawQuery?: string } = {}
 ): RagSearchResult[] {
   const topK = options.topK || 5;
   const minScore = options.minScore || 0.15;
   const scored: RagSearchResult[] = [];
 
+  // Use rawQuery deterministic embedding if available to match the seed doc space
+  const effectiveQueryVector = options.rawQuery
+    ? generateDeterministicEmbedding(options.rawQuery)
+    : queryVector;
+
   for (const doc of SEED_KNOWLEDGE_DOCUMENTS) {
     if (options.category && doc.category !== options.category) continue;
     const docVector = generateDeterministicEmbedding(doc.content);
-    const score = cosineSimilarity(queryVector, docVector);
+    let score = cosineSimilarity(effectiveQueryVector, docVector);
+
+    // Boost score if rawQuery keywords or titles match
+    if (options.rawQuery) {
+      const qLower = options.rawQuery.toLowerCase();
+      const titleLower = doc.title.toLowerCase();
+      const kwMatch = Array.isArray(doc.keywords)
+        ? doc.keywords.some((k: string) => qLower.includes(k.toLowerCase()))
+        : (typeof doc.keywords === 'string' ? qLower.includes((doc.keywords as string).toLowerCase()) : false);
+      const titleMatch = titleLower.split(' ').some((w: string) => w.length > 3 && qLower.includes(w));
+      if (kwMatch || titleMatch) {
+        score = Math.max(score, 0.60) + 0.20;
+      }
+    }
+
     if (score >= minScore) {
       scored.push({
         chunk: {
@@ -43,8 +62,8 @@ function searchSeedDocuments(
           tenantTag: 'rto-ai',
           createdAt: new Date().toISOString(),
         },
-        score,
-        distance: 1 - score,
+        score: Math.min(0.99, score),
+        distance: Math.max(0.01, 1 - score),
       });
     }
   }
@@ -126,6 +145,7 @@ export async function searchNearestVectors(
     minScore?: number;
     category?: string;
     tenantTag?: string;
+    rawQuery?: string;
   } = {}
 ): Promise<RagSearchResult[]> {
   const topK = options.topK || 5;

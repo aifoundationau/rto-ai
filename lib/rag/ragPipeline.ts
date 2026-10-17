@@ -120,6 +120,7 @@ export async function queryMultilingualRag(
     minScore,
     category: options.categoryFilter,
     tenantTag: 'rto-ai',
+    rawQuery: query,
   });
 
   // Prepare source citations
@@ -208,7 +209,7 @@ Generate the answer in ${queryLangName}:`;
       });
 
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('RAG generation timeout after 6s')), 6000)
+        setTimeout(() => reject(new Error('RAG generation timeout after 20s')), 20000)
       );
 
       const response = await Promise.race([genPromise, timeoutPromise]);
