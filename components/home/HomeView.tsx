@@ -232,37 +232,37 @@ export const HomeView: React.FC<HomeViewProps> = ({
         />
         <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-indigo-950/85 to-slate-900/50" />
 
-        {/* Floating Quick Stats (Desktop) */}
-        <div className="hidden lg:flex flex-col absolute right-8 top-8 space-y-3 z-20 w-72">
+        {/* Floating Quick Stats (Desktop) - Evenly spread top to down */}
+        <div className="hidden lg:flex flex-col justify-between absolute right-8 xl:right-10 top-10 bottom-10 z-20 w-72 xl:w-80 py-1">
           {/* Box 1: Students */}
-          <div className="bg-slate-900/85 backdrop-blur-md border border-white/15 p-3.5 rounded-2xl text-white shadow-xl space-y-1 transform hover:scale-105 transition-transform">
-            <div className="flex items-center gap-2 text-indigo-300 font-extrabold text-base">
+          <div className="bg-slate-900/85 backdrop-blur-md border border-white/15 p-4 rounded-2xl text-white shadow-xl space-y-1.5 transform hover:scale-105 transition-all hover:bg-slate-800/90 hover:border-white/25">
+            <div className="flex items-center gap-2.5 text-indigo-300 font-extrabold text-base">
               <Users className="w-5 h-5 text-indigo-400 shrink-0" />
-              <span>{formatStudents(campusMetrics.totalStudents)}</span>
+              <span className="tracking-tight">{formatStudents(campusMetrics.totalStudents)}</span>
             </div>
-            <p className="text-[11px] text-slate-300 leading-snug">
+            <p className="text-xs text-slate-300 leading-snug">
               {campusMetrics.studentsSubtitle || 'Active learners across all faculties'}
             </p>
           </div>
 
           {/* Box 2: Graduate Placement */}
-          <div className="bg-slate-900/85 backdrop-blur-md border border-white/15 p-3.5 rounded-2xl text-white shadow-xl space-y-1 transform hover:scale-105 transition-transform">
-            <div className="flex items-center gap-2 text-emerald-400 font-extrabold text-base">
+          <div className="bg-slate-900/85 backdrop-blur-md border border-white/15 p-4 rounded-2xl text-white shadow-xl space-y-1.5 transform hover:scale-105 transition-all hover:bg-slate-800/90 hover:border-white/25">
+            <div className="flex items-center gap-2.5 text-emerald-400 font-extrabold text-base">
               <TrendingUp className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span>{formatPlacement(campusMetrics.placementRate)}</span>
+              <span className="tracking-tight">{formatPlacement(campusMetrics.placementRate)}</span>
             </div>
-            <p className="text-[11px] text-slate-300 leading-snug">
+            <p className="text-xs text-slate-300 leading-snug">
               {campusMetrics.placementSubtitle || 'Graduate employment within 90 days'}
             </p>
           </div>
 
           {/* Box 3: Total Faculty and Admin Staff */}
-          <div className="bg-slate-900/85 backdrop-blur-md border border-white/15 p-3.5 rounded-2xl text-white shadow-xl space-y-1 transform hover:scale-105 transition-transform">
-            <div className="flex items-center gap-2 text-amber-300 font-extrabold text-base">
+          <div className="bg-slate-900/85 backdrop-blur-md border border-white/15 p-4 rounded-2xl text-white shadow-xl space-y-1.5 transform hover:scale-105 transition-all hover:bg-slate-800/90 hover:border-white/25">
+            <div className="flex items-center gap-2.5 text-amber-300 font-extrabold text-base">
               <GraduationCap className="w-5 h-5 text-amber-400 shrink-0" />
-              <span>{formatFaculty(campusMetrics.facultyStaff)}</span>
+              <span className="tracking-tight">{formatFaculty(campusMetrics.facultyStaff)}</span>
             </div>
-            <p className="text-[11px] text-slate-300 leading-snug">
+            <p className="text-xs text-slate-300 leading-snug">
               {campusMetrics.facultySubtitle || 'Academic educators & operational staff'}
             </p>
           </div>
