@@ -1,0 +1,230 @@
+================================================================================
+COMPREHENSIVE AGENTIC PROMPT: CRYPTOGRAPHIC CALLER IDENTITY & ZERO-TRUST RBAC
+FILE: apicheckwhoscallinguidemail.txt
+PURPOSE: UNIVERSAL AGENTIC INSTRUCTION FOR ERADICATING IDENTITY SPOOFING,
+         UNPROTECTED BACKEND APIS, AND FRONTEND ADMIN VIEW LEAKS
+================================================================================
+
+[COPY & PASTE THE ENTIRE PROMPT BELOW INTO ANY AI CODING ASSISTANT / AGENT]
+
+--------------------------------------------------------------------------------
+PROMPT BEGINS
+--------------------------------------------------------------------------------
+
+You are an expert Security Engineer and Full-Stack Systems Architect.
+Your task is to conduct an end-to-end security audit and remediation of this application's API routes, frontend view gating, authentication flow, and Role-Based Access Control (RBAC).
+
+CRITICAL SECURITY FLAWS TO AUDIT & ELIMINATE:
+
+FLAW 1: "Identity Spoofing via Client-Supplied Identifiers"
+  In insecure backends, API routes (e.g., /api/users, /api/assign-role, /api/profile) trust the caller's identity by reading 'uid', 'id', 'email', or 'role' directly from the HTTP request body (`req.body` / `await req.json()`) or query parameters (`req.query` / `req.url`).
+  An attacker issues an HTTP request with:
+    { "uid": "attacker_id", "email": "superadmin@domain.com", "role": "superadmin" }
+  and the unauthenticated backend accepts it, creating or elevating accounts to Superadmin, overwriting data, or leaking private records.
+
+FLAW 2: "Frontend View Leaks & Insecure Admin Gating (Security by Obscurity)"
+  In insecure frontends, developers merely hide the "Admin" link in the navbar, but in the page view renderer they write:
+    {activeTab === 'admin' && ((user || isLoggedIn) ? <AdminDashboardView /> : <LoginView />)}
+  Because ANY signed-in user (even a regular supporter or student) satisfies `user != null`, any signed-in user who deep-links, clicks a settings button, clicks a quick-shortcut card, or navigates to `/admin` gets the FULL Admin Panel with complete access to administrative operations!
+
+YOUR MANDATE:
+  1. Enforce a ZERO-TRUST CRYPTOGRAPHIC IDENTITY ARCHITECTURE across all backend API routes.
+     - The server MUST NEVER trust 'uid' or 'email' provided in request bodies or query parameters.
+     - Identity MUST be derived EXCLUSIVELY from a cryptographically verified signature (e.g. Firebase ID Token, Auth0 JWT, Supabase Token, or NextAuth Session).
+     - Any non-superadmin caller attempting to access administrative endpoints or elevate privileges MUST be rejected with HTTP 401/403.
+  2. Enforce STRICT PRIVILEGE-BASED FRONTEND GATING with multi-layer DEFENSE-IN-DEPTH.
+     - Merely being a signed-in user (`user != null` or `isLoggedIn === true`) MUST NEVER grant access to the Admin panel.
+     - The Admin view MUST only render if the user has an explicit, verified `role === 'superadmin'`.
+     - Administrative components must embed internal fail-closed guards.
+     - All auxiliary navigation paths (settings handlers, classroom links, quick shortcuts) must be audited and secured.
+
+Follow this systematic step-by-step workflow:
+
+--------------------------------------------------------------------------------
+PHASE 1: VULNERABILITY AUDIT & SCANNING
+--------------------------------------------------------------------------------
+1. Backend Audit:
+   - Scan all API route handlers (e.g. `app/api/**/route.ts`, `pages/api/**/*.ts`, `routes/*.js`, or backend controllers):
+   - Find every route that extracts `uid`, `email`, `role`, or `isSuperAdmin` from `req.body`, `req.json()`, or URL query parameters.
+   - Find every route that mutates user roles, permissions, tenant configurations, or user records without validating caller identity.
+   - Find every route that exposes directory listings of users, applications, or personal identifiable information (PII) without authentication.
+   - Detect and flag any "development fallbacks" (e.g., `if (process.env.NODE_ENV === 'development') { useBodyValues(); }`) which create severe backdoors.
+
+2. Frontend Audit:
+   - Scan page view renderers (e.g., `app/page.tsx`, `App.tsx`, router definitions, navigation components):
+   - Search for insecure admin view gating patterns like:
+     `{activeTab === 'admin' && ((user || isAdminLoggedIn) ? <AdminView /> : ...)}`
+     `{activeTab === 'admin' && (currentUser ? <AdminView /> : ...)}`
+   - Search for navigation handlers (e.g. `handleOpenSettings`, `onOpenClassroom`, user dropdown items) that unconditionally set the active route/tab to `'admin'`.
+   - Search for dashboard shortcut cards (e.g. "Admin Panel", "Manage Users") displayed to regular users without role checks.
+   - Check `localStorage` / session storage handling: ensure the app never grants Superadmin based solely on an unverified `{ isSuperAdmin: true }` flag stored in the browser.
+
+3. Document all vulnerable backend endpoints and frontend view leaks found before modifying code.
+
+--------------------------------------------------------------------------------
+PHASE 2: SERVER-SIDE CRYPTOGRAPHIC AUTHENTICATION MIDDLEWARE
+--------------------------------------------------------------------------------
+1. Create or enhance a central server-side authentication utility (e.g., `lib/auth/serverAuth.ts` or `middleware/auth.ts`):
+   - Extract the Bearer token from the incoming HTTP `Authorization` header (`Authorization: Bearer <token>`).
+   - If the header is missing, malformed, or has an invalid format, reject immediately with HTTP 401 Unauthorized (`{ error: "Unauthorized: Missing or invalid Authorization header", code: "UNAUTHORIZED" }`).
+   - Cryptographically verify the token using the server-side Admin SDK / Identity Provider (e.g., `admin.auth().verifyIdToken(token)` for Firebase, or `jwt.verify(token, secret)`).
+   - If token decoding or verification fails (expired token, wrong project, forged signature), catch the error, log securely on the server, and reject with HTTP 401 Unauthorized.
+   - Return a normalized `VerifiedCaller` object containing:
+     {
+       uid: verifiedPayload.uid || verifiedPayload.sub,
+       email: (verifiedPayload.email || '').toLowerCase().trim(),
+       name: verifiedPayload.name,
+       picture: verifiedPayload.picture,
+       claims: verifiedPayload
+     }
+
+2. Implement a Superadmin Verification Gate (`requireSuperAdminCaller(req)`):
+   - Verify the caller's token first.
+   - Determine if the caller is an authenticated Superadmin:
+     a) Check if the verified email matches immutable project owners in secure server environment variables (e.g., `PROJECT_OWNERS` / `SUPERADMIN_EMAILS`).
+     b) AND/OR query the database (e.g., Firestore `users/{uid}` or SQL `users` table) using the VERIFIED UID and verify that `role === 'superadmin'` or `isSuperAdmin === true`.
+   - If the caller is NOT a superadmin, reject immediately with HTTP 403 Forbidden:
+     `{ error: "Forbidden: Superadmin authorization is required", code: "FORBIDDEN", currentRole: role }`.
+
+3. Implement an Authenticated Self-or-Admin Gate (`requireSelfOrAdmin(req, targetUid, targetEmail)`):
+   - Ensure users can only query or mutate their OWN records unless they possess verified Superadmin rights.
+
+--------------------------------------------------------------------------------
+PHASE 3: HARDENING USER PROFILE & REGISTRATION ENDPOINTS (e.g., /api/users)
+--------------------------------------------------------------------------------
+1. Refactor User Registration & Profile Sync (`POST /api/users`):
+   - Require `Authorization: Bearer <idToken>`. Return 401 if missing or invalid.
+   - Derive `uid` and `email` STRICTLY from `verifiedToken.uid` and `verifiedToken.email`.
+   - DISCARD any client-supplied `uid`, `email`, `role`, or `isSuperAdmin` present in the request body. Never let the request body overwrite identity or role fields.
+   - Enforce the Strict First-Time Registration Rule:
+     * If the user document does NOT exist in the database, create it with least privilege: `role: 'supporter'` (or 'member'/'user') and `isSuperAdmin: false`.
+     * Exception: Only allow `role: 'superadmin'` if the caller's VERIFIED email is explicitly defined in the server-side `SUPERADMIN_EMAILS` environment variable.
+     * If the user already exists in the database, preserve their existing role and permissions. Do NOT allow client requests to overwrite existing roles.
+
+2. Refactor Role Assignment & Management Endpoints (`PATCH /api/users`, `POST /api/assign-role`):
+   - Gate the entire handler behind `requireSuperAdminCaller(req)`.
+   - Non-superadmins MUST receive 403 Forbidden.
+   - Validate target roles against a strict whitelist of valid system roles (reject arbitrary strings).
+   - Update database role AND synchronize server-side auth custom claims (e.g. `auth.setCustomUserClaims(uid, { role })`).
+
+3. Refactor User Directory Lookups (`GET /api/users`):
+   - If querying the full user list/directory: Gate with `requireSuperAdminCaller(req)` (403 Forbidden for non-admins to prevent PII scraping).
+   - If querying by `?uid=` or `?email=`: Verify that caller is requesting their own profile OR is a Superadmin. Reject unauthorized queries with 403 Forbidden.
+
+4. Eliminate All Development Backdoors:
+   - Search for and delete any `if (process.env.NODE_ENV === 'development')` clauses that fall back to trusting `req.body.uid` or `req.body.email` when no Bearer token is provided. Security rules must be active and tested in development as well as production.
+
+--------------------------------------------------------------------------------
+PHASE 4: FRONTEND VIEW GATING & DEFENSE-IN-DEPTH HARDENING
+--------------------------------------------------------------------------------
+1. Implement Strict Frontend Role Evaluation:
+   - Define a reliable client-side helper:
+     ```typescript
+     const isSuperAdminUser = Boolean(
+       currentUser && (
+         isProjectOwnerEmail(currentUser.email) ||
+         (currentUser.role || '').toLowerCase() === 'superadmin'
+       )
+     );
+     ```
+   - Never determine superadmin status from an unvalidated boolean flag in `localStorage`. If `role !== 'superadmin'`, `isSuperAdminUser` must evaluate to `false`.
+
+2. Lock Down View Rendering:
+   - In page routers or view switches, replace `(user || isAdminLoggedIn)` with `isSuperAdminUser`:
+     ```tsx
+     {activeTab === 'admin' && (
+       isSuperAdminUser ? (
+         <AdminDashboardView
+           currentUser={currentUser}
+           apiKey={apiKey}
+           onSaveApiKey={handleSaveApiKey}
+           onLogout={handleLogoutAdmin}
+         />
+       ) : (
+         <AccessDeniedOrSignInView currentUser={currentUser} />
+       )
+     )}
+     ```
+   - If a non-superadmin lands on `activeTab === 'admin'`, they must NEVER see the admin panel. Display an explicit "Superadmin Privileges Required" card or redirect them to their home/chat view.
+
+3. Embed Defense-in-Depth Inside the Admin Component:
+   - In `<AdminDashboardView />` (or equivalent admin component), accept `currentUser` as a prop.
+   - At the very top of the component render, enforce:
+     ```tsx
+     const isSuper = currentUser
+       ? isSuperAdmin(currentUser.role, currentUser.isSuperAdmin, currentUser.email)
+       : true;
+
+     if (currentUser && !isSuper) {
+       return <AccessDeniedView currentUser={currentUser} onLogout={onLogout} />;
+     }
+     ```
+   - Even if the parent page fails to guard the view, the component itself fails closed.
+
+4. Audit All Navigation Buttons & Shortcut Cards:
+   - **Settings Button**: If user is Superadmin &rarr; route to `admin`; if regular user &rarr; route to `account`/`profile`; if logged out &rarr; trigger login.
+   - **Classroom / Portal Buttons**: Route non-superadmin users to public catalogs or member courses, NEVER to `admin`.
+   - **Dashboard Shortcut Cards**: Wrap any "Open Admin Panel" or "Administrative Controls" cards in `{isSuperAdminUser && (...)}` so regular users never see or click them.
+
+--------------------------------------------------------------------------------
+PHASE 5: CLIENT-SIDE AUTHENTICATED CALLS
+--------------------------------------------------------------------------------
+1. Update Client-Side API Helpers:
+   - Create or update an `authenticatedFetch(url, options)` helper.
+   - Automatically retrieve the active user's ID token (e.g. `await auth.currentUser.getIdToken()`).
+   - Automatically attach `headers['Authorization'] = 'Bearer ' + idToken`.
+   - Handle token expiration or refresh seamlessly.
+
+2. Update All Frontend Admin & Sync Components:
+   - Ensure sign-in components (e.g. Google Sign-In button, login hooks) pass `Authorization: Bearer <idToken>` when calling the profile sync endpoint (`/api/users`).
+   - Replace any raw `fetch('/api/users')` or `fetch('/api/assign-role')` in admin dashboards with `authenticatedFetch`.
+   - Ensure the UI gracefully handles 401/403 responses by displaying clear permission notices or redirecting unauthorized users away from admin views.
+
+--------------------------------------------------------------------------------
+PHASE 6: COMPREHENSIVE AUTOMATED SECURITY AUDIT & TESTING
+--------------------------------------------------------------------------------
+Create and execute an automated penetration test script (e.g., `scripts/test_security_rbac.js`) that programmatically simulates real attack vectors and verifies proper rejection:
+
+1. Test Vector 1 (Unauthenticated Spoof Attempt):
+   - Send `POST /api/users` with `{ uid: "attacker-id", email: "admin@domain.com" }` without an Authorization header.
+   - ASSERT: Returns HTTP 401 Unauthorized. Document is NOT created in database.
+
+2. Test Vector 2 (Forged / Malformed Bearer Token):
+   - Send `POST /api/users` with `Authorization: Bearer forged-token-abc123xyz`.
+   - ASSERT: Returns HTTP 401 Unauthorized.
+
+3. Test Vector 3 (Unauthenticated Role Escalation):
+   - Send `PATCH /api/users` or `POST /api/assign-role` with `{ role: "superadmin" }` without an Authorization header.
+   - ASSERT: Returns HTTP 401 or 403. Role is NOT changed.
+
+4. Test Vector 4 (Unauthorized Directory Scraping):
+   - Send `GET /api/users` without an Authorization header.
+   - ASSERT: Returns HTTP 401 or 403. User directory is NOT exposed.
+
+5. Test Vector 5 (Legitimate Supporter Token Privilege Boundary):
+   - Mint a genuine ID token for a regular non-admin user (e.g., via Admin SDK or test credentials).
+   - Call `POST /api/users` passing a spoofed admin email in the body.
+   - ASSERT: Server discards body email, creates profile with genuine token email, and strictly assigns least-privilege role (e.g. `supporter`).
+   - Using this legitimate supporter token, attempt to call `PATCH /api/users` or `POST /api/assign-role` to promote to `superadmin`.
+   - ASSERT: Returns HTTP 403 Forbidden with `{ error: "Forbidden: Superadmin authorization is required" }`.
+
+6. Run the project's type checker (`npx tsc --noEmit` or equivalent) to verify 0 syntax or type errors.
+
+--------------------------------------------------------------------------------
+DEFINITION OF DONE & DELIVERABLES
+--------------------------------------------------------------------------------
+1. Central authentication middleware implementing cryptographic token verification.
+2. All mutating and administrative endpoints protected by verified caller identity and Superadmin checks.
+3. Zero trust in body or query parameter `uid`/`email`.
+4. Client-side fetch helper and components attaching valid Bearer tokens.
+5. All dev backdoors completely purged.
+6. Frontend view rendering strictly gated by verified `role === 'superadmin'`; `(user || isLoggedIn)` patterns eliminated.
+7. Defense-in-depth embedded inside the Admin component itself.
+8. Auxiliary buttons and shortcut cards audited; admin shortcuts hidden from regular users.
+9. Automated security test script exiting with 100% PASS (0 failures).
+10. Type check passes with 0 errors.
+
+Report your findings, the endpoints hardened, the frontend view guards installed, and the full test suite output upon completion.
+--------------------------------------------------------------------------------
+PROMPT ENDS
+================================================================================

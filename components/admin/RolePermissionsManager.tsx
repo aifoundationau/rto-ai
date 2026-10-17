@@ -35,6 +35,7 @@ import {
   PERMISSION_CATEGORIES,
   type SystemPermission
 } from '@/lib/auth/permissions';
+import { authenticatedFetch } from '@/lib/firebase/client';
 
 export const RolePermissionsManager: React.FC = () => {
   const [rolePermissions, setRolePermissions] = useState<Record<SystemRole, string[]>>(
@@ -59,7 +60,7 @@ export const RolePermissionsManager: React.FC = () => {
   const fetchPermissions = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/permissions');
+      const res = await authenticatedFetch('/api/permissions');
       if (res.ok) {
         const data = await res.json();
         if (data.rolePermissions) {
@@ -124,7 +125,7 @@ export const RolePermissionsManager: React.FC = () => {
     setIsSaving(true);
     setStatusMessage({ type: null, text: '' });
     try {
-      const res = await fetch('/api/permissions', {
+      const res = await authenticatedFetch('/api/permissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -157,7 +158,7 @@ export const RolePermissionsManager: React.FC = () => {
     setIsSaving(true);
     setStatusMessage({ type: null, text: '' });
     try {
-      const res = await fetch('/api/permissions', {
+      const res = await authenticatedFetch('/api/permissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

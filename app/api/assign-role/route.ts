@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { assignUniversityRole } from '@/lib/firebase/admin';
+import { requireSuperAdminCaller } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * POST /api/assign-role
+ * Strictly requires cryptographically verified Superadmin caller.
+ */
 export async function POST(req: NextRequest) {
   try {
+    // 1. Enforce Superadmin Authentication
+    const authCheck = await requireSuperAdminCaller(req);
+    if ('errorResponse' in authCheck) {
+      return authCheck.errorResponse;
+    }
+
     const body = await req.json();
     const { uid, role, dept, fullName, email } = body;
 

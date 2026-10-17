@@ -109,13 +109,19 @@ try {
   // already configured
 }
 
+function isPlainObject(v: unknown): v is Record<string, any> {
+  if (typeof v !== 'object' || v === null) return false;
+  const proto = Object.getPrototypeOf(v);
+  return proto === Object.prototype || proto === null;
+}
+
+// Only recurse into plain objects: arrays, Dates and FieldValue sentinels
+// (e.g. serverTimestamp()) must reach Firestore untouched.
 function cleanUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
   const cleaned: Record<string, any> = {};
   for (const [k, v] of Object.entries(obj)) {
     if (v !== undefined) {
-      cleaned[k] = (typeof v === 'object' && v !== null && !(v instanceof Date))
-        ? cleanUndefined(v)
-        : v;
+      cleaned[k] = isPlainObject(v) ? cleanUndefined(v) : v;
     }
   }
   return cleaned as Partial<T>;
@@ -420,7 +426,7 @@ export async function saveChatInteraction(interaction: {
       metadata: {
         interactionId: docRef.id,
         queryPreview: interaction.userMessage.slice(0, 100),
-        toolsUsed: interaction.toolsExecuted?.map((t: any) => t.tool) || [],
+        toolsUsed: interaction.toolsExecuted?.map((t: any) => t.toolName) || [],
       },
     });
 

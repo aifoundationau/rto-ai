@@ -46,3 +46,45 @@ body {
 .animate-pulse-subtle {
   animation: pulse-subtle 3s infinite ease-in-out;
 }
+
+/* Google Translate Integration Styling */
+.goog-te-banner-frame.skiptranslate,
+.goog-te-banner-frame,
+#goog-gt-tt,
+.goog-te-balloon-frame {
+  display: none !important;
+}
+
+body {
+  top: 0px !important;
+  position: static !important;
+}
+
+#google_translate_element {
+  position: absolute;
+  top: -9999px;
+  left: -9999px;
+  width: 0px;
+  height: 0px;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.goog-tooltip,
+.goog-tooltip:hover {
+  display: none !important;
+}
+
+.goog-text-highlight {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Enforce non-translatable Australian elements and language selectors */
+.notranslate,
+[translate="no"] {
+  -webkit-transform: translateZ(0);
+}
+

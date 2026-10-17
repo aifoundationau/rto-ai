@@ -10,16 +10,26 @@ import {
   isValidRole,
   type SystemRole
 } from '@/lib/auth/roles';
+import {
+  verifyBearerToken,
+  getVerifiedCaller,
+  requireSuperAdminCaller
+} from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/users
+ * - Querying specific user by ?uid=... or ?email=... returns that user profile.
+ * - Listing all users requires verified Superadmin authentication to protect PII.
+ */
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const uid = searchParams.get('uid');
     const emailParam = searchParams.get('email');
 
-    // If querying a single user by UID
+    // 1. Querying a single user by UID
     if (uid) {
       try {
         const doc = await db.collection('users').doc(uid).get();
@@ -43,7 +53,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ user: null, message: 'User not found' }, { status: 404 });
     }
 
-    // If querying a single user by Email
+    // 2. Querying a single user by Email
     if (emailParam) {
       try {
         const cleanEmail = emailParam.toLowerCase().trim();
@@ -69,6 +79,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ user: null, message: 'User not found' }, { status: 404 });
     }
 
+    // 3. Listing ALL users -> Requires Superadmin authentication
+    const authCheck = await requireSuperAdminCaller(req);
+    if ('errorResponse' in authCheck) {
+      return authCheck.errorResponse;
+    }
+
     let usersList: any[] = [];
 
     try {
@@ -81,12 +97,12 @@ export async function GET(req: NextRequest) {
             id: doc.id,
             ...data,
             role,
-            isSuperAdmin: isSuperAdmin(role, data.isSuperAdmin)
+            isSuperAdmin: isSuperAdmin(role, data.isSuperAdmin, data.email)
           });
         });
       }
     } catch (dbErr) {
-      console.warn('Firestore fetch failed or not configured, using seed fallback:', dbErr);
+      console.warn('Firestore fetch failed, using fallback:', dbErr);
     }
 
     // Fallback to sample data if Firestore is empty or uninitialized
@@ -96,7 +112,7 @@ export async function GET(req: NextRequest) {
         return {
           ...u,
           role,
-          isSuperAdmin: isSuperAdmin(role, (u as any).isSuperAdmin)
+          isSuperAdmin: isSuperAdmin(role, (u as any).isSuperAdmin, u.email)
         };
       });
     }
@@ -110,19 +126,32 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/users
- * Registers or synchronizes a user profile upon Google Sign-In:
- * - First-time registrations default strictly to the role of 'supporter'.
- * - Existing users have their persisted Firestore role and permissions loaded.
- * - Multi-tenant tag 'rto-ai' is automatically associated with the record.
+ * Cryptographically verified user profile synchronization:
+ * - Requires Authorization: Bearer <idToken> from Firebase Auth.
+ * - Discards client-supplied UIDs/emails and uses ONLY the verified token payload.
+ * - New users strictly receive role = 'supporter' (unless verified email is on project owners list).
+ * - Existing users have their persisted Firestore role loaded and preserved.
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { uid, email, displayName, photoURL } = body;
+    // 1. Cryptographically verify caller's Firebase ID token
+    const verifiedToken = await verifyBearerToken(req);
 
-    if (!uid) {
-      return NextResponse.json({ error: 'Missing required parameter "uid".' }, { status: 400 });
+    if (!verifiedToken || !verifiedToken.uid) {
+      return NextResponse.json(
+        {
+          error: 'Unauthorized: A cryptographically verified Firebase ID token is required in the Authorization header to sync user profile.',
+          code: 'UNAUTHORIZED'
+        },
+        { status: 401 }
+      );
     }
+
+    // SECURE: Use cryptographically verified identity directly from Google
+    const uid = verifiedToken.uid;
+    const email = (verifiedToken.email || '').toLowerCase().trim();
+    const displayName = verifiedToken.name || '';
+    const photoURL = verifiedToken.picture || '';
 
     const userRef = db.collection('users').doc(uid);
     const userDoc = await userRef.get();
@@ -133,39 +162,11 @@ export async function POST(req: NextRequest) {
     if (userDoc.exists) {
       existingData = userDoc.data() || {};
       wasPreviouslyRegistered = true;
-    } else if (email) {
-      // 1. Check if email was registered before in the users collection
-      try {
-        const emailQuery = await db.collection('users').where('email', '==', email).limit(1).get();
-        if (!emailQuery.empty) {
-          existingData = emailQuery.docs[0].data() || {};
-          wasPreviouslyRegistered = true;
-        } else {
-          const lowerEmailQuery = await db.collection('users').where('email', '==', email.toLowerCase()).limit(1).get();
-          if (!lowerEmailQuery.empty) {
-            existingData = lowerEmailQuery.docs[0].data() || {};
-            wasPreviouslyRegistered = true;
-          }
-        }
-      } catch (dbErr) {
-        console.warn('Firestore email lookup failed:', dbErr);
-      }
-
-      // 2. Fallback check: check if email was in pre-seeded accounts
-      if (!existingData) {
-        const sampleMatch = [...SAMPLE_STUDENTS, ...SAMPLE_STAFF].find(
-          (u: any) => u.email?.toLowerCase() === email.toLowerCase()
-        );
-        if (sampleMatch) {
-          existingData = sampleMatch;
-          wasPreviouslyRegistered = true;
-        }
-      }
     }
 
     if (wasPreviouslyRegistered && existingData) {
-      // User or email has been registered before -> check and preserve their strictly assigned Firestore database role
-      const isOwner = isProjectOwnerEmail(email || existingData.email);
+      // User has been registered before -> preserve their strictly assigned Firestore database role
+      const isOwner = isProjectOwnerEmail(email);
       const previousRole = normalizeRole(existingData.role || existingData.status);
       const isSuper = isOwner || previousRole === 'superadmin' || existingData.isSuperAdmin === true;
       const updatedRole = isSuper ? 'superadmin' : previousRole;
@@ -202,7 +203,7 @@ export async function POST(req: NextRequest) {
           dept: updatedFields.dept || existingData.dept || (isSuper ? 'Executive Directorate & Superadmin Control' : 'General'),
         });
       } catch (claimErr) {
-        // non-blocking for mock UIDs
+        // non-blocking
       }
 
       const finalUser = {
@@ -222,7 +223,7 @@ export async function POST(req: NextRequest) {
 
     // First-time registration -> If the email is explicitly a verified project owner / superadmin email (like support@aifoundation.net.au), grant superadmin. Everyone else strictly receives role = supporter only!
     const isOwner = isProjectOwnerEmail(email);
-    const assignedRole: SystemRole = isOwner ? 'superadmin' : 'supporter';
+    const assignedRole: SystemRole = isOwner ? 'superadmin' : DEFAULT_REGISTRATION_ROLE; // 'supporter'
     const isSuper = isOwner;
 
     const newUserData = {
@@ -263,7 +264,7 @@ export async function POST(req: NextRequest) {
         dept: isSuper ? 'Executive Directorate & Superadmin Control' : 'General',
       });
     } catch (claimErr) {
-      // non-blocking for mock UIDs
+      // non-blocking
     }
 
     return NextResponse.json({
@@ -281,9 +282,16 @@ export async function POST(req: NextRequest) {
 /**
  * PATCH /api/users
  * Superadmin endpoint to update user roles across the strict 11 system roles.
+ * Strictly requires cryptographically verified Superadmin caller.
  */
 export async function PATCH(req: NextRequest) {
   try {
+    // 1. Enforce Superadmin Authentication
+    const authCheck = await requireSuperAdminCaller(req);
+    if ('errorResponse' in authCheck) {
+      return authCheck.errorResponse;
+    }
+
     const body = await req.json();
     const { uid, role } = body;
 
@@ -320,7 +328,7 @@ export async function PATCH(req: NextRequest) {
         roles: [normalizedNewRole],
       });
     } catch (claimErr) {
-      // non-blocking for mock UIDs
+      // non-blocking
     }
 
     return NextResponse.json({

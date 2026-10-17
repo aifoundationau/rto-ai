@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProspectiveEvent, EVENTS_DATA } from '@/data/events';
 import { EventBookingCard } from '@/components/chat/EventBookingCard';
 import { StudentApplication } from '@/data/applications';
@@ -36,6 +36,17 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
   const [studentName, setStudentName] = useState(application.personalDetails.fullName || '');
   const [studentEmail, setStudentEmail] = useState(application.personalDetails.email || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState('');
+
+  // Load live event state (RSVP counts and booked advisor slots) from the server
+  useEffect(() => {
+    fetch('/api/events')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.events) && data.events.length > 0) setEvents(data.events);
+      })
+      .catch((err) => console.log('Using default events list:', err));
+  }, []);
 
   const categories = ['All', 'Open Day', 'Advising Session', 'Workshop', 'Webinar', 'Campus Tour'];
 
@@ -44,6 +55,7 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
   );
 
   const handleOpenBookingModal = (event: ProspectiveEvent) => {
+    setBookingError('');
     setSelectedEventForModal(event);
     if (event.availableSlots && event.availableSlots.length > 0) {
       const firstAvailable = event.availableSlots.find((s) => !s.isBooked);
@@ -58,6 +70,7 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
     if (!selectedEventForModal || !studentName.trim() || !studentEmail.trim()) return;
 
     setIsSubmitting(true);
+    setBookingError('');
     try {
       const res = await fetch('/api/events', {
         method: 'POST',
@@ -72,12 +85,19 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
       });
 
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setActiveBooking(data);
         setSelectedEventForModal(null);
+        // Reflect the new RSVP count / booked slot straight away
+        if (data.event) {
+          setEvents((prev) => prev.map((ev) => (ev.id === data.event.id ? data.event : ev)));
+        }
+      } else {
+        setBookingError(data.error || 'Registration failed. Please try again.');
       }
     } catch (err) {
       console.error('Failed to book event:', err);
+      setBookingError('Could not reach the server. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -141,13 +161,13 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredEvents.map((ev) => {
           const startDate = new Date(ev.startDate);
-          const formattedDate = startDate.toLocaleDateString('en-US', {
+          const formattedDate = startDate.toLocaleDateString('en-AU', {
             weekday: 'short',
-            month: 'short',
             day: 'numeric',
+            month: 'short',
             year: 'numeric'
           });
-          const timeStr = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+          const timeStr = startDate.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true });
           const percentFull = Math.min(100, Math.round((ev.registeredCount / ev.capacity) * 100));
 
           return (
@@ -208,7 +228,7 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
                           }`}
                         >
                           <div className="font-semibold">
-                            {new Date(slot.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                            {new Date(slot.startTime).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })}
                           </div>
                           <div className="text-[10px] text-slate-500 truncate">{slot.advisorName}</div>
                         </div>
@@ -295,7 +315,7 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
                   >
                     {selectedEventForModal.availableSlots.map((s) => (
                       <option key={s.slotId} value={s.slotId} disabled={s.isBooked}>
-                        {new Date(s.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - {s.advisorName} {s.isBooked ? '(Booked)' : '(Available)'}
+                        {new Date(s.startTime).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })} - {s.advisorName} {s.isBooked ? '(Booked)' : '(Available)'}
                       </option>
                     ))}
                   </select>
@@ -306,6 +326,12 @@ export const EventsCalendarView: React.FC<EventsCalendarViewProps> = ({
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>You will receive an instant 1-click Google Calendar sync link and .ics invitation!</span>
               </div>
+
+              {bookingError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700">
+                  {bookingError}
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button

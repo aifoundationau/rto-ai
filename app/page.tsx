@@ -46,6 +46,13 @@ export default function HomePage() {
   const [isClassroomLoginOpen, setIsClassroomLoginOpen] = useState(false);
   const [classroomUser, setClassroomUser] = useState<ClassroomUser | null>(null);
 
+  const isSuperAdminUser = Boolean(
+    classroomUser && (
+      isProjectOwnerEmail(classroomUser.email) ||
+      (classroomUser.role || '').toLowerCase() === 'superadmin'
+    )
+  );
+
   // Track page navigation changes to Firebase
   useEffect(() => {
     trackPageView(activeTab, {
@@ -68,7 +75,7 @@ export default function HomePage() {
         const parsed = JSON.parse(savedUser);
         const isOwner = isProjectOwnerEmail(parsed.email);
         const initialRole = isOwner ? 'superadmin' : (parsed.role || 'supporter');
-        const isSuper = isOwner || parsed.isSuperAdmin === true || initialRole.toLowerCase() === 'superadmin';
+        const isSuper = isOwner || initialRole.toLowerCase() === 'superadmin';
         const correctedUser = {
           ...parsed,
           role: initialRole,
@@ -87,7 +94,7 @@ export default function HomePage() {
             .then((data) => {
               if (data?.user) {
                 const liveRole = isOwner ? 'superadmin' : (data.user.role || 'supporter');
-                const liveSuper = isOwner || data.user.isSuperAdmin === true || liveRole.toLowerCase() === 'superadmin';
+                const liveSuper = isOwner || liveRole.toLowerCase() === 'superadmin';
                 const refreshedUser = {
                   ...parsed,
                   role: liveRole,
@@ -124,24 +131,26 @@ export default function HomePage() {
             return;
           }
           if (firebaseUser) {
-            // Fetch/sync user record from database
-            fetch('/api/users', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                displayName: firebaseUser.displayName,
-                photoURL: firebaseUser.photoURL,
-              }),
-            })
-              .then((res) => (res.ok ? res.json() : null))
-              .then((data) => {
-                if (!isMounted) return;
-                const dbUser = data?.user;
+            // Fetch/sync user record from database with cryptographically verified ID token
+            firebaseUser.getIdToken().then((idToken) => {
+              fetch('/api/users', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                  displayName: firebaseUser.displayName,
+                  photoURL: firebaseUser.photoURL,
+                }),
+              })
+                .then((res) => (res.ok ? res.json() : null))
+                .then((data) => {
+                  if (!isMounted) return;
+                  const dbUser = data?.user;
                 const isOwner = isProjectOwnerEmail(firebaseUser.email);
                 const role = isOwner ? 'superadmin' : (dbUser?.role || 'supporter');
-                const isSuper = isOwner || dbUser?.isSuperAdmin === true || role.toLowerCase() === 'superadmin';
+                const isSuper = isOwner || role.toLowerCase() === 'superadmin';
                 const syncUser: ClassroomUser = {
                   name: firebaseUser.displayName || dbUser?.name || 'User',
                   email: firebaseUser.email || dbUser?.email || '',
@@ -166,10 +175,11 @@ export default function HomePage() {
                 } catch (e) {}
               })
               .catch(() => {});
+            }).catch(() => {});
           }
         });
-      }).catch(() => {});
-    }).catch(() => {});
+      });
+    });
 
     return () => {
       isMounted = false;
@@ -191,8 +201,10 @@ export default function HomePage() {
   };
 
   const handleOpenSettings = () => {
-    if (classroomUser || isAdminLoggedIn) {
+    if (isSuperAdminUser) {
       setActiveTab('admin');
+    } else if (classroomUser) {
+      setActiveTab('signin');
     } else {
       handleGoogleSignInDirect();
     }
@@ -224,12 +236,14 @@ export default function HomePage() {
       let finalRole = 'supporter';
       let isSuper = false;
       try {
+        const idToken = await result.user.getIdToken();
         const syncRes = await fetch('/api/users', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+          },
           body: JSON.stringify({
-            uid: result.user.uid,
-            email: result.user.email,
             displayName: result.user.displayName,
             photoURL: result.user.photoURL,
           }),
@@ -239,7 +253,7 @@ export default function HomePage() {
           if (syncData.user) {
             const isOwner = isProjectOwnerEmail(result.user.email);
             finalRole = isOwner ? 'superadmin' : (syncData.user.role || 'supporter');
-            isSuper = isOwner || syncData.user.isSuperAdmin === true || finalRole.toLowerCase() === 'superadmin';
+            isSuper = isOwner || finalRole.toLowerCase() === 'superadmin';
           }
         }
       } catch (syncErr) {
@@ -409,6 +423,16 @@ export default function HomePage() {
 
       if (data.updatedApplication) {
         handleUpdateApplication(data.updatedApplication);
+
+        // An application submitted through the chat must also reach the admissions
+        // database (the portal's Submit button already does this)
+        if (data.updatedApplication.status === 'Submitted' && application.status !== 'Submitted') {
+          fetch('/api/applications', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ application: data.updatedApplication })
+          }).catch((err) => console.warn('Failed to save chat-submitted application:', err));
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -515,8 +539,10 @@ export default function HomePage() {
             onApplyForCourse={handleApplyForCourse}
             onExploreUnit={handleSelectUnitForChat}
             onOpenClassroom={() => {
-              if (classroomUser || isAdminLoggedIn) {
+              if (isSuperAdminUser) {
                 setActiveTab('admin');
+              } else if (classroomUser) {
+                setActiveTab('courses');
               } else {
                 handleGoogleSignInDirect();
               }
@@ -569,11 +595,12 @@ export default function HomePage() {
         )}
 
         {activeTab === 'admin' && (
-          (classroomUser || isAdminLoggedIn) ? (
+          isSuperAdminUser ? (
             <AdminDashboardView
               apiKey={apiKey}
               onSaveApiKey={handleSaveApiKey}
               onLogout={handleLogoutAdmin}
+              currentUser={classroomUser}
             />
           ) : (
             <SignInView
@@ -586,12 +613,16 @@ export default function HomePage() {
                   isSuperAdmin: isSuper,
                 };
                 setClassroomUser(authed);
-                setIsAdminLoggedIn(true);
+                setIsAdminLoggedIn(isSuper);
                 try {
                   localStorage.setItem('edupulse_user', JSON.stringify(authed));
-                  localStorage.setItem('edupulse_is_admin', 'true');
+                  localStorage.setItem('edupulse_is_admin', isSuper ? 'true' : 'false');
                 } catch (e) {}
-                setActiveTab('admin');
+                if (isSuper) {
+                  setActiveTab('admin');
+                } else {
+                  setActiveTab('chat');
+                }
               }}
               onLogout={handleLogoutAdmin}
               onNavigateTab={setActiveTab}
@@ -631,14 +662,24 @@ export default function HomePage() {
         onClose={() => setIsClassroomLoginOpen(false)}
         currentUser={classroomUser}
         onLoginSuccess={(user) => {
-          setClassroomUser(user);
-          setIsAdminLoggedIn(true);
+          const isSuper = isProjectOwnerEmail(user.email) || user.isSuperAdmin === true || user.role?.toLowerCase() === 'superadmin';
+          const authed = {
+            ...user,
+            role: isSuper ? 'superadmin' : (user.role || 'supporter'),
+            isSuperAdmin: isSuper,
+          };
+          setClassroomUser(authed);
+          setIsAdminLoggedIn(isSuper);
           try {
-            localStorage.setItem('edupulse_user', JSON.stringify(user));
-            localStorage.setItem('edupulse_is_admin', 'true');
+            localStorage.setItem('edupulse_user', JSON.stringify(authed));
+            localStorage.setItem('edupulse_is_admin', isSuper ? 'true' : 'false');
           } catch (e) {}
           setIsClassroomLoginOpen(false);
-          setActiveTab('admin');
+          if (isSuper) {
+            setActiveTab('admin');
+          } else {
+            setActiveTab('chat');
+          }
         }}
         onLogout={handleLogoutAdmin}
       />

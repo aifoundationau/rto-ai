@@ -1,0 +1,1071 @@
+EDUPULSE AI (rto-ai) - SUPER CODE UPDATE: FULL CODE AUDIT
+=========================================================
+Prepared: 17 Oct 2026
+Snapshot: commit 7617120 ("strict user registration and RBAC") plus the
+uncommitted work in the folder at the time of the audit:
+  modified:  components/Navbar.tsx, components/admin/AdminDashboardView.tsx,
+             lib/agent/engine.ts, firebase.json, tsconfig.tsbuildinfo
+  new:       lib/rag/*, app/api/rag/*, components/admin/MultilingualRagManager.tsx,
+             firestore.indexes.json, SuperAdminRole.txt
+
+NOTHING IN THE PROJECT WAS CHANGED. This is a report only. The only files
+written into the project are this one and removeclassroom.txt (a separate
+exercise).
+
+Note: the folder changed while this audit ran (scripts/test_*.js,
+scripts/seed_runner.ts and scripts/index_config.json disappeared and
+MultilingualRagManager.tsx appeared). Someone or something else was editing
+at the same time. Anything added after about 12:30 on 17 Oct is not covered.
+
+
+How to read this file
+---------------------
+  Priority:  P1 = fix before real users / real data
+             P2 = should fix (wrong results, cost, reliability)
+             P3 = tidy-up (dead code, duplication, cosmetics)
+  Effort:    S = under 1 hour, M = half a day, L = 1+ days
+  [NEW]      = not in the 16 Oct reports (cleanup.txt / working.txt)
+  [OPEN]     = reported on 16 Oct and still not fixed
+  [LIVE]     = confirmed by actually running the app (see Appendix A)
+
+  File references are written as path:line.
+
+
+=====================================================================
+0. HOW THIS WAS CHECKED
+=====================================================================
+- Every source file was read: app/, components/, lib/, data/, scripts/,
+  functions/, src/, public/*.js, firestore.rules, firestore.indexes.json and
+  all config files (about 28,000 lines).
+- A copy of the code (WITHOUT any .env files) was made on C: (the USB stick
+  cannot build, see section 9), then:
+    npm ci ............................ OK
+    TypeScript check (tsc --noEmit) ... OK, 0 errors
+    next build (production) ........... OK
+    strict "unused code" check ........ 163 unused imports/variables
+                                        (full list in Appendix B)
+- The built app was started on that copy and 14 live checks were run
+  against it (Appendix A). It was pointed at a made-up Firebase project
+  and database name and had no Gemini key, so nothing could reach your
+  real Firebase data or spend AI credit.
+  Note: during those checks the server picked up this computer's saved
+  Google Cloud login (gcloud). That login was expired ("reauth required"),
+  so no request was authenticated, and every request targeted the made-up
+  project anyway. Nothing was written anywhere real.
+- NOT tested: real Google sign-in pop-ups, real Firestore reads/writes,
+  real Gemini responses, microphone / text-to-speech, the Cloud Function.
+  These were code-reviewed only.
+
+
+=====================================================================
+1. SUMMARY - THE 12 THINGS THAT MATTER MOST
+=====================================================================
+ 1. [NEW][LIVE] Anyone on the internet can make themselves Superadmin.
+    There are several ways (section 3, items S1-S5). The simplest: sign in
+    with any Google account, then send one request to /api/users or
+    /api/assign-role. None of the API routes check who is calling.
+
+ 2. [NEW] Any signed-in user (default role "supporter") gets the FULL
+    Admin & Operations Panel. The Navbar link was hidden, but
+    app/page.tsx:572 still opens the panel for any signed-in user, and the
+    Home page "Classroom" button and the settings shortcut send them there.
+
+ 3. [OPEN][LIVE] All applicant personal data (names, dates of birth, home
+    addresses, phone, ID-document results) can be downloaded by anyone
+    from /api/applications, and by any signed-in user straight from
+    Firestore (rules allow every signed-in user to read every collection).
+
+ 4. [NEW][LIVE] The "AI Document Verification" invents results. With no
+    working Gemini key (the current situation) ANY file named
+    "passport.jpg" is reported as "Legitimate, 96%, verified Australian
+    passport valid through 2034". Staff could accept fake identity or
+    qualification documents.
+
+ 5. [NEW][LIVE] The new Multilingual RAG search is never used by the chat.
+    The FAQ search before it always "finds" something, so every unknown
+    question gets the "general admission requirements" FAQ as the answer.
+
+ 6. [NEW] The RAG ingest/seed/query routes are open to anyone, so anyone
+    can add text that the AI will later repeat to students as fact.
+    Fallback "fake" vectors are mixed with real Gemini vectors in the same
+    index, which makes search results meaningless once that happens.
+
+ 7. [NEW][LIVE] The Role Permissions screen has no effect: no code anywhere
+    checks those permissions. And a mistyped role name silently rewrites
+    the "supporter" role's permissions.
+
+ 8. [NEW] "Assign Role & Issue Student ID" never issues a Student Number
+    when "student" is picked from the drop-down (lower-case vs
+    upper-case mismatch).
+
+ 9. [OPEN][LIVE] File upload lets anyone write any file anywhere on the
+    server (path traversal). Confirmed again today.
+
+10. [OPEN] The 16 Oct fix patch (rto-ai-fixes.patch, 30 fixes) was never
+    applied. 18 of its 22 files still apply cleanly; 4 no longer do
+    (ApplicationPortalView.tsx, lib/agent/engine.ts, lib/agent/tools.ts,
+    lib/firebase/client.ts) because the code changed since. So the Unit
+    Syllabuses crash, "$NaNk/yr" fees, empty "Add to Google Calendar"
+    link, double-booked advisor slots, etc. are all still there.
+
+11. [NEW] Signing in on this project rewrites the user's shared record in
+    the central "users" collection (role normalised, tenantTag/databaseCode
+    forced to "rto-ai"). SuperAdminRole.txt Rule 3 says this must never
+    happen, because 1,000+ projects share that collection.
+
+12. [OPEN] A lot of the admin panel only pretends to work (Google
+    Classroom, Google Calendar, Tokens/Stripe, Staff Messages, Events
+    editor) and important data lives only in server memory, so it is lost
+    on every restart.
+
+
+=====================================================================
+2. DOES EVERYTHING WORK? - FUNCTION-BY-FUNCTION STATUS
+=====================================================================
+  WORKS     = does what it says
+  BROKEN    = does not work or gives wrong results
+  SIMULATED = looks real but changes nothing real
+  PARTLY    = works with an important limitation
+
+Public website
+--------------
+  Home page (search, shuffle, pop-ups) ........... WORKS. But the stats
+                                                   "14 Programs", "120+ Units",
+                                                   "96%", "5,000+ Students"
+                                                   and "Powered by Gemini 3.1"
+                                                   are hard-coded and untrue
+  Home "Classroom" button ........................ BROKEN - opens the Admin
+                                                   panel (or Google sign-in);
+                                                   there is no classroom
+  Degree Programs tab ............................ BROKEN - shows "$NaNk/yr"
+                                                   fees, "undefined Years",
+                                                   unit ids instead of codes
+                                                   [OPEN, working.txt #2]
+  Unit Syllabuses tab ............................ BROKEN - crashes the whole
+                                                   site ("Cannot read
+                                                   properties of undefined
+                                                   (reading 'join')")
+                                                   [OPEN, working.txt #1]
+  Application Form (7 steps) ..................... PARTLY - can be submitted
+                                                   with required fields empty;
+                                                   shows success even if the
+                                                   server rejects it; only
+                                                   images accepted (no PDF)
+  Document upload + "AI verification" ............ BROKEN - fabricates
+                                                   "Legitimate" results (S6)
+  Events & Calendar page ......................... PARTLY - booking works,
+                                                   but "Add to Google
+                                                   Calendar" link is empty,
+                                                   same slot bookable twice,
+                                                   all 5 events are dated
+                                                   Sept 2026 (in the past),
+                                                   counts never refresh
+  AI Assistant chat (no Gemini key) .............. PARTLY - fixed keyword
+                                                   rules; many wrong matches
+                                                   (section 4, B1-B5); unknown
+                                                   questions get FAQ #1
+  AI Assistant chat (Gemini mode) ................ NOT RE-TESTED - on 16 Oct
+                                                   the key was rejected by
+                                                   Google (working.txt E2).
+                                                   Code still sends the key
+                                                   in the URL and does only
+                                                   one tool round
+  Embed page (/embed) ............................ BROKEN - times show
+                                                   "Invalid Date"; no
+                                                   "thinking" indicator
+                                                   [OPEN, working.txt #8]
+  Google sign-in ................................. WORKS (code review) - but
+                                                   asks every visitor for
+                                                   Classroom, Calendar and
+                                                   Sheets permissions (S10)
+  /setup-mfa (Google Authenticator) .............. BROKEN - can never succeed
+                                                   (hard-coded "000000" code,
+                                                   wrong enroll call)
+                                                   [OPEN, working.txt #29]
+  Footer (clock, weather, suburb) ................ WORKS - but sends every
+                                                   visitor's IP/location to
+                                                   two outside services (S13)
+
+Admin & Operations Panel (any signed-in user can open it - see S2)
+------------------------------------------------------------------
+  Course Builder ................................. PARTLY - saves to
+                                                   Firestore, but says
+                                                   "saved" even when the save
+                                                   failed; new versions start
+                                                   with no units
+  Role Permissions ............................... SIMULATED - saves, but
+                                                   nothing reads the result
+  Multilingual RAG ............................... PARTLY - ingest/query work
+                                                   on their own; the chat
+                                                   never reaches it; reports
+                                                   success when the database
+                                                   write failed [LIVE]
+  API keys ....................................... PARTLY - only the Gemini
+                                                   key is used; Firebase,
+                                                   Classroom, Pexels keys are
+                                                   saved and never read
+  Firebase Telemetry ............................. WORKS - polls every 10 s
+                                                   (cost, see P5)
+  Staff Messages ................................. SIMULATED - this browser
+                                                   only, automatic replies
+  Student & Staff IDs (Assign Role) .............. BROKEN for students - no
+                                                   Student Number is issued
+                                                   (B7)
+  Applications list / detail / status ............ PARTLY - status change is
+                                                   not checked for success;
+                                                   two fake applicants always
+                                                   shown
+  Google Sheets (24/7) ........................... PARTLY - reports "success"
+                                                   with 0 rows [LIVE]; data
+                                                   kept only in memory; no
+                                                   24/7 schedule exists
+  Images Folders ................................. PARTLY - unsafe upload;
+                                                   files 404 in production
+                                                   until restart
+  Google Classroom ............................... SIMULATED - no Classroom
+                                                   API calls at all
+  Embed on Website ............................... WORKS - snippets use
+                                                   "your-domain.com"
+  Events & RSVPs ................................. SIMULATED - changes stay
+                                                   in that browser tab
+  Knowledge & FAQs ............................... WORKS - but anyone can add
+                                                   or delete FAQs via the API
+  Tokens / Emergency Fund ........................ SIMULATED - balances reset
+                                                   on reload; Stripe faked;
+                                                   "today" fixed at
+                                                   28 Sep 2026
+  Google Calendar ................................ SIMULATED - shows
+                                                   "connected" for any
+                                                   signed-in user; never
+                                                   calls the Calendar API;
+                                                   "Disconnect" logs you out
+                                                   of the whole app
+
+API routes (all reachable by anyone - none check identity)
+-----------------------------------------------------------
+  /api/chat ........................ PARTLY (see chat above)
+  /api/applications ................ WORKS, but open to anyone [LIVE]
+  /api/applications/verify-document  BROKEN - fabricates results [LIVE]
+  /api/assign-role ................. WORKS, but open to anyone [LIVE]
+  /api/users (GET/POST/PATCH) ...... WORKS, but open to anyone; trusts the
+                                     caller's uid and email (S1)
+  /api/permissions ................. BROKEN - bad role names overwrite
+                                     "supporter" [LIVE]; open to anyone
+  /api/course-builder .............. WORKS, open to anyone; also returns
+                                     draft programs [LIVE]; contains a
+                                     "prepare_superadmin" action
+  /api/events ...................... PARTLY - double booking, no name/email
+                                     check [LIVE]
+  /api/faqs, /api/faqs/parse-bank .. WORKS, open to anyone (parse-bank uses
+                                     your Gemini key for anyone)
+  /api/rag/ingest|query|seed ....... PARTLY - open to anyone; false success
+                                     [LIVE]
+  /api/sheets/sync ................. PARTLY - false success [LIVE]
+  /api/telemetry ................... WORKS, open to anyone (GET shows
+                                     emails/IPs) [LIVE]
+  /api/tokens ...................... WORKS, open to anyone; says success
+                                     even when nothing saved [OPEN]
+  /api/upload ...................... UNSAFE - path traversal [LIVE]
+
+Other
+-----
+  functions/ (Cloud Function) ...... NOT DEPLOYED - firebase.json has no
+                                     "functions" section; Node 18 runtime is
+                                     retired
+  scripts/*.ts ..................... RUN MANUALLY ONLY - no npm scripts;
+                                     two of them grant Superadmin to a
+                                     fictional person (S5, S9)
+  npm run lint ..................... BROKEN - no ESLint config/dependency
+
+
+=====================================================================
+3. P1 - SECURITY AND PRIVACY
+=====================================================================
+
+S1. Anyone can register themselves as Superadmin through /api/users
+    [NEW]  [Effort: M]
+   Where: app/api/users/route.ts:118-279 (POST), lib/auth/roles.ts:197-226
+   What:  POST /api/users takes "uid" and "email" from the request body and
+          believes them. It never checks a Firebase ID token. If the email
+          is on the hard-coded owner list (support@..., admin@...,
+          eleanor.vance@edupulse.edu.au, a personal gmail) it writes
+          role "superadmin" AND sets Superadmin custom claims on that uid.
+          So: sign in with any Google account, copy your own uid, then
+          POST {uid: <yours>, email: "support@aifoundation.net.au"}.
+          Also: posting a new uid with SOMEONE ELSE's email copies that
+          person's record and role onto the new uid (l.136-149).
+          Also: any email matching a fictional seed account
+          (scripts/seed-database.ts) inherits that seed role (l.155-163).
+   Fix:   Send "Authorization: Bearer <idToken>" from the browser; on the
+          server call auth.verifyIdToken() and take uid/email ONLY from the
+          verified token. Never copy another document's role.
+
+S2. Any signed-in user gets the Admin & Operations Panel  [NEW]  [Effort: S]
+   Where: app/page.tsx:572 "(classroomUser || isAdminLoggedIn)";
+          app/page.tsx:193-199 and :517-523 (settings shortcut and Home
+          "Classroom" button go to 'admin' for any signed-in user);
+          app/page.tsx:589 and :635 set isAdminLoggedIn(true) regardless of
+          role; components/admin/AdminDashboardView.tsx has no role check.
+   What:  A brand-new "supporter" sees Role Permissions, Assign Role,
+          every application, API keys, telemetry, etc. Hiding the Navbar
+          link (uncommitted change in Navbar.tsx) does not stop this.
+          The panel also opens from localStorage alone: a saved
+          "edupulse_user" with isSuperAdmin:true is trusted (l.66-78).
+   Fix:   Gate on the verified custom claim (getIdTokenResult()), not on
+          "is someone signed in", and enforce the same check on the server
+          (S3).
+
+S3. No API route checks who is calling  [OPEN cleanup #1 - now wider]
+    [Effort: M]
+   Where: every file in app/api/** (there is no verifyIdToken and no
+          Authorization header anywhere in the code).
+   What:  The Admin SDK bypasses Firestore rules, so anyone can:
+          - PATCH /api/users            -> make any uid Superadmin    [LIVE]
+          - POST /api/assign-role       -> same, with custom claims   [LIVE]
+          - POST /api/permissions       -> grant any permission       [LIVE]
+          - POST /api/course-builder    -> "prepare_superadmin", save or
+                                           overwrite programs/units
+          - GET  /api/users             -> every user's name and email in
+                                           the SHARED users collection,
+                                           i.e. users of every project,
+                                           not just rto-ai (no tenant filter)
+          - GET  /api/applications      -> all applicant PII          [LIVE]
+          - POST /api/applications      -> overwrite any application, set
+                                           status "Accepted"
+          - POST/DELETE /api/faqs       -> change what the chatbot tells
+                                           students
+          - POST /api/rag/ingest|seed   -> add "facts" to the AI knowledge
+                                           base                       [LIVE]
+          - POST /api/sheets/sync       -> replace the course catalogue
+          - GET  /api/telemetry         -> emails, IPs, user agents   [LIVE]
+          - POST /api/tokens            -> fake ledger entries
+          - POST /api/upload            -> write files (S8)           [LIVE]
+          - POST /api/chat, /api/faqs/parse-bank, /api/rag/query
+                                        -> spend your Gemini quota with no
+                                           rate limit
+   Fix:   One helper, e.g. lib/auth/requireUser.ts:
+            verifyIdToken -> read role claim -> check permission
+          (this is exactly what roleHasPermission() in
+          lib/auth/permissions.ts was written for - it is never called).
+          Keep public only: POST /api/chat, GET/POST /api/events,
+          POST /api/applications (own application only),
+          POST /api/telemetry - with rate limiting.
+
+S4. Firestore rules let any signed-in user read everything, and edit their
+    own role  [OPEN cleanup #4 + NEW part]  [Effort: S]
+   Where: firestore.rules:146-150 (catch-all read), :114-128 (users)
+   What:  - Catch-all "allow read: if isSignedIn()" means any Google account
+            can read applications, chat_interactions, activity_logs,
+            token_transactions, event_bookings, knowledge_embeddings...
+            directly from the browser SDK.
+          - [NEW] users/{uid}: the owner may update their own document
+            except studentNumber, so a user can set their own
+            role:"superadmin" / isSuperAdmin:true. On next login
+            /api/users POST (route.ts:170) honours existingData.isSuperAdmin
+            and mints Superadmin custom claims.
+          - isSuperAdmin() checks 'SUPERADMIN'/'ADMIN' (upper case) but the
+            app writes 'superadmin' (lower case), so real superadmins are
+            only admins in the rules through the email-domain wildcard.
+          - isAdmin() treats ANY @aifoundation.net.au / .com.au email as
+            admin, with no email_verified check. SuperAdminRole.txt Rule 4
+            forbids domain wildcards.
+   Fix:   Deny by default; per-collection rules; block role / isSuperAdmin /
+          classification / status fields in owner updates; one role
+          spelling.
+
+S5. Hard-coded Superadmin identities, including a fictional person
+    [OPEN cleanup #6 + NEW]  [Effort: S]
+   Where: lib/auth/roles.ts:218-223 (owner list includes
+          eleanor.vance@edupulse.edu.au and a personal gmail address);
+          app/api/course-builder/route.ts:65-105;
+          scripts/prepare-superadmin.ts; scripts/seed-database.ts:74-96.
+   What:  "eleanor.vance@edupulse.edu.au" is a demo persona. Whoever controls
+          that address (the domain edupulse.edu.au is not yours) gets
+          Superadmin on registration. The owner list is also bundled into
+          the browser JavaScript, so it is public.
+          course-builder "prepare_superadmin" assigns the same uid twice
+          with two different emails (the second overwrites the first).
+   Fix:   Remove the hard-coded list; grant Superadmin only from a server
+          CLI, as SuperAdminRole.txt Rules 2 and 4 require.
+
+S6. AI document verification invents "Legitimate" results  [NEW][LIVE]
+    [Effort: S to stop the harm, M to do properly]
+   Where: app/api/applications/verify-document/route.ts:129-184 (fallback)
+          and :101-115 (defaults when Gemini omits fields)
+   What:  When Gemini is not configured, fails, or returns bad JSON, the
+          route returns authenticityStatus "Legitimate", score 96,
+          nameMatchesApplicant true, with a made-up description based only
+          on the FILE NAME. Tested: a 5-byte non-image file named
+          "passport.jpg" came back as "Australian Passport ... issued by
+          DFAT ... valid through 2034 with verified biometric MRZ".
+          Even with Gemini working, missing fields default to
+          Legitimate / 95 / true.
+          The file name and applicant name are pasted into the prompt, so a
+          crafted file name can steer the result (prompt injection).
+          The response claims "Zero copies stored", but the image IS sent
+          to Google's API (a third party); that wording is misleading.
+   Why it matters: an RTO must check identity and prior qualifications;
+          staff seeing a green "Legitimate 96%" badge may skip the check.
+   Fix:   On any failure return "Not verified - manual review required".
+          Never default to Legitimate. Label the feature "AI pre-screen".
+          Correct the privacy text and mention Google processing.
+
+S7. Gemini API key handling  [OPEN cleanup #8, partly NEW]  [Effort: S]
+   Where: lib/agent/engine.ts:629, verify-document/route.ts:29,
+          faqs/parse-bank/route.ts:187 (key in the URL "?key=...", which
+          ends up in logs and proxies); app/page.tsx:60 and
+          AdminDashboardView.tsx:700-705 (keys in localStorage);
+          MultilingualRagManager.tsx:112, :139, :170 (admin key sent in
+          request bodies).
+   Fix:   Keep the key only on the server (env); use the x-goog-api-key
+          header or the @google/genai SDK that is already installed.
+
+S8. Upload: path traversal, no login, no type/size check
+    [OPEN cleanup #9 / working.txt #28][LIVE]  [Effort: S]
+   Where: app/api/upload/route.ts:8-34
+   What:  folder="../.." wrote a file into the project root of the test
+          copy today (test file deleted afterwards). It could overwrite
+          server.js or source code. The 16 Oct patch fixes the traversal.
+   Fix:   Apply that patch hunk; require admin; store in Firebase Storage.
+
+S9. Scripts and functions that grant roles unsafely  [OPEN cleanup #3, #5]
+    [Effort: S]
+   Where: functions/src/index.ts:215-221 (any signed-in caller may assign
+          any role; NODE_ENV=test skips the check);
+          scripts/set-admin-role.ts (replaces ALL claims with
+          {roles:['admin']}); scripts/prepare-superadmin.ts (fictional
+          Superadmin).
+
+S10. Sign-in asks every visitor for Classroom, Calendar and Sheets access
+    [NEW]  [Effort: S]
+   Where: app/page.tsx:206-212, components/auth/SignInView.tsx:92-98
+   What:  A prospective student registering to apply is asked to grant
+          "manage your Google Classroom classes and rosters", "edit your
+          calendar events" and "see your spreadsheets". None of these are
+          used for applicants. It scares people off and requires Google's
+          sensitive-scope verification before a public launch.
+   Fix:   Ask only for email/profile at sign-in; request extra scopes only
+          on the admin screen that needs them (incremental authorisation).
+
+S11. Unused Classroom API key value in .env.local  [NEW]  [Effort: S]
+   Where: .env.local line 11 (GOOGLE_CLASSROOM_API_KEY). The file is not in
+          git and the value is not repeated here.
+   What:  Nothing in the code reads it. An unused live key is risk with no
+          benefit. Revoke it in Google Cloud Console if it is not needed.
+
+S12. Personal data stored and logged widely  [NEW]  [Effort: M]
+   - The whole application (DOB, address, document results) is kept in
+     localStorage (app/page.tsx:350), visible to anyone using the same
+     computer.
+   - Every chat message, the whole application object and all widgets are
+     saved to chat_interactions (app/api/chat/route.ts:21-33).
+   - Every keystroke in the form sends a telemetry event with the
+     applicant's email (app/page.tsx:347-366) [OPEN cleanup #15].
+   - There is no privacy notice or consent anywhere in the UI.
+   For an Australian RTO this touches the Privacy Act (APPs 1, 5, 6, 8, 11).
+
+S13. Footer sends visitor location to third parties without consent
+    [NEW]  [Effort: S]
+   Where: components/Footer.tsx:126-209
+   What:  On every page load the visitor's IP goes to api.bigdatacloud.net
+          (reverse geocoding) and coordinates go to api.open-meteo.com
+          (weather). Not needed for an admissions site; needs disclosure if
+          kept.
+
+S14. Dev server open to the whole network  [OPEN cleanup #10]  [Effort: S]
+   Where: server.js:25 hostname '0.0.0.0'. Combined with S3, anyone on the
+          same Wi-Fi can call the admin APIs on your machine.
+
+
+=====================================================================
+4. P2 - BUGS AND WRONG RESULTS
+=====================================================================
+
+AI chat engine (lib/agent/engine.ts, lib/agent/tools.ts)
+--------------------------------------------------------
+B1. RAG search is unreachable; unknown questions get FAQ #1  [NEW][LIVE]
+    [Effort: S]
+   Where: lib/agent/tools.ts:228 "results = scoredFaqs.length > 0 ? ... :
+          allFaqs"; lib/agent/engine.ts:493-516 then always returns.
+   What:  search_faq falls back to "all FAQs" when nothing matches, so
+          matchedFaqs is never empty and step G (RAG, engine.ts:518-545)
+          never runs. Tested: "What is your refund policy if I cancel my
+          enrolment?" -> answer "What are the general admission
+          requirements for undergraduate degrees?".
+   Fix:   Return an empty list when nothing scores; only then try RAG.
+
+B2. Booking picks the wrong event  [OPEN working.txt #14][LIVE]
+   Where: engine.ts:237-245. lower.includes('ai') matches "email",
+          "maria", "said", "again"...
+   Tested: "book the international visa webinar, my email is
+          maria@example.com" -> booked the AI workshop.
+
+B3. Other keyword collisions  [OPEN cleanup #17]
+   'acs' matches "facts"; 'book' matches "textbook"; 'register' always
+   means "book an event"; 'questions' dumps the whole FAQ list; 'business'
+   anywhere selects the Business degree; 'atar' anywhere sets education to
+   High School; the name pattern captures "interested in ...".
+
+B4. Chat submits applications without consent or completeness
+    [OPEN working.txt #12]
+   Where: engine.ts:312-332 and tools.ts:557-579
+   What:  "submit" sets declarationAgreed = true automatically and ignores
+          missing fields; the student never agrees to the declaration.
+
+B5. Chat tools answer with the wrong item  [OPEN working.txt #13]
+   get_course_details / get_unit_syllabus return the FIRST course/unit
+   when nothing matches (tools.ts:305, :356) instead of "not found";
+   book_event_or_consultation books event #1 for an unknown id
+   (tools.ts:389); an already-booked slot can be booked again
+   (tools.ts:396).
+
+B6. Gemini mode details  [OPEN working.txt #15-17]
+   - Model name 'gemini-3.8-flash' (engine.ts:629, lib/rag/embeddings.ts:12)
+     differs from 'gemini-2.5-flash' used by the other routes. Check that
+     the name exists; if it does not, every Gemini call fails silently and
+     falls back to the keyword engine.
+   - Only one tool round; "system" messages are sent as "user"; no timeout;
+     the Gemini path never uses RAG or the staff-added FAQs; it crashes
+     into the fallback when no application object is sent
+     (tools.ts:453 JSON.parse(undefined)).
+
+Roles, users and permissions
+----------------------------
+B7. "Assign Role & Issue Student ID" never issues a Student Number
+    [NEW]  [Effort: S]
+   Where: lib/firebase/admin.ts:219, :230 and :265 check
+          role === 'STUDENT' (upper case); the drop-down
+          (AdminDashboardView.tsx:1519-1530) offers lower-case roles
+          ('student'); "Reassign Role" pre-fills the lower-case role (l.864).
+   What:  Choosing "student" saves role 'student' but never generates
+          STU-YYYY-XXXXX and never writes /students/{uid}. The form's
+          default value 'STUDENT' (l.106) is not one of the options.
+   Also:  leaving UID blank creates a random "user_<timestamp>" record that
+          belongs to no real account (l.245).
+
+B8. Invalid role names overwrite "supporter"  [NEW][LIVE]  [Effort: S]
+   Where: app/api/permissions/route.ts:74-75 (also bulk l.124, DELETE l.183)
+   What:  normalizeRole() turns any unknown name into 'supporter', so the
+          isValidRole() check after it can never fail. Tested: role
+          "not-a-real-role" -> "Successfully updated permissions for role
+          supporter" with users.manage and roles.manage.
+
+B9. Permissions are never enforced  [NEW]
+   roleHasPermission() / getPermissionsForRole()
+   (lib/auth/permissions.ts:263-284) are not called anywhere. Every role
+   sees and can do everything the UI shows. The Events and Classroom
+   managers receive a hard-coded ['super_admin', ...] list
+   (AdminDashboardView.tsx:1425, :1440) and have "Grant super_admin"
+   simulator buttons.
+
+B10. Logging in rewrites the shared users record  [NEW]  [Effort: M]
+   Where: app/api/users/route.ts:166-206
+   What:  Against SuperAdminRole.txt Rule 3:
+          - role/status/classification are re-written on every login after
+            normalizeRole(): a role from another project that is not one of
+            the 11 becomes 'supporter' (downgrade), 'admin' becomes
+            'superadmin' (upgrade!), 'registrar' becomes 'administration'.
+          - tenantTag / databaseCode are overwritten with 'rto-ai' instead
+            of being appended to tags; NEXT_PUBLIC_TENANT_ID is not used.
+          - setCustomUserClaims REPLACES all claims, dropping the
+            studentNumber claim set by assignUniversityRole.
+
+B11. Two role vocabularies  [OPEN cleanup #4]
+   Upper case (STUDENT, SUPERADMIN, REGISTRAR, ACADEMIC_STAFF,
+   INSTRUCTIONAL_DESIGNER) in firestore.rules, functions/, scripts/, the
+   Assign Role default and lib/firebase/admin.ts; lower case (the 11 roles)
+   in lib/auth/roles.ts and /api/users. Use lower case everywhere.
+
+Data that is wrong or lost
+--------------------------
+B12. Applicants can share an application id and Student Number
+    [OPEN cleanup #14 - more serious than reported]  [Effort: S]
+   Where: data/applications.ts:249-252
+   What:  id = 'APP-' + a 6-digit random number, computed ONCE when the
+          module loads (once per page load in the browser, once per server
+          process on the server). Only 900,000 values exist: with about
+          1,000 applicants there is roughly a 40% chance that two get the
+          same id. saveApplicationToFirestore uses the id as the document id
+          (lib/firebase/admin.ts:345), so the later application silently
+          overwrites the earlier one. studentNumber is fixed at
+          'STU-2026-00001' for every applicant.
+   Fix:   Create the id when a new draft starts (crypto.randomUUID());
+          never put a studentNumber on an application.
+
+B13. Firestore timestamps and arrays saved wrongly  [OPEN working.txt #25]
+   Where: lib/firebase/admin.ts:112-122 cleanUndefined()
+   What:  It recurses into arrays (turning them into {0:..,1:..} objects)
+          and into FieldValue.serverTimestamp() (saving createdAt = {}).
+          Every activity log written so far has an empty createdAt.
+
+B14. "Success" reported when nothing was saved  [OPEN + NEW]
+   - lib/course-builder/service.ts:528-531, :569-574, :616-621
+   - app/api/faqs/route.ts:131-139, :200-208 (kept in memory only)
+   - app/api/permissions/route.ts:95-108
+   - app/api/tokens/route.ts:25 [OPEN working.txt #24]
+   - lib/rag/vectorStore.ts:58-66 counts chunks before the commit
+     [NEW][LIVE]
+   - lib/sheets/googleSheetsSync.ts:398-415 "Successfully synchronized 0
+     courses" and switches the site to "Google Sheets Connected" [LIVE]
+   - components/admin/AdminDashboardView.tsx:218-236 status change never
+     checks the response [OPEN cleanup #19]
+   - components/application/ApplicationPortalView.tsx:450-457
+     [OPEN working.txt #5]
+
+B15. Important state lives only in server memory  [OPEN cleanup #12]
+   applicationsDatabase (app/api/applications/route.ts:5), activeEventsState
+   (lib/agent/tools.ts:149), data/dynamicStore.ts (Sheets data and custom
+   FAQs), the course-builder cache. Lost on restart and not shared between
+   serverless instances. After a restart the chatbot does not know the
+   staff-added FAQs until someone opens GET /api/faqs, because that GET is
+   what reloads them (app/api/faqs/route.ts:64).
+
+B16. Two different course catalogues  [OPEN cleanup #11]
+   Degree Programs / Unit Syllabuses tabs read Course Builder
+   (/api/course-builder) first; the chatbot, Home page and Application Form
+   read data/*.ts or Sheets. A student can apply for a course the catalogue
+   does not show, and the other way round. Course Builder always wins,
+   because its service falls back to built-in seed programs even when
+   Firestore fails.
+
+B17. Events problems  [OPEN working.txt #3, #4][LIVE]
+   - /api/events returns googleCalendarUrl; the card reads googleCalUrl
+     (EventBookingCard) -> empty "Add to Google Calendar" button.
+   - Booking with no name/email is accepted ("undefined" in the invite).
+   - The same advisor slot was booked twice, both "success".
+   - EventsCalendarView.tsx:29 never reloads events (setEvents unused).
+   - All events are dated September 2026, which has passed.
+   - .ics text is not escaped, so commas cut locations short
+     [OPEN working.txt #27].
+
+B18. Sheets sync edge cases  [OPEN cleanup #18]
+   A missing tab makes Google return the FIRST tab (Courses parsed as
+   Units); header matching by substring; blank columns are filled with
+   invented values (fees 9500/42000, units COMP1001...) that the chatbot
+   then quotes as fact.
+
+B19. Course Builder logic gaps  [OPEN cleanup #16, working.txt #20-21]
+   New versions copy no units; programs can be published while
+   non-compliant; save_unit saves even when weights do not total 100%
+   (app/api/course-builder/route.ts:123-129); getUnits(programId) replaces
+   the whole cache with one program's units; totalAssessmentWeight is
+   always 100.
+
+B20. Application form details  [NEW unless noted]
+   - Upload works on a stale copy of the application
+     (ApplicationPortalView.tsx:71-120): edits made while verification runs
+     are lost when the result arrives.
+   - Full-size photos are sent as base64 JSON with no size limit.
+   - verificationError is set but never shown.
+   - The course list uses COURSES_DATA only (see B16).
+   - Submission forces declarationAgreed:true (l.445).
+
+B21. RAG pipeline details (new, uncommitted code)  [NEW]
+   - lib/rag/embeddings.ts:153-158: when Gemini is unavailable it silently
+     stores "deterministic" hash vectors in the same index as real Gemini
+     vectors. Similarity between the two kinds means nothing, so search
+     quality silently collapses. Store the model name with each chunk and
+     refuse to mix.
+   - If the primary model returns the wrong length (no error), the
+     secondary model is never tried (embeddings.ts:121-128).
+   - vectorStore.ts:93-97: findNearest() has no tenantTag filter, so the
+     composite index in firestore.indexes.json is unused and results are
+     filtered afterwards (can return fewer than topK). When results are
+     below minScore it re-scans 100 documents with the same threshold.
+   - Re-ingesting a document with the same id leaves old extra chunks
+     behind (no delete first). Input "keywords" and "metadata" are ignored.
+   - Query always uses tenantTag 'rto-ai' even if ingest used another.
+   - "minScore: 0" is impossible ("||" instead of "??").
+   - The prompt says "Answer strictly from sources" but, with no sources,
+     says "Provide general accredited higher-ed guidance" - an invitation
+     to make things up.
+   - chunker.ts: very long sentences are never split; the "no sentence
+     markers" fallback can never run; Thai and Korean have no sentence rule.
+
+B22. MFA page can never work  [OPEN working.txt #29]
+   lib/firebase/client.ts:56-72 (hard-coded '000000' code) and
+   app/setup-mfa/page.tsx:64 (wrong enroll() arguments). It also offers
+   email/password sign-in although the app is Google-only.
+
+B23. Smaller bugs
+   - Footer OS detection: Android shows "Linux", iPhone shows "macOS"
+     (Footer.tsx:83-87 checks in the wrong order).
+   - Chat microphone is fixed to en-US (ChatInterface.tsx:161).
+   - EventBookingCard fires confetti on every re-mount; the .ics object URL
+     is never released [OPEN cleanup #21].
+   - handleSendMessage builds the history from a stale "messages" value
+     (app/page.tsx:378), so quick double sends can lose a message; the whole
+     history (including the long welcome text) is sent every time.
+   - AdminCalendarManager / GoogleClassroomManager subscribe to auth after
+     an async import, so the listener can leak [OPEN cleanup #20].
+   - Student counter: scripts/seed-database.ts:104 resets the counter to 5
+     without merge; running it after real students exist creates duplicate
+     Student Numbers.
+   - Embed page: timestamps stored as "10:42 am" strings -> "Invalid Date"
+     [OPEN working.txt #8].
+
+
+=====================================================================
+5. P3 - UNNECESSARY CODE
+=====================================================================
+
+U1. Files that nothing uses (safe to delete after a quick look)
+    [OPEN cleanup #22 unless noted]
+   - index.html (root, 1,137 lines) - old standalone page, not served
+   - public/legacy_dashboard.html (1,056 lines)
+   - public/admin-demo.html.bak (a backup, and TRACKED in git)
+   - public/firebase-auth-sso.js - not referenced
+   - public/courses_template.csv - not referenced; it is actually a Google
+     Classroom batch-import template, not a course template [NEW detail]
+   - src/services/lmsClient.js, src/services/lmsAiService.js - Vite-era,
+     point at a DIFFERENT Firebase project (pro-lms-c44d1); not imported
+   - components/admin/AdminLoginModal.tsx - not imported anywhere
+   - components/ApiKeyModal.tsx - imported in app/page.tsx, never rendered
+   - components/auth/GoogleClassroomLoginModal.tsx - rendered but can never
+     open (isClassroomLoginOpen is never set to true). Its ClassroomUser
+     type IS used elsewhere - move it before deleting (see
+     removeclassroom.txt)
+   - lib/firebase/admin.cjs.js - only used by scripts/set-admin-role.ts
+   - functions/ - never deployed; duplicates lib/firebase/admin.ts
+   - server.log - tracked in git; should be ignored [NEW]
+   - rto-ai-fixes.patch - apply it (selectively, P11) or delete it
+
+U2. Unused functions and settings
+   - lib/firebase/admin.ts: enrollTotpMfa() does nothing (updateUser(uid,{}))
+   - lib/firebase/admin.ts: setUserRoles() - only the unsafe script uses it
+   - lib/firebase/client.ts: signInAndRefreshToken() is never called
+   - lib/rag/vectorStore.ts: deleteDocumentChunks() is never called [NEW]
+   - lib/auth/permissions.ts: roleHasPermission(), getPermissionsForRole()
+     are never called (they SHOULD be used - see S3)
+   - app/api/faqs/parse-bank/route.ts:24-25: qPrefixRegex, aPrefixRegex
+   - lib/course-builder/service.ts:389 cachedTenantConfig; the "tenants"
+     document is written but never read
+   - Admin API tab: the Firebase, Classroom and Pexels key fields are saved
+     to localStorage and never read (AdminDashboardView.tsx:70-89, :608-693)
+   - .env.example: GOOGLE_CLASSROOM_API_KEY, PEXELS_API_KEY and all VITE_*
+     variables are not used by this Next.js app
+   - Props accepted and ignored: CourseBuilderView "apiKey", Navbar
+     "onOpenSettings", ChatInterface "currentApplication",
+     AdminDashboardView "onLogout"
+   - The "event_list" chat widget is produced but never rendered
+   - FAQ relatedLinks "action" values are never handled
+   - firestore.indexes.json: while queries do not filter by tenant, the
+     tenantTag+embedding index is unused (only the second one is needed)
+
+U3. Unused dependencies  [OPEN cleanup #23, corrected]
+   - clsx, tailwind-merge - not imported anywhere
+   - ts-node - only for lib/firebase/admin.cjs.js
+   - (@google/genai IS now used by lib/rag - cleanup.txt #23 is out of date)
+
+U4. 163 unused imports / variables in 40 files
+   Mostly unused lucide-react icons. Full list in Appendix B. They do not
+   break anything but make files harder to read.
+
+U5. Duplicated code  [OPEN cleanup #25 + NEW]
+   - Google sign-in + user object built 4 times (app/page.tsx twice,
+     SignInView.tsx, GoogleClassroomLoginModal.tsx), each with the same
+     hard-coded scope list and Unsplash avatar fallback.
+   - The Superadmin decision (isOwner || isSuperAdmin || role==='superadmin')
+     is repeated 8 times across app/page.tsx, SignInView.tsx, Navbar.tsx
+     and /api/users.
+   - assignUniversityRole + generateStudentNumber exist twice, identical
+     (lib/firebase/admin.ts and functions/src/index.ts).
+   - Event booking logic exists twice (app/api/events/route.ts, tools.ts).
+   - The missing-field check exists twice in tools.ts (l.500-508, l.530-537).
+   - Keyword extraction written 4 times (twice inside app/api/faqs/route.ts,
+     generateKeywords in faqs/parse-bank, extractKeywords in lib/rag/chunker).
+   - .env parsing written by hand twice (lib/firebase/admin.ts:17-51,
+     scripts/verify_strict_supporter_registration.js) although Next.js
+     already loads .env files.
+   - The CSV getVal() helper is copied 3 times in
+     lib/sheets/googleSheetsSync.ts.
+   - Navbar.tsx:133-156 ten-branch colour chain duplicates
+     ROLE_DEFINITIONS.badgeBg (use getRoleMeta()).
+   - The Google "G" logo SVG is pasted 5 times; the chat welcome message is
+     in 2 pages.
+
+U6. Demo / fictional content in live code  [OPEN cleanup #14 + NEW]
+   - Fake applicants Emma Watson and Rajesh Kumar are always merged into
+     real applications (app/api/applications/route.ts:5-221).
+   - /api/users shows sample users when Firestore is empty or fails.
+   - "EduPulse Institute of Technology & AI": fictional campuses, "TEQSA
+     registered", "AACSB & EQUIS", "Top 3 Australian University for
+     Graduate Employability", Vice-Chancellor scholarships
+     (lib/agent/tools.ts:319-342, data/*.ts, lib/rag seed documents).
+     For a real RTO, publishing invented accreditation, rankings or fees
+     is a consumer-law and ASQA marketing risk - the chatbot repeats these
+     to the public as fact.
+   - The product is an RTO, but the content is university-style (ATAR,
+     GPA out of 7, semesters, CSP/HECS, degrees, "Chancellor"). VET
+     concepts (USI, qualifications and units of competency, ASQA) appear
+     only in the RAG seed text.
+   - Hard-coded dates: events Sept 2026, Tokens "today" = 2026-09-28,
+     commencingYear '2026', counter year 2026.
+
+U7. Tailwind classes that do nothing  [OPEN cleanup #26]
+   Tailwind v4-only or plugin classes (shadow-2xs, shadow-xs, outline-hidden,
+   backdrop-blur-xs, animate-in, fade-in, animate-fade-in, no-scrollbar)
+   and the invalid py-0.2 are still used; the project is on Tailwind 3.4.
+
+
+=====================================================================
+6. PROCESS IMPROVEMENTS
+=====================================================================
+
+P1. One way to know who the user is  [Effort: M]
+    Today the "current user" is assembled in the browser from localStorage,
+    a hard-coded email list and an unauthenticated GET. Replace with:
+    Google sign-in -> server verifies the ID token -> server sets custom
+    claims -> browser reads claims from getIdTokenResult() -> every API
+    checks the token. Put it in one hook (e.g. useSession) and one server
+    helper.
+
+P2. One source of truth for courses and units  [Effort: L]
+    Choose either Course Builder (Firestore) or Google Sheets / data files,
+    and make the catalogue tabs, chatbot tools, Home page and Application
+    Form all read from it. (If Course Builder is removed - see
+    removeclassroom.txt - the data files / Sheets become that source.)
+
+P3. Persist what matters  [Effort: M]
+    Events, booked slots, applications, the synced catalogue and custom
+    FAQs: store them in Firestore and use memory only as a cache. Delete the
+    in-memory fake applicants.
+
+P4. Let the AI do the understanding  [Effort: M]
+    The 500-line keyword engine causes most of the wrong answers. When
+    Gemini is available, let Gemini choose the tool (it already has the tool
+    definitions) and keep the keyword engine only as a small emergency
+    fallback. Add RAG as a tool, not as an unreachable last step.
+
+P5. Cut Firestore and AI cost  [Effort: S]
+    - Telemetry: 2 writes per event, one event per keystroke in the form,
+      plus one hot "metrics/platform_stats" document (Firestore sustains
+      about 1 write per second per document). Debounce, sample, or use
+      Google Analytics for page views.
+    - The admin telemetry tab re-reads 61 documents every 10 seconds
+      (about 8,800 reads per day per open tab). Use onSnapshot or 60 s.
+    - RAG embeds with 5 parallel single calls; the SDK can embed a batch in
+      one call. A new GoogleGenAI client is created on every call.
+    - Rate-limit the public AI routes (chat, parse-bank, rag/query).
+
+P6. Make failures visible  [Effort: S]
+    Many functions catch errors and return success:true (B14). Return the
+    real outcome and show it to staff. Add timeouts (AbortController) to
+    every Gemini request.
+
+P7. Build safety  [Effort: S]
+    next.config.js sets typescript.ignoreBuildErrors and
+    eslint.ignoreDuringBuilds, so broken code can be deployed without
+    warning. The type check passes today - turn the checks back on to keep
+    it that way. Add an ESLint config (no-unused-vars would have caught
+    Appendix B). "config.cache = false" turns off webpack caching
+    everywhere; it is only needed on the USB stick.
+
+P8. Tests  [Effort: M]
+    There are no automated tests. The 14 live checks in Appendix A and the
+    65 API / 80 browser checks from 16 Oct are a ready-made list. A small
+    Vitest + Playwright suite run against the Firestore emulator would stop
+    regressions and never touch production data.
+    scripts/verify_strict_supporter_registration.js runs against the LIVE
+    database, hard-codes a third party's email address, and leaves its test
+    user behind if a check fails.
+
+P9. Admin panel performance  [Effort: S]
+    AdminDashboardView statically imports all 16 tab components (about
+    11,000 lines). Load each tab with next/dynamic. /setup-mfa ships 252 kB
+    of JavaScript for a page that cannot work.
+
+P10. Repository hygiene  [OPEN cleanup #27]
+    tsconfig.tsbuildinfo, next-env.d.ts, server.log and
+    public/admin-demo.html.bak are tracked although they should not be.
+    Move the root-level planning documents into /docs. Commit or discard
+    the uncommitted RAG work deliberately (it has the issues in S3, B1 and
+    B21).
+
+P11. Apply the 16 Oct patch (selectively)  [Effort: S-M]
+    18 of the 22 files still apply cleanly:
+      git apply --3way --exclude=components/application/ApplicationPortalView.tsx --exclude=lib/agent/engine.ts --exclude=lib/agent/tools.ts --exclude=lib/firebase/client.ts rto-ai-fixes.patch
+    The other 4 need their hunks redone by hand. If Course Builder is going
+    to be removed, also exclude components/admin/CourseBuilderView.tsx and
+    lib/course-builder/service.ts.
+
+
+=====================================================================
+7. SUGGESTED ORDER
+=====================================================================
+  1. Today, before anyone else signs in:
+       S1, S2, S4 (rules: catch-all read + own-role edit), and S3 for
+       /api/users, /api/assign-role, /api/permissions, /api/course-builder.
+  2. Stop the harm: S6 (fake verification), S8 (upload), B8, B12.
+  3. Data protection: the rest of S3, S4, S12, S13; revoke unused keys
+     (S11).
+  4. Apply the 16 Oct patch selectively (P11) - this fixes most of the
+     BROKEN items in section 2.
+  5. Correctness: B1, B7, B10, B11, B13, B14.
+  6. Decide on Google Classroom / Course Builder (removeclassroom.txt) -
+     do this BEFORE P2, because it decides what the single course source
+     will be.
+  7. Architecture: P1-P4, then tidy-up U1-U7 and P7-P10.
+
+
+=====================================================================
+8. STATUS OF THE 16 OCT REPORTS (cleanup.txt / working.txt)
+=====================================================================
+  Fixed since 16 Oct
+    - working.txt #30 (2 TypeScript errors): the type check now passes.
+    - working.txt E3 (backup): local main = origin/main, so the latest
+      commit is pushed. (The uncommitted work listed at the top is not.)
+    - cleanup.txt #17 (chat strips markdown): the chat now renders headings,
+      bold, code and bullet lists (links and numbered lists still not).
+  Changed but still open
+    - cleanup.txt #2: "any Google account gets SUPERADMIN" became "any
+      Google account gets the admin panel as a supporter" (S2), and new
+      self-elevation paths appeared (S1, S4).
+  Still open: everything else, including working.txt #1-29 (patch not
+    applied) and cleanup.txt #1, #3-16, #18-30.
+  Out of date
+    - cleanup.txt #23: @google/genai is now used (lib/rag).
+
+
+=====================================================================
+9. ENVIRONMENT
+=====================================================================
+  - The project is still on the D: USB stick (FAT32). "next build" fails
+    there; it builds fine on C: (done for this audit). Move the project to
+    an NTFS drive.
+  - The Gemini key was rejected by Google on 16 Oct. It was not re-checked
+    today (the test deliberately used no key).
+  - This computer's saved gcloud login is expired ("invalid_rapt"). Any
+    local script that relies on it (instead of the service account in
+    .env.local) will fail until you run
+    "gcloud auth application-default login" again.
+
+
+=====================================================================
+APPENDIX A - LIVE CHECKS RUN ON 17 OCT (C: copy, fake Firebase project)
+=====================================================================
+  #  Request                                       Result
+  1  POST /api/chat "What is your refund policy   tools: search_faq only;
+     if I cancel my enrolment?"                   answer = "general admission
+                                                  requirements" FAQ; RAG not run
+  2  POST /api/chat "book the international visa  booked event-ai-taster-workshop
+     webinar, my email is maria@example.com"
+  3  POST verify-document, 5-byte non-image,      Legitimate / 96 / name match
+     fileName passport.jpg                        true / "Australian Passport ...
+                                                  valid through 2034"
+  4  POST /api/permissions role                   "Successfully updated
+     "not-a-real-role", perms users.manage,       permissions for role
+     roles.manage                                 supporter"
+  5  POST /api/upload folder "../.."              file written to the project
+                                                  root (test file removed)
+  6  GET /api/applications (no login)             names, dates of birth and
+                                                  home addresses returned
+  7  POST /api/events with no name/email          success:true, studentName
+                                                  undefined; key returned is
+                                                  googleCalendarUrl
+  8  POST /api/events slot-1 twice                both success, same slot
+  9  PATCH /api/users role superadmin (no login)  reached the database (failed
+                                                  only because the DB was fake)
+ 10  POST /api/assign-role superadmin (no login)  reached Firebase Auth/DB
+                                                  (failed only because the
+                                                  credentials were fake/expired)
+ 11  POST /api/rag/ingest (no login)              success:true, chunksCreated:1
+                                                  although the write failed
+ 12  GET /api/telemetry (no login)                HTTP 200
+ 13  GET /api/course-builder (no login)           includes draft program
+                                                  prog-m-ai
+ 14  POST /api/sheets/sync, non-existent sheet    success:true "Successfully
+                                                  synchronized 0 courses...";
+                                                  site switched to "Google
+                                                  Sheets Connected"
+
+
+=====================================================================
+APPENDIX B - UNUSED IMPORTS / VARIABLES
+  (tsc --noUnusedLocals --noUnusedParameters: 163 items in 40 files)
+=====================================================================
+  app/api/applications/route.ts
+      INITIAL_APPLICATION_STATE (l.2)
+  app/api/faqs/parse-bank/route.ts
+      qPrefixRegex (l.24), aPrefixRegex (l.25)
+  app/api/sheets/sync/route.ts
+      extractGoogleSheetId (l.5)
+  app/api/telemetry/route.ts
+      req (l.41)
+  app/api/users/route.ts
+      DEFAULT_REGISTRATION_ROLE (l.5)
+  app/embed/page.tsx
+      setIsLoading (l.19), setApiKey (l.20), CourseProgram (l.7)
+  app/page.tsx
+      ApiKeyModal (l.15), COURSES_DATA (l.18)
+  components/Footer.tsx
+      Wifi (l.16), Thermometer (l.19), Navigation (l.21), geoError (l.60)
+  components/Navbar.tsx
+      onOpenSettings (l.31)
+  components/admin/AdminCalendarManager.tsx
+      result (l.48)
+  components/admin/AdminDashboardView.tsx
+      Clock (l.14), X (l.18), HelpCircle (l.20), ExternalLink (l.24), Lock (l.31), normalizeRole (l.52), onLogout (l.63), ShieldAlert (l.8), searchTerm (l.91), setSearchTerm (l.91)
+  components/admin/AdminEventsManager.tsx
+      Building (l.13), Sparkles (l.15), ArrowUpDown (l.18), Check (l.20), X (l.21), AlertCircle (l.22), Users (l.9)
+  components/admin/ApplicationDetailModal.tsx
+      Award (l.16), Layers (l.28), ChevronRight (l.29), ExternalLink (l.30)
+  components/admin/CourseBuilderView.tsx
+      ContentBlock (l.12), AccreditationFramework (l.14), PresentationItem (l.15), Sparkles (l.23), Eye (l.29), Sliders (l.37), HelpCircle (l.39), Lock (l.41), ChevronDown (l.42), Download (l.49), HardDrive (l.50), isLoading (l.71)
+  components/admin/FirebaseTelemetryView.tsx
+      ArrowUpRight (l.16), Users (l.9)
+  components/admin/GoogleClassroomManager.tsx
+      AlertCircle (l.11), ExternalLink (l.17), X (l.21), setParsedSpreadsheetRows (l.237), Layers (l.24), HelpCircle (l.26), UserPlus (l.27), setAiGeneratedCourse (l.273), Mail (l.28), LinkIcon (l.30), ShieldCheck (l.9)
+  components/admin/KnowledgeFaqManager.tsx
+      BookOpen (l.15), MessageSquare (l.16), ChevronDown (l.22), Layers (l.23), ListOrdered (l.26), ArrowRight (l.27), Filter (l.8)
+  components/admin/MultilingualRagManager.tsx
+      ExternalLink (l.15), Tag (l.17), BookOpen (l.18), HelpCircle (l.19), ChevronRight (l.21)
+  components/admin/RolePermissionsManager.tsx
+      Filter (l.12), Eye (l.13), Sparkles (l.16), normalizeRole (l.28), SystemPermission (l.36), isLoading (l.47), Lock (l.5), Unlock (l.6)
+  components/admin/StaffMessagingView.tsx
+      CheckCheck (l.11), Paperclip (l.12), Smile (l.13), ShieldCheck (l.14), Sparkles (l.16), Phone (l.17), Video (l.18), Pin (l.19), Bell (l.20), Trash2 (l.21), Users (l.7)
+  components/application/ApplicationPortalView.tsx
+      AlertCircle (l.10), Printer (l.12), Building (l.22), FileCheck (l.28), Icon (l.541), verificationError (l.56)
+  components/auth/GoogleClassroomLoginModal.tsx
+      Sparkles (l.10), ExternalLink (l.11), Key (l.12), Layers (l.13), ArrowRight (l.14), firebaseSignOut (l.57), ShieldCheck (l.9)
+  components/auth/SignInView.tsx
+      ArrowRight (l.10), User (l.12), Mail (l.16), Zap (l.18), BookOpen (l.8), Sparkles (l.9)
+  components/catalog/CourseCatalogView.tsx
+      Award (l.3), BookOpen (l.3), CheckCircle2 (l.3), DollarSign (l.3)
+  components/catalog/UnitCatalogView.tsx
+      Award (l.4)
+  components/chat/ApplicationUpdateCard.tsx
+      AlertCircle (l.3), CheckCircle2 (l.3), Sparkles (l.3)
+  components/chat/ChatInterface.tsx
+      currentApplication (l.137), Layers (l.21), Calendar (l.22), FileText (l.23), HelpCircle (l.24), CheckCircle2 (l.25), ChevronRight (l.26), UnitDetail (l.5)
+  components/chat/CourseCard.tsx
+      GraduationCap (l.3)
+  components/chat/UnitCard.tsx
+      BookOpen (l.3)
+  components/events/EventsCalendarView.tsx
+      Clock (l.10), ExternalLink (l.11), Download (l.12), percentFull (l.151), ArrowRight (l.16), UserCheck (l.17), setEvents (l.29)
+  components/home/HomeView.tsx
+      Calendar (l.20), CheckCircle2 (l.22)
+  lib/agent/engine.ts
+      ToolExecutionResult (l.1), (all imports on line 3) (l.3), (all imports on line 4) (l.4), ProspectiveEvent (l.5), (all imports on line 6) (l.6), isAskingUnit (l.99)
+  lib/agent/tools.ts
+      FAQS_DATA (l.1), (all imports on line 2) (l.2), (all imports on line 3) (l.3)
+  lib/auth/permissions.ts
+      SYSTEM_ROLES (l.1)
+  lib/course-builder/service.ts
+      cachedTenantConfig (l.389), ProgramOutcome (l.7), AssessmentItem (l.9)
+  lib/firebase/admin.ts
+      totpSecret (l.127), deleteApp (l.5), getApp (l.5)
+  lib/firebase/client.ts
+      getApp (l.8), EmailAuthProvider (l.9)
+  lib/rag/ragPipeline.ts
+      getVectorStoreStats (l.11), query (l.196)
+  lib/sheets/googleSheetsSync.ts
+      GoogleSheetsSyncStatus (l.10), getGoogleSheetsSyncStatus (l.9)
+  scripts/prepare-superadmin.ts
+      res (l.37)
+
+
+=====================================================================
+END OF REPORT
+=====================================================================

@@ -20,39 +20,70 @@ export async function POST(req: NextRequest) {
       ? imageBase64.split('base64,')[1]
       : imageBase64;
 
-    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    const apiKey = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
 
-    let auditResult: DocumentAuthenticityAudit | null = null;
+    if (!apiKey || apiKey.length < 10) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'AI document inspection service is not configured (missing Gemini API key). Document cannot be verified.',
+          audit: {
+            documentCategory: documentCategory as 'identity' | 'academic',
+            documentType: 'Unverified Upload',
+            issuingEntity: 'Unknown',
+            country: 'Unknown',
+            briefDescription: `Unverified ${documentCategory === 'identity' ? 'Identity Document' : 'Academic Credential'} (${fileName || 'file'}). Manual admissions officer inspection required.`,
+            identifiedName: 'Unverified',
+            nameMatchesApplicant: false,
+            authenticityStatus: 'Requires Additional Review',
+            authenticityScore: 0,
+            legitimacyNotes: 'Automated inspection service is unconfigured. Zero automated verification performed.',
+            verifiedAt: new Date().toISOString(),
+            filename: fileName
+          }
+        },
+        { status: 503 }
+      );
+    }
 
-    if (apiKey && apiKey.length > 10) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const isIdentity = documentCategory === 'identity';
 
-        const prompt = `You are a certified forensic credential auditor for university admissions, trained under the 'personal-id-inspection' and 'academic-transcript-inspection' skills.
+    const prompt = `You are a certified forensic credential auditor for university admissions, trained under the 'personal-id-inspection' and 'academic-transcript-inspection' forensic standards.
 Analyze this uploaded document image for authenticity verification.
-Target Category: ${documentCategory === 'identity' ? 'Proof of Identity (Passport, Driver License, National ID)' : 'Academic Qualification (University Transcript, Diploma, Degree Testamur)'}.
+Target Category: ${isIdentity ? 'Proof of Identity (Passport, Driver License, National ID)' : 'Academic Qualification (University Transcript, Diploma, Degree Testamur)'}.
 Applicant Name on File: "${applicantName}".
 Uploaded Filename: "${fileName}".
 
 PRIVACY AND SECURITY DIRECTIVE:
 You are analyzing this image in volatile memory only. The image will be discarded immediately after this check. Zero copies will be stored.
 
-SKILL INSPECTION CRITERIA:
-${documentCategory === 'identity' ? `
-- Passports: ICAO Doc 9303 compliance, Machine Readable Zone (MRZ) checksums, OCR-B font integrity, biometric chip symbol, ghost portrait opacity, holographic laminate patterns, and issuing department (e.g. DFAT, State Dept).
-- Driver Licences / National IDs: PDF417 2D barcodes, state transport logos, security laminates, micro-lines (guilloche patterns), expiration logic.
-- Red Flags: Digital compression noise around names/DOB, font weight discrepancies, misaligned text baselines, artificial lighting on portrait photos.
+CRITICAL ACCURACY & INTEGRITY MANDATES:
+1. ZERO HALLUCINATIONS: Under NO circumstances should you invent, assume, or fabricate document details based on the filename. You must base your findings SOLELY on the visual content present in the image.
+2. INVALID / NON-DOCUMENT HANDLING: If the image is blank, a placeholder, a generic logo, an icon, a corrupted image, a selfie/photo without document text, or completely unrelated:
+   - Set "authenticityStatus" to "Suspect / Irregular".
+   - Set "authenticityScore" to 0 (or a number between 0 and 15).
+   - Set "documentType" to "Invalid / Unrecognized Image".
+   - Set "issuingEntity" to "None".
+   - Set "country" to "Unknown".
+   - Set "nameMatchesApplicant" to false.
+   - Set "identifiedName" to "None".
+   - State clearly in "briefDescription" and "legitimacyNotes" that the uploaded file does not contain a recognizable, authentic credential.
+3. FORENSIC VERIFICATION CRITERIA (If document is present):
+${isIdentity ? `
+   - Passports: ICAO Doc 9303 compliance, Machine Readable Zone (MRZ) 2-line OCR-B typography and check digits, biometric camera symbol, ghost portrait opacity, holographic laminate patterns, and issuing department (e.g. DFAT, State Dept).
+   - Driver Licences / National IDs: PDF417 2D barcodes, state transport authority logos, security laminates, micro-lines (guilloche curved patterns), expiration date validity.
+   - Tampering Red Flags: Font weight discrepancies around name/DOB, compression block noise clustered solely around personal details, misaligned baselines, artificial halos around portrait photo.
 ` : `
-- University Transcripts: Institutional letterhead & crest, Registrar seal/signature, course code hierarchy, semester-by-semester term progression, unit credit points, grading scale (WAM/GPA/Distinction), and completion/conferral statement.
-- Degree Testamurs & Diplomas: Senate/Council authorization formula, Chancellor signatures, embossed/foil seals, graduation date, calligraphy & typography consistency.
-- Red Flags: Diploma mill naming, font mismatch between student name and certificate body, arithmetic grade errors, missing security borders.
+   - University Transcripts: Institutional letterhead & crest, Registrar signature or digital seal, sequential semester course codes & credit points, grading scale (WAM/GPA/HD/D/CR/P), and official completion/conferral statement.
+   - Degree Testamurs & Diplomas: Senate/Council authorization wording, Chancellor signatures, embossed or gold foil seals, graduation date, calligraphy consistency.
+   - Tampering Red Flags: Diploma mill naming variations, font mismatch between student name and certificate body, arithmetic grade errors, missing security borders.
 `}
+4. NAME MATCHING: Compare the name printed on the document with the Applicant Name on File ("${applicantName}"). Set "nameMatchesApplicant" to true only if they clearly match or represent a standard nickname/legal variation.
 
-MANDATORY OUTPUT REQUIREMENT:
-You MUST provide a concise 1-2 sentence "briefDescription" specifically tailored for admissions officers in the Admin & Operations Panel.
-Example Brief Descriptions:
-- Identity: "Australian Passport (Series R) for Emma Watson, issued by DFAT, valid through 2034 with verified biometric MRZ and holographic coat of arms."
-- Academic: "Official Academic Transcript from University of Sydney (Australia) for Emma Watson. Confirms Bachelor of Computer Science with 144 credits completed at High Distinction (WAM 86.2) with Registrar digital seal."
+5. MANDATORY BRIEF DESCRIPTION STANDARD:
+Provide a concise, factual 1-2 sentence "briefDescription" tailored for university admissions officers.
+- Format if Authentic: "[Official Document Type] for [Identified Name], issued by [Issuing Authority] ([Country]). [Validity status / Expiration] with [Security feature confirmation]."
+- Format if Invalid / Suspect: "Uploaded file does not contain a verifiable [Identity/Academic] document. [Specific visual failure description]."
 
 Respond with ONLY valid JSON with this exact structure:
 {
@@ -62,135 +93,139 @@ Respond with ONLY valid JSON with this exact structure:
   "country": "string",
   "briefDescription": "string",
   "identifiedName": "string",
-  "nameMatchesApplicant": true,
+  "nameMatchesApplicant": false,
   "authenticityStatus": "Legitimate",
-  "authenticityScore": 96,
+  "authenticityScore": 95,
   "legitimacyNotes": "string"
 }`;
 
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
+    // Target Gemini 3.8 Flash
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
               {
-                parts: [
-                  { text: prompt },
-                  {
-                    inlineData: {
-                      mimeType: mimeType || 'image/jpeg',
-                      data: cleanBase64
-                    }
-                  }
-                ]
+                inlineData: {
+                  mimeType: mimeType || 'image/jpeg',
+                  data: cleanBase64
+                }
               }
-            ],
-            generationConfig: {
-              temperature: 0.1,
-              responseMimeType: 'application/json'
-            }
-          })
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (rawText) {
-            try {
-              const parsed = JSON.parse(rawText);
-              auditResult = {
-                documentCategory: documentCategory as 'identity' | 'academic',
-                documentType: parsed.documentType || (documentCategory === 'identity' ? 'Government Issued ID' : 'Academic Credential'),
-                issuingEntity: parsed.issuingEntity || 'Verified Authority',
-                country: parsed.country || 'Australia',
-                briefDescription: parsed.briefDescription || (documentCategory === 'identity'
-                  ? `${parsed.documentType || 'Identity Document'} for ${parsed.identifiedName || applicantName}, issued by ${parsed.issuingEntity || 'Verified Authority'} (${parsed.country || 'Australia'}). Authenticity verified.`
-                  : `${parsed.documentType || 'Academic Credential'} from ${parsed.issuingEntity || 'University'} (${parsed.country || 'Australia'}) for ${parsed.identifiedName || applicantName}. Verified by Registrar.`),
-                identifiedName: parsed.identifiedName || applicantName,
-                nameMatchesApplicant: parsed.nameMatchesApplicant ?? true,
-                authenticityStatus: parsed.authenticityStatus || 'Legitimate',
-                authenticityScore: typeof parsed.authenticityScore === 'number' ? parsed.authenticityScore : 95,
-                legitimacyNotes: parsed.legitimacyNotes || 'Document inspected. Official security patterns, typography, and issuing seals appear authentic.',
-                verifiedAt: new Date().toISOString()
-              };
-            } catch (err) {
-              console.warn('[verify-document] Failed to parse Gemini JSON output:', err);
-            }
+            ]
           }
-        } else {
-          const errText = await res.text();
-          console.warn('[verify-document] Gemini returned non-200:', res.status, errText);
+        ],
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: 'application/json'
         }
-      } catch (geminiErr) {
-        console.warn('[verify-document] Gemini vision error:', geminiErr);
-      }
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('[verify-document] Gemini 3.8 Flash returned error:', res.status, errText);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `AI document inspection service returned status ${res.status}: ${errText}`,
+          audit: {
+            documentCategory: documentCategory as 'identity' | 'academic',
+            documentType: 'Unverified Upload',
+            issuingEntity: 'Unknown',
+            country: 'Unknown',
+            briefDescription: `Document inspection could not be completed by Gemini AI (${res.status}). Manual inspection required.`,
+            identifiedName: 'Unverified',
+            nameMatchesApplicant: false,
+            authenticityStatus: 'Requires Additional Review',
+            authenticityScore: 0,
+            legitimacyNotes: `AI vision service failed with status ${res.status}. No automated legitimacy claims can be made. Document must be inspected manually.`,
+            verifiedAt: new Date().toISOString(),
+            filename: fileName
+          }
+        },
+        { status: 502 }
+      );
     }
 
-    // Robust heuristic evaluation if Gemini was unreachable or not configured
-    if (!auditResult) {
-      const isIdentity = documentCategory === 'identity';
-      const fnLower = (fileName || '').toLowerCase();
-      
-      let docType = isIdentity ? 'Government Photo Identification' : 'Official Academic Credential';
-      let issuingEntity = isIdentity ? 'Official Issuing Authority' : 'Recognized Tertiary Institution';
-      let country = 'Australia';
-      let briefDesc = '';
+    const data = await res.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-      if (isIdentity) {
-        if (fnLower.includes('passport')) {
-          docType = 'International Passport (Series R Biometric)';
-          issuingEntity = 'Department of Foreign Affairs and Trade (Passport Authority)';
-          briefDesc = `Australian Passport for ${applicantName || 'Applicant'}, issued by DFAT (Australia). Valid through 2034 with verified biometric MRZ and security kinegram.`;
-        } else if (fnLower.includes('driver') || fnLower.includes('licence') || fnLower.includes('license')) {
-          docType = 'State Driver Licence (Class C - Car)';
-          issuingEntity = 'State Department of Transport';
-          briefDesc = `State Driver Licence (Class C) for ${applicantName || 'Applicant'}, issued by State Department of Transport. Verified with guilloche anti-copy patterns.`;
-        } else {
-          docType = 'Government Photo Identification Document';
-          issuingEntity = 'National Identity Registry';
-          briefDesc = `Government Photo ID for ${applicantName || 'Applicant'}, issued by National Identity Registry. Verified with authentic security laminate.`;
-        }
-      } else {
-        if (fnLower.includes('transcript')) {
-          docType = 'Certified Academic Transcript of Results';
-          issuingEntity = 'Office of the Academic Registrar';
-          briefDesc = `Official Academic Transcript from ${issuingEntity} (${country}) for ${applicantName || 'Applicant'}. Shows semester course completion with Distinction average and Registrar stamp.`;
-        } else if (fnLower.includes('diploma') || fnLower.includes('degree') || fnLower.includes('testamur')) {
-          docType = 'Bachelor Degree Official Testamur Certificate';
-          issuingEntity = 'University Academic Senate';
-          briefDesc = `Bachelor Degree Official Testamur from ${issuingEntity} (${country}) conferring degree upon ${applicantName || 'Applicant'} with Senate seal and Chancellor signatures.`;
-        } else {
-          docType = 'Educational Qualification Certificate';
-          issuingEntity = 'Accredited Higher Education Institution';
-          briefDesc = `Educational Qualification Certificate issued by ${issuingEntity} (${country}) for ${applicantName || 'Applicant'}. Accredited institutional seals confirmed.`;
-        }
-      }
-
-      auditResult = {
-        documentCategory: isIdentity ? 'identity' : 'academic',
-        documentType: docType,
-        issuingEntity: issuingEntity,
-        country: country,
-        briefDescription: briefDesc,
-        identifiedName: applicantName || 'Verified Applicant',
-        nameMatchesApplicant: true,
-        authenticityStatus: 'Legitimate',
-        authenticityScore: 96,
-        legitimacyNotes: isIdentity
-          ? `Verified ${docType} from ${issuingEntity} (${country}). Standard government typography, security guilloche borders, and identification alignment confirmed legitimate. Name matches application record.`
-          : `Verified ${docType} issued by ${issuingEntity} (${country}). Institutional crest, Senate registrar authorization signature, and degree conferral formatting confirmed authentic.`,
-        verifiedAt: new Date().toISOString()
-      };
+    if (!rawText) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'AI vision model returned empty inspection output.',
+          audit: {
+            documentCategory: documentCategory as 'identity' | 'academic',
+            documentType: 'Unverified Upload',
+            issuingEntity: 'Unknown',
+            country: 'Unknown',
+            briefDescription: 'Document inspection returned empty result. Manual inspection required.',
+            identifiedName: 'Unverified',
+            nameMatchesApplicant: false,
+            authenticityStatus: 'Requires Additional Review',
+            authenticityScore: 0,
+            legitimacyNotes: 'Model was unable to generate a forensic analysis for the supplied image data.',
+            verifiedAt: new Date().toISOString(),
+            filename: fileName
+          }
+        },
+        { status: 502 }
+      );
     }
 
-    // Return audit verdict (Strictly NO image binary or storage path is returned or persisted)
+    let parsed: any;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch (parseErr) {
+      console.error('[verify-document] Failed to parse JSON from model:', rawText);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Failed to parse model inspection response.',
+          rawText
+        },
+        { status: 500 }
+      );
+    }
+
+    // Sanitize score and status
+    const status: 'Legitimate' | 'Requires Additional Review' | 'Suspect / Irregular' = 
+      ['Legitimate', 'Requires Additional Review', 'Suspect / Irregular'].includes(parsed.authenticityStatus)
+        ? parsed.authenticityStatus
+        : (parsed.authenticityScore >= 75 ? 'Legitimate' : parsed.authenticityScore >= 50 ? 'Requires Additional Review' : 'Suspect / Irregular');
+
+    const score = typeof parsed.authenticityScore === 'number'
+      ? Math.max(0, Math.min(100, Math.round(parsed.authenticityScore)))
+      : (status === 'Legitimate' ? 90 : status === 'Requires Additional Review' ? 50 : 0);
+
+    const auditResult: DocumentAuthenticityAudit = {
+      documentCategory: documentCategory as 'identity' | 'academic',
+      documentType: parsed.documentType || (isIdentity ? 'Identity Document' : 'Academic Credential'),
+      issuingEntity: parsed.issuingEntity || 'Unknown Authority',
+      country: parsed.country || 'Unknown',
+      briefDescription: parsed.briefDescription || 'Document inspected by automated forensic system.',
+      identifiedName: parsed.identifiedName || 'None',
+      nameMatchesApplicant: Boolean(parsed.nameMatchesApplicant),
+      authenticityStatus: status,
+      authenticityScore: score,
+      legitimacyNotes: parsed.legitimacyNotes || 'Forensic evaluation completed.',
+      verifiedAt: new Date().toISOString(),
+      filename: fileName
+    };
+
     return NextResponse.json({
       success: true,
       audit: auditResult,
-      privacyGuarantee: 'Image analyzed in volatile memory only and discarded. Zero copies stored in database.'
+      privacyGuarantee: 'Image analyzed in volatile memory only and discarded immediately. Zero copies stored in database.'
     });
   } catch (error: any) {
-    console.error('[verify-document] Error:', error);
+    console.error('[verify-document] Unhandled Error:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to analyze document' },
       { status: 500 }

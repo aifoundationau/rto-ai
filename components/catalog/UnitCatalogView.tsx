@@ -21,29 +21,43 @@ export const UnitCatalogView: React.FC<UnitCatalogViewProps> = ({ onAskAgentAbou
         if (data.units && data.units.length > 0) {
           const publishedUnits = data.units.filter((u: any) => u.status === 'published');
           if (publishedUnits.length > 0) {
+            const programLevelById = new Map<string, string>(
+              (data.programs || []).map((p: any) => [p.id, p.degreeLevel])
+            );
+            // Map Course Builder UnitDocuments onto the UnitDetail shape that UnitCard renders
+            // (a mismatched shape previously crashed this tab on `semestersOffered.join`).
             const mappedUnits: UnitDetail[] = publishedUnits.map((u: any) => ({
               code: u.code,
               title: u.title,
               creditPoints: u.creditWeight || 6,
               faculty: 'Faculty of Engineering & Computer Science',
-              level: u.code.includes('5') ? 'Postgraduate' : 'Undergraduate',
-              semester: ['Semester 1', 'Semester 2'],
-              deliveryMode: u.deliveryMode || 'Hybrid',
+              level: (programLevelById.get(u.programId) || (u.code.includes('5') ? 'Postgraduate' : 'Undergraduate')) === 'Postgraduate'
+                ? 'Postgraduate'
+                : 'Undergraduate',
+              semestersOffered: ['Semester 1', 'Semester 2'],
+              deliveryMode: u.deliveryMode === 'Hybrid' ? 'Blended' : (u.deliveryMode || 'Blended'),
+              coordinator: {
+                name: u.coordinator?.name || 'Academic Faculty Team',
+                email: u.coordinator?.email || 'TBA',
+                office: u.coordinator?.room || ''
+              },
               overview: u.overview || 'Accredited syllabus.',
-              learningOutcomes: u.outcomes ? u.outcomes.map((o: any) => o.statement) : [],
-              assessments: u.assessments ? u.assessments.map((a: any) => ({
-                title: a.title,
-                type: a.type,
-                weight: `${a.weight}%`,
-                dueWeek: `Week ${a.dueDateWeek || 10}`
-              })) : [],
-              topics: u.modules ? u.modules.map((m: any) => ({
+              learningOutcomes: (u.outcomes || []).map((o: any) => o.statement),
+              prerequisites: u.prerequisites?.length ? u.prerequisites : ['None'],
+              topics: (u.modules || []).map((m: any) => ({
                 week: m.order,
-                title: m.title,
-                readings: `${m.studyHours || 8} Hours Estimated Study`
-              })) : [],
-              prerequisites: u.prerequisites || [],
-              coordinator: u.coordinator ? `${u.coordinator.name} (${u.coordinator.email})` : 'Academic Faculty Team'
+                // Module titles already start with "Week N:"; UnitCard adds its own prefix
+                title: String(m.title || '').replace(/^week\s*\d+\s*[:\-–]\s*/i, ''),
+                summary: (m.learningObjectives || []).join('; ') || `${m.studyHours || 8} hours estimated study`
+              })),
+              assessments: (u.assessments || []).map((a: any) => ({
+                name: a.title,
+                weight: Number(a.weight) || 0,
+                type: a.type,
+                description: a.wordCountOrDuration || `${a.type} assessment task`,
+                dueWeek: a.dueDateWeek ? `Week ${a.dueDateWeek}` : 'TBA'
+              })),
+              prescribedResources: []
             }));
             setUnits(mappedUnits);
             if (!mappedUnits.some((u) => u.code === selectedUnitCode)) {

@@ -100,7 +100,7 @@ export function parseCoursesFromCsv(csvText: string): CourseProgram[] {
     const title = getVal('title');
     if (!title) continue; // skip empty rows
 
-    const degreeLevel = (getVal('degreelevel') || getVal('level') || 'Undergraduate').includes('Post')
+    const degreeLevel = (getVal('degreelevel') || getVal('level') || 'Undergraduate').toLowerCase().includes('post')
       ? 'Postgraduate'
       : 'Undergraduate';
 
@@ -118,8 +118,10 @@ export function parseCoursesFromCsv(csvText: string): CourseProgram[] {
 
     const atar = parseFloat(getVal('atar')) || undefined;
     const gpa = parseFloat(getVal('gpa')) || undefined;
-    const annualTuitionDomestic = parseInt(getVal('domesticfee') || getVal('tuitiondomestic')) || 9500;
-    const annualTuitionInternational = parseInt(getVal('intlfee') || getVal('tuitionintl') || getVal('internationalfee')) || 42000;
+    // Accept "44,500" / "$44500" style values; the template header is annualTuitionInternational
+    const parseAmount = (val: string) => parseInt(val.replace(/[^0-9.]/g, ''));
+    const annualTuitionDomestic = parseAmount(getVal('domesticfee') || getVal('tuitiondomestic')) || 9500;
+    const annualTuitionInternational = parseAmount(getVal('intlfee') || getVal('tuitionintl') || getVal('tuitioninternational') || getVal('internationalfee')) || 42000;
     const overview = getVal('overview') || `${title} degree program at the university.`;
 
     const highlightsRaw = getVal('highlight') || '';
@@ -197,7 +199,7 @@ export function parseUnitsFromCsv(csvText: string): UnitDetail[] {
     if (!code || !title) continue;
 
     const faculty = getVal('faculty') || 'Faculty of Science & Engineering';
-    const level = (getVal('level') || 'Undergraduate').includes('Post') ? 'Postgraduate' : 'Undergraduate';
+    const level = (getVal('level') || 'Undergraduate').toLowerCase().includes('post') ? 'Postgraduate' : 'Undergraduate';
     const creditPoints = parseInt(getVal('credit')) || 6;
 
     const semestersRaw = getVal('semester') || 'Semester 1, Semester 2';
@@ -226,6 +228,8 @@ export function parseUnitsFromCsv(csvText: string): UnitDetail[] {
       const topicParts = topicsRaw.split('|');
       topicParts.forEach((part, idx) => {
         const segs = part.split(':');
+        // Drop a leading week label ("W1", "Week 1") so the title is the topic itself
+        if (segs.length > 1 && /^\s*w(eek)?\s*\d+\s*$/i.test(segs[0])) segs.shift();
         const tTitle = segs[0]?.trim() || `Week ${idx + 1} Lecture`;
         const tSum = segs[1]?.trim() || 'Core theoretical and practical session';
         topics.push({ week: idx + 1, title: tTitle, summary: tSum });
@@ -393,6 +397,14 @@ export async function syncFromGoogleSheet(sheetIdOrUrl: string): Promise<{
         setDynamicFaqs(parsedFaqs);
         loadedFaqsCount = parsedFaqs.length;
       }
+    }
+
+    // A private sheet (or wrong tab names) returns a login page / unusable CSV with HTTP 200.
+    // Report that instead of claiming success while the old data stays in place.
+    if (loadedCoursesCount + loadedUnitsCount + loadedFaqsCount === 0) {
+      const message = 'No courses, units or FAQs could be read from that sheet. Check it is shared as "Anyone with the link can view" and has tabs named Courses, Units and FAQs with a header row.';
+      setGoogleSheetsSyncStatus({ status: 'error', errorMessage: message });
+      return { success: false, coursesCount: 0, unitsCount: 0, faqsCount: 0, message };
     }
 
     const nowIso = new Date().toISOString();

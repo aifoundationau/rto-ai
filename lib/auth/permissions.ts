@@ -154,8 +154,15 @@ export const SYSTEM_PERMISSIONS: SystemPermission[] = [
     name: 'Manage API Keys & Integrations',
     description: 'Configure Gemini API keys, Firebase service accounts, and external credentials.',
     category: 'Administration & Governance'
+  },
+  {
+    id: 'campus_metrics.manage',
+    name: 'Manage Front Page Campus Metrics',
+    description: 'Adjust front page headline statistics (Total Students, Employment Placement Rate, Total Faculty & Admin Staff).',
+    category: 'Administration & Governance'
   }
 ];
+
 
 export const ALL_PERMISSION_IDS: string[] = SYSTEM_PERMISSIONS.map((p) => p.id);
 
@@ -230,8 +237,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'faqs.edit',
     'messaging.staff',
     'users.manage',
-    'sheets.sync'
+    'sheets.sync',
+    'campus_metrics.manage'
   ],
+
   teacher: [
     'courses.view',
     'courses.create',

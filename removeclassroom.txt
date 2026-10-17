@@ -1,0 +1,448 @@
+EDUPULSE AI (rto-ai) - SAFE REMOVAL PLAN:
+GOOGLE CLASSROOM  and  GLOBAL COURSE & CURRICULUM BUILDER
+==========================================================
+Prepared: 17 Oct 2026, against commit 7617120 plus the uncommitted changes
+present on that day (see supercodeupdate.txt for the full snapshot).
+
+NOTHING HAS BEEN CHANGED OR DELETED. This file lists what CAN be removed,
+exactly where, in what order, and what to check afterwards, so that
+nothing else breaks.
+
+Every item below was checked by searching the whole project (code, config,
+rules, scripts, public files and docs) for every name involved. Line
+numbers are from 17 Oct; if the files change, search for the quoted text
+instead of trusting the line number.
+
+What the two names mean in this code
+------------------------------------
+  "Google Classroom"
+      Admin panel tab "Google Classroom" (components/admin/
+      GoogleClassroomManager.tsx), the Google Classroom sign-in modal, the
+      Home page "Classroom" button, Classroom OAuth scopes, the Classroom
+      API key field, the 'classroom.manage' permission and the
+      'classroom_sync' Firestore rule.
+      IMPORTANT FACT: none of it talks to Google Classroom. There are no
+      Classroom API calls anywhere. The courses, rosters, batch pipeline and
+      "AI course wizard" are hard-coded sample data and timers.
+
+  "Global Course & Curriculum Builder"
+      The heading of the Admin panel tab "Course Builder"
+      (components/admin/CourseBuilderView.tsx:264), its server code
+      (lib/course-builder/*, app/api/course-builder/route.ts) and its
+      Firestore collections (tenants, programs, units).
+      IMPORTANT FACT: unlike Classroom, this one is REAL and is ALSO used by
+      two PUBLIC pages: "Degree Programs" and "Unit Syllabuses" load their
+      content from /api/course-builder first. Those two pages must be
+      changed before the Course Builder is deleted (Part B, step B1).
+      (The "AI Course Builder Wizard" inside the Google Classroom tab is a
+      different, fake feature; it goes with Part A.)
+
+
+SUMMARY
+-------
+  Part A - Google Classroom
+    Delete 4 files, edit 7 files, 1 Firestore rule, 1 env example line.
+    Visible effect: the "Google Classroom" admin tab, the Classroom API-key
+    card and the Home "Classroom" button disappear; Google sign-in stops
+    asking for Classroom permission. No working feature is lost.
+    Risk: LOW, as long as the ClassroomUser type is moved first (A1).
+
+  Part B - Global Course & Curriculum Builder
+    Delete 4 code files (2,802 lines) plus 1 optional agent-skill file,
+    edit 4 files, remove 3 Firestore rule blocks, optional clean-up of
+    Firestore data.
+    Visible effects you must accept:
+      1. Staff lose the curriculum editor (programs, units, outcomes,
+         assessments, modules, compliance matrix, versioning).
+      2. The public "Degree Programs" and "Unit Syllabuses" tabs will show
+         the same catalogue the chatbot and Application Form already use
+         (data/courses.ts + data/units.ts, or Google Sheets once synced):
+         4 degrees and 6 units, instead of the Course Builder's
+         1 published program and 3 published units.
+         Side benefit: the Unit Syllabuses crash and the "$NaNk/yr" fees
+         (working.txt #1, #2) go away, because both come from converting
+         Course Builder data.
+      3. The Admin panel opens on a different first tab (it currently
+         opens on Course Builder).
+      4. The unauthenticated "prepare_superadmin" action disappears with
+         /api/course-builder (a security improvement).
+    Risk: MEDIUM - only because of the two public pages. Follow the order.
+
+  Do Part A and Part B separately (two commits), and run the checks in
+  Part C after each.
+
+
+=====================================================================
+PART A - GOOGLE CLASSROOM
+=====================================================================
+
+A0. Before you start
+    - Commit or stash the current uncommitted work, so the removal is its
+      own commit that can be reverted with one command.
+    - Work on the C: copy or after moving off the USB stick - the build
+      check in Part C cannot run on the D: drive.
+
+A1. FIRST: move the ClassroomUser type (required)
+    File: components/auth/GoogleClassroomLoginModal.tsx:17-25
+      export interface ClassroomUser { name, email, role, avatarUrl,
+      googleWorkspaceId, scopesGranted, isSuperAdmin? }
+    Despite its name, this is the app's general "signed-in user" type. It
+    is imported by:
+      - app/page.tsx:12          (state at l.47, objects at l.145, l.249)
+      - components/auth/SignInView.tsx:21  (props l.26-27, objects l.58,
+                                            l.139)
+    Do: create e.g. lib/auth/types.ts with the same interface (you may
+    rename it AppUser, but renaming is optional), and change those two
+    imports to the new file.
+    If you skip this step, deleting the modal breaks the build of the main
+    page and the sign-in page.
+
+A2. app/page.tsx - remove the modal and Classroom scopes
+    - l.12   import { GoogleClassroomLoginModal, ClassroomUser } ...
+             -> keep only the ClassroomUser import, from the new file (A1)
+    - l.46   const [isClassroomLoginOpen, setIsClassroomLoginOpen] = ...
+             -> delete (it is never set to true, so the modal never opens)
+    - l.628-644  {/* Google Classroom Login Modal */} <GoogleClassroomLoginModal
+             ... />  -> delete the whole block
+    - l.209-210  provider.addScope('.../auth/classroom.courses') and
+                 provider.addScope('.../auth/classroom.rosters')  -> delete
+    - l.155-156 and l.259-260  'classroom.courses', 'classroom.rosters'
+             inside scopesGranted lists  -> delete those two strings
+    - l.517-523  onOpenClassroom={...} prop passed to HomeView  -> delete
+             (together with A4)
+    Optional, cosmetic only: the state variable "classroomUser" (l.47) is
+    the signed-in user; renaming it to "currentUser" is safe but touches
+    about 25 lines - not needed for the removal. The telemetry field
+    "hasClassroomUser" (l.52) can stay or be renamed.
+
+A3. components/auth/SignInView.tsx - remove Classroom scopes
+    - l.21       import ClassroomUser -> import from the new file (A1)
+    - l.95-96    provider.addScope(... classroom.courses / classroom.rosters)
+                 -> delete
+    - l.149-150  'classroom.courses', 'classroom.rosters' in scopesGranted
+                 -> delete
+
+A4. components/home/HomeView.tsx - remove the "Classroom" button
+    - l.236-241  the <button onClick={onOpenClassroom}> ... Classroom
+                 </button>  -> delete
+    - l.35       onOpenClassroom: () => void;   (props interface) -> delete
+    - l.92       onOpenClassroom                (destructuring)   -> delete
+    - l.9        DoorOpen icon import - becomes unused (harmless; remove
+                 for tidiness)
+    Note: this button never opened a classroom; it opened the Admin panel
+    or Google sign-in. Sign-in remains available in the Navbar
+    ("Register / Log On"). If you want a visible staff entry point on the
+    Home page, relabel the button "Staff Login" instead of deleting it.
+
+A5. components/admin/AdminDashboardView.tsx - remove the tab and key field
+    - l.42       import { GoogleClassroomManager } from './GoogleClassroomManager';
+                 -> delete
+    - l.69       remove 'classroom' from the activeTab type list
+    - l.433-441  the "Google Classroom" tab button -> delete
+    - l.1438-1441 {/* Tab 5: Google Classroom API Management */}
+                 {activeTab === 'classroom' && (<GoogleClassroomManager .../>)}
+                 -> delete
+    - l.608-635  {/* Google Classroom API */} key card in the API tab
+                 -> delete
+    - l.73       classroom: ''           (apiKeys state)   -> delete
+    - l.80       const storedClassroomKey = localStorage.getItem(...) -> delete
+    - l.85       ...(storedClassroomKey ? { classroom: ... } : {})    -> delete
+    - l.704      localStorage.setItem('classroom_api_key', ...)       -> delete
+    - l.12       BookOpen icon import - only used by the deleted button;
+                 becomes unused (harmless)
+    Nothing else reads apiKeys.classroom - it was never used.
+
+A6. lib/auth/permissions.ts - remove the 'classroom.manage' permission
+    - l.42-47    the { id: 'classroom.manage', name: 'Manage Google
+                 Classroom', ... } entry  -> delete
+    - l.240      'classroom.manage', in the teacher defaults -> delete
+    Why this is safe: nothing in the code checks this permission. If a
+    role_permissions document in Firestore still lists it, GET
+    /api/permissions already drops unknown ids
+    (app/api/permissions/route.ts:37-39), so old data cannot break the
+    Role Permissions screen. The screen will simply show one permission
+    fewer.
+
+A7. firestore.rules - remove the classroom_sync rule
+    - l.102-106  // Google Classroom sync collection ... match
+                 /classroom_sync/{docId} { ... }  -> delete
+    Why this is safe: no code reads or writes "classroom_sync". After
+    removal the catch-all rule at the bottom applies, which gives exactly
+    the same access (read: signed in, write: admin).
+    This only takes effect after: firebase deploy --only firestore:rules
+    (Deploying rules also deploys your other rule changes - check the
+    whole file first.)
+
+A8. Delete these files (after A1-A7)
+    - components/admin/GoogleClassroomManager.tsx   (1,526 lines)
+        Only importer: AdminDashboardView (removed in A5). Its exported
+        types SpreadsheetCourseRow, GoogleClassroomCourse and
+        CourseworkAssignment are used nowhere else (checked).
+    - components/auth/GoogleClassroomLoginModal.tsx (340 lines)
+        Importers: app/page.tsx and SignInView.tsx - both fixed in A1-A3.
+    - public/courses_template.csv
+        Despite the name, it is a Google Classroom batch-import template
+        (courseName, section, ownerId, studentEmails, CREATE/UPDATE/
+        ARCHIVE). Nothing references it.
+    - public/firebase-auth-sso.js
+        Not referenced by anything; requests a Classroom scope (l.37) and
+        loads Firebase from a CDN.
+
+A9. Configuration and keys
+    - .env.example l.22  GOOGLE_CLASSROOM_API_KEY=... -> delete the line
+    - .env.local l.11    GOOGLE_CLASSROOM_API_KEY  -> delete the line, and
+      revoke that key in Google Cloud Console (APIs & Services ->
+      Credentials) if it was created only for this. Nothing in the code
+      ever read it.
+    - Google Cloud Console -> OAuth consent screen: if the Classroom scopes
+      (classroom.courses, classroom.rosters, classroom.coursework.*) were
+      added to the consent screen, remove them. This shortens the
+      permission prompt and avoids Google's sensitive-scope review.
+    - Users' browsers may still hold a localStorage item
+      "classroom_api_key" - harmless, nothing reads it.
+    - Old telemetry records with action GOOGLE_CLASSROOM_* in
+      activity_logs - harmless history; leave them.
+
+A10. Cosmetic text (optional)
+    - components/admin/FirebaseTelemetryView.tsx:233 label
+      "Classroom & Admin" under the AUTH counter -> e.g. "Sign-ins & Admin"
+
+A11. Documents that mention Classroom (optional, no effect on the app)
+    - FUTURE_FIREBASE_AUTH_AND_GOOGLE_SSO_PROMPT.txt (whole document is
+      about Classroom/Workspace SSO; l.171 classroom_sync rule)
+    - AUDIT_FRONTEND_DATA_ENTRY_CATALOG.txt (Classroom sections, e.g.
+      l.1252, l.1642)
+    - data-contracts.md:130 (example action GOOGLE_CLASSROOM_TEACHER_LOGIN)
+    - index.html, public/legacy_dashboard.html, public/admin-demo.html.bak
+      (old standalone pages - recommended for deletion anyway, see
+      supercodeupdate.txt U1)
+    - cleanup.txt / working.txt (history - leave as is)
+
+A12. DO NOT remove (they look related but are needed or are separate)
+    - Google sign-in itself (lib/firebase/client.ts, signInWithPopup in
+      app/page.tsx and SignInView.tsx) - this is how everyone logs in.
+    - The 'teacher' role (lib/auth/roles.ts) - a general role, not
+      Classroom-specific.
+    - The calendar.events and spreadsheets.readonly scopes at sign-in -
+      not Classroom. (They are not really used either - see
+      supercodeupdate.txt S10 - but that is a separate decision.)
+    - The Google Sheets sync (Admin "Google Sheets (24/7)" tab,
+      lib/sheets/googleSheetsSync.ts) - separate, real feature. The
+      Classroom tab's "Sheets pipeline" sub-tab is fake and goes with A8.
+    - lib/agent/tools.ts:325 "Executive Classrooms" - just a word in the
+      campus description.
+
+
+=====================================================================
+PART B - GLOBAL COURSE & CURRICULUM BUILDER
+=====================================================================
+
+B0. Decide first (this part removes a working feature)
+    - Do staff need to edit programs/units inside the app? If yes, do NOT
+      do Part B; consider hiding the tab instead (see B9).
+    - Accept that the public catalogue will switch to the static/Sheets
+      catalogue (see SUMMARY, Part B, effect 2).
+    - Optional: export the Firestore collections "programs", "units" and
+      "tenants" first (Firebase Console -> Firestore -> Import/Export), so
+      the curriculum content can be recovered later.
+
+B1. FIRST: switch the two public catalogue pages off Course Builder
+    (required - if you delete the API first, these pages lose their
+    Google Sheets data and fall back to the built-in data silently)
+
+    components/catalog/CourseCatalogView.tsx:20-63
+      Today: fetch('/api/course-builder') -> if published programs exist,
+      convert and show them; otherwise fetch('/api/sheets/sync').
+      Change to: fetch('/api/sheets/sync') only (the existing fallback
+      block at l.54-60 already does exactly this), keeping COURSES_DATA as
+      the starting value (l.16).
+
+    components/catalog/UnitCatalogView.tsx:16-65
+      Same pattern: keep only the /api/sheets/sync part (l.55-62) and
+      UNITS_DATA as the starting value (l.11).
+
+    Why first: after /api/course-builder is deleted, the old code would get
+    a 404 page, fail at res.json(), jump to .catch() and never reach the
+    Sheets fallback - so synced Sheets data would stop showing.
+    Result: both pages show exactly what the chatbot and Application Form
+    use, and the conversion code that causes the Unit Syllabuses crash and
+    "$NaNk/yr" fees is gone.
+
+B2. components/admin/AdminDashboardView.tsx - remove the tab
+    - l.47       import { CourseBuilderView } from './CourseBuilderView';
+                 -> delete
+    - l.69       remove 'course_builder' from the activeTab type list AND
+                 change the starting tab at the end of that line from
+                 ('course_builder') to another tab, e.g. ('applications').
+                 If you forget this, the Admin panel opens on an empty page.
+    - l.339-348  the "Course Builder" + "LMS" tab button -> delete
+    - l.536-539  {/* Tab: Course Builder (LMS & Website) */}
+                 {activeTab === 'course_builder' && (<CourseBuilderView .../>)}
+                 -> delete
+    - l.332      header text "Executive control over LMS Course Builder,
+                 ..." -> reword (cosmetic)
+    - l.37       GraduationCap icon import - only used by the deleted
+                 button; becomes unused (harmless)
+
+B3. scripts/prepare-superadmin.ts - remove the Course Builder seeding
+    - l.10       import { initializeCourseBuilderDatabase } ... -> delete
+    - l.30-32    console.log('... Initializing Course Builder Database...');
+                 const dbInit = await initializeCourseBuilderDatabase();
+                 console.log(dbInit.message);  -> delete
+    - l.1-7 and l.44 comments/messages mention Course Builder (cosmetic)
+    Better: delete the whole script. Its other job is granting SUPERADMIN
+    to a fictional account (supercodeupdate.txt S5/S9).
+    Without this step the script will not compile/run after B4.
+
+B4. Delete these files (after B1-B3)
+    - components/admin/CourseBuilderView.tsx      (1,830 lines)
+        Only importer: AdminDashboardView (removed in B2).
+    - app/api/course-builder/route.ts             (157 lines)
+        Only callers: CourseBuilderView, CourseCatalogView, UnitCatalogView
+        (all handled in B1/B2). This also removes the unauthenticated
+        "prepare_superadmin" action.
+    - lib/course-builder/service.ts               (647 lines)
+    - lib/course-builder/types.ts                 (168 lines)
+        Only importers: the route, CourseBuilderView and
+        scripts/prepare-superadmin.ts (B3). Checked: nothing else imports
+        lib/course-builder/*. data/units.ts has its OWN AssessmentItem
+        type, which is not affected.
+    - (then the empty folder lib/course-builder/)
+    Optional:
+    - .agents/skills/course-builder-skill/SKILL.md (75 lines) - an AI
+      assistant instruction file, not app code. skills-lock.json does not
+      list it, so deleting it changes nothing else.
+
+B5. firestore.rules - remove the Course Builder rules
+    - l.50-52    // Course Builder & Multi-Tenant Rules (comment header)
+    - l.54-63    match /tenants/{tenantId} { ... }
+    - l.65-79    match /programs/{programId} { ... incl. /outcomes }
+    - l.81-94    match /units/{unitId} { ... incl. sub-collections }
+    - l.37-42    function isCourseStaff() - only used by the blocks above;
+                 delete it too (an unused function is allowed, but it is
+                 dead code)
+    Keep: /content (l.96-100), /counters, /users, /students and the rest.
+    Why this is safe: only lib/course-builder/service.ts uses these three
+    collections, through the Admin SDK (which ignores rules). No browser
+    code reads them. After removal the catch-all rule applies to any
+    leftover documents.
+    Takes effect only after: firebase deploy --only firestore:rules
+
+B6. Firestore data (optional, after B4 is deployed)
+    The collections "tenants" (document aifoundation-edupulse), "programs"
+    and "units" will no longer be used. Leaving them costs almost nothing
+    and allows a later rollback. Delete them only after the export in B0.
+    CAUTION: delete ONLY those three collections. "users", "students",
+    "applications", "faqs", "knowledge_embeddings", etc. are used by other
+    features - and the "users" collection is shared with other projects.
+
+B7. Text that mentions Course Builder (optional, cosmetic)
+    - lib/auth/roles.ts:50          superadmin description
+    - lib/auth/permissions.ts:21    'courses.create' description ("in LMS
+      Course Builder"). Keep the permission ids 'courses.create' /
+      'courses.publish' themselves - they are generic, stored in Firestore
+      role_permissions documents, and removing them gains nothing.
+    - AUDIT_FRONTEND_DATA_ENTRY_CATALOG.txt section 5 "ACCREDITED COURSE &
+      CURRICULUM BUILDER" (l.805 onwards), and l.293, l.319, l.1683,
+      l.1696
+    - cleanup.txt / working.txt / safetyprotocols.txt mentions (history)
+
+B8. The 16 Oct patch (rto-ai-fixes.patch)
+    It contains fixes for CourseBuilderView.tsx, lib/course-builder/
+    service.ts, CourseCatalogView.tsx and UnitCatalogView.tsx (the last two
+    fix the Course Builder data conversion). After Part B those hunks are
+    pointless or will conflict. When applying the rest of the patch, add:
+      --exclude=components/admin/CourseBuilderView.tsx
+      --exclude=lib/course-builder/service.ts
+      --exclude=components/catalog/CourseCatalogView.tsx
+      --exclude=components/catalog/UnitCatalogView.tsx
+    (and the 4 excludes listed in supercodeupdate.txt P11).
+
+B9. If you would rather NOT delete it yet (lowest-risk alternative)
+    - Do only B1 (public pages off Course Builder) and remove the tab
+      button/render in B2. Keep the files and the API.
+    - BUT /api/course-builder stays reachable by anyone (including
+      "prepare_superadmin"), so this alternative is only acceptable
+      together with the API authentication fix (supercodeupdate.txt S3).
+
+B10. DO NOT remove (they look related but are needed or are separate)
+    - data/courses.ts, data/units.ts and data/dynamicStore.ts - the static
+      catalogue that the chatbot, Home page, Application Form and (after
+      B1) the catalogue pages use.
+    - lib/sheets/googleSheetsSync.ts and /api/sheets/sync - the Google
+      Sheets catalogue sync; after Part B it is the only way for staff to
+      change the catalogue without editing code.
+    - components/chat/UnitCard.tsx and CourseCard.tsx - used by the chat
+      and the catalogue pages.
+    - lib/firebase/admin.ts assignUniversityRole() - also used by
+      /api/assign-role (the route only borrowed it).
+    - The 'teacher' role and the permissions 'courses.view',
+      'courses.create', 'courses.publish'.
+    - firestore.rules /content block - not part of Course Builder.
+
+
+=====================================================================
+PART C - CHECKS AFTER EACH PART (so nothing else is affected)
+=====================================================================
+  Run these on a copy on C: (or after moving off the USB stick):
+
+  1. Search for leftovers - each should return nothing (except docs):
+       Part A:  GoogleClassroom   classroom_api_key   classroom.courses
+                classroom.rosters  classroom_sync    onOpenClassroom
+                isClassroomLoginOpen  classroom.manage
+       Part B:  course-builder    CourseBuilderView  course_builder
+                initializeCourseBuilderDatabase    ProgramDocument
+                UnitDocument
+     (e.g.  grep -rn "<word>" app components lib scripts public firestore.rules)
+  2. npx tsc --noEmit            -> 0 errors (it is 0 today)
+  3. npx next build              -> must succeed. Note next.config.js
+     ignores type errors during build, so step 2 is the real check.
+  4. Click through (npm run dev or next start):
+       Public: Home (no Classroom button), Degree Programs, Unit
+       Syllabuses (must not crash), Application Form (course list),
+       Events, AI Assistant ("tell me about Bachelor of Computer Science",
+       "COMP1001 syllabus").
+       Sign in with Google: the permission prompt must no longer mention
+       Classroom.
+       Admin panel: opens on the new first tab; every remaining tab opens;
+       Role Permissions no longer lists "Manage Google Classroom";
+       API tab shows Gemini, Firebase, Pexels only.
+  5. Firestore rules (if changed):  firebase deploy --only firestore:rules
+     then sign in and check the app still loads your profile.
+  6. Commit each part separately, so either can be undone with
+     git revert <commit>.
+
+
+=====================================================================
+TOTALS
+=====================================================================
+  Part A (Google Classroom)
+    Files deleted ....... 4  (GoogleClassroomManager.tsx,
+                              GoogleClassroomLoginModal.tsx,
+                              public/courses_template.csv,
+                              public/firebase-auth-sso.js)
+    Files edited ........ 7  (app/page.tsx, SignInView.tsx, HomeView.tsx,
+                              AdminDashboardView.tsx, permissions.ts,
+                              firestore.rules, .env.example)
+                          + 1 new small type file (A1)
+    Lines removed ....... about 2,000
+    Features lost ....... none (all Classroom functions were simulated)
+
+  Part B (Global Course & Curriculum Builder)
+    Files deleted ....... 4 code files + 1 optional skill file
+    Files edited ........ 4  (CourseCatalogView.tsx, UnitCatalogView.tsx,
+                              AdminDashboardView.tsx, firestore.rules)
+                          + scripts/prepare-superadmin.ts (edit or delete)
+    Lines removed ....... about 2,900
+    Features lost ....... the in-app curriculum editor; the public
+                          catalogue switches to the static/Sheets catalogue
+
+  Nothing outside the items listed here references either feature
+  (checked across app/, components/, lib/, data/, scripts/, functions/,
+  src/, public/, firestore.rules, firestore.indexes.json, package.json and
+  the env example).
+
+
+=====================================================================
+END OF REMOVAL PLAN
+=====================================================================

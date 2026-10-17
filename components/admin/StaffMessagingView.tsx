@@ -208,7 +208,8 @@ export const StaffMessagingView: React.FC = () => {
     if (activeDirectStaffId) {
       return (
         (m.senderId === 'staff-current' && m.recipientId === activeDirectStaffId) ||
-        (m.senderId === activeDirectStaffId && (m.recipientId === 'staff-current' || !m.recipientId))
+        // Only direct messages: channel posts by this person have no recipient and belong in their channel
+        (m.senderId === activeDirectStaffId && m.recipientId === 'staff-current')
       );
     }
     return m.channelId === activeChannelId;

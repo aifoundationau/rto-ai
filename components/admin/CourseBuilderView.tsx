@@ -625,8 +625,11 @@ export const CourseBuilderView: React.FC<CourseBuilderViewProps> = () => {
               <button
                 onClick={() => {
                   if (!selectedProgram) return;
+                  // One timestamp so the starter assessment maps to the starter ULO
+                  // (two Date.now() calls could differ and leave the ULO unassessed)
+                  const stamp = Date.now();
                   const newUnit: UnitDocument = {
-                    id: `unit-${Date.now().toString().slice(-4)}`,
+                    id: `unit-${stamp}`,
                     tenantId: selectedProgram.tenantId,
                     programId: selectedProgram.id,
                     code: `NEW${Math.floor(1000 + Math.random() * 9000)}`,
@@ -638,7 +641,7 @@ export const CourseBuilderView: React.FC<CourseBuilderViewProps> = () => {
                     coRequisites: [],
                     outcomes: [
                       {
-                        id: `ulo-${Date.now()}-1`,
+                        id: `ulo-${stamp}-1`,
                         code: 'ULO-1',
                         statement: 'Analyze foundational principles of this subject area.',
                         mappedPloIds: selectedProgram.outcomes[0]?.id ? [selectedProgram.outcomes[0].id] : []
@@ -646,11 +649,11 @@ export const CourseBuilderView: React.FC<CourseBuilderViewProps> = () => {
                     ],
                     assessments: [
                       {
-                        id: `asmt-${Date.now()}-1`,
+                        id: `asmt-${stamp}-1`,
                         title: 'Capstone Assessment',
                         type: 'Summative',
                         weight: 100,
-                        mappedUloIds: [`ulo-${Date.now()}-1`]
+                        mappedUloIds: [`ulo-${stamp}-1`]
                       }
                     ],
                     modules: [],

@@ -21,7 +21,11 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
-  Award
+  Award,
+  Video,
+  FileText,
+  Play,
+  ExternalLink
 } from 'lucide-react';
 import { CourseProgram, COURSES_DATA } from '@/data/courses';
 import { UnitDetail, UNITS_DATA } from '@/data/units';
@@ -35,14 +39,18 @@ interface HomeViewProps {
   onOpenClassroom: () => void;
 }
 
-interface BlogPost {
-  id: number;
+export interface BlogPost {
+  id: number | string;
   tag: string;
   date: string;
   title: string;
   image: string;
   snippet: string;
   content: string;
+  type?: 'youtube' | 'linkedin' | 'article';
+  url?: string;
+  videoId?: string;
+  author?: string;
 }
 
 const BLOG_POSTS: BlogPost[] = [
@@ -97,6 +105,66 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [featuredSyllabi, setFeaturedSyllabi] = useState<UnitDetail[]>([]);
   const [selectedUnitModal, setSelectedUnitModal] = useState<UnitDetail | null>(null);
   const [selectedBlogModal, setSelectedBlogModal] = useState<BlogPost | null>(null);
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>(BLOG_POSTS);
+
+  // Fetch live blog posts from admin submissions API
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/blog')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isMounted && data && Array.isArray(data.posts) && data.posts.length > 0) {
+          setBlogPosts(data.posts);
+        }
+      })
+      .catch((err) => console.warn('[HomeView] Blog fetch error:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Dynamic Front-Page Campus Metrics (Adjustable via Admin Panel)
+  const [campusMetrics, setCampusMetrics] = useState({
+    totalStudents: '5,000+',
+    placementRate: '96%',
+    facultyStaff: '350+',
+    studentsSubtitle: 'Active learners across all faculties',
+    placementSubtitle: 'Graduate employment within 90 days',
+    facultySubtitle: 'Academic educators & operational staff',
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/campus-metrics')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isMounted && data && data.metrics) {
+          setCampusMetrics((prev) => ({
+            ...prev,
+            ...data.metrics,
+          }));
+        }
+      })
+      .catch((err) => console.warn('[HomeView] Campus metrics fetch error:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const formatStudents = (val?: string) => {
+    const raw = (val || '5,000+').trim();
+    return raw.toLowerCase().includes('student') ? raw : `${raw} Students`;
+  };
+  const formatPlacement = (val?: string) => {
+    const raw = (val || '96%').trim();
+    return raw.toLowerCase().includes('placement') ? raw : `${raw} Placement`;
+  };
+  const formatFaculty = (val?: string) => {
+    const raw = (val || '350+').trim();
+    return raw.toLowerCase().includes('faculty') || raw.toLowerCase().includes('staff')
+      ? raw
+      : `${raw} Faculty & Staff`;
+  };
 
   // Helper to shuffle and pick N items
   const shuffleAndPick = <T,>(arr: T[], n: number): T[] => {
@@ -165,18 +233,38 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-indigo-950/85 to-slate-900/50" />
 
         {/* Floating Quick Stats (Desktop) */}
-        <div className="hidden lg:block absolute right-10 top-12 space-y-4 z-20">
-          <div className="bg-slate-900/80 backdrop-blur-md border border-white/10 p-4 rounded-2xl text-white shadow-xl space-y-1 transform hover:scale-105 transition-transform">
-            <div className="flex items-center gap-2 text-emerald-400 font-extrabold text-lg">
-              <TrendingUp className="w-5 h-5" /> 96% Placement
+        <div className="hidden lg:flex flex-col absolute right-8 top-8 space-y-3 z-20 w-72">
+          {/* Box 1: Students */}
+          <div className="bg-slate-900/85 backdrop-blur-md border border-white/15 p-3.5 rounded-2xl text-white shadow-xl space-y-1 transform hover:scale-105 transition-transform">
+            <div className="flex items-center gap-2 text-indigo-300 font-extrabold text-base">
+              <Users className="w-5 h-5 text-indigo-400 shrink-0" />
+              <span>{formatStudents(campusMetrics.totalStudents)}</span>
             </div>
-            <p className="text-[11px] text-slate-300">Graduate employment within 90 days</p>
+            <p className="text-[11px] text-slate-300 leading-snug">
+              {campusMetrics.studentsSubtitle || 'Active learners across all faculties'}
+            </p>
           </div>
-          <div className="bg-slate-900/80 backdrop-blur-md border border-white/10 p-4 rounded-2xl text-white shadow-xl space-y-1 transform hover:scale-105 transition-transform">
-            <div className="flex items-center gap-2 text-indigo-300 font-extrabold text-lg">
-              <Users className="w-5 h-5" /> 5,000+ Students
+
+          {/* Box 2: Graduate Placement */}
+          <div className="bg-slate-900/85 backdrop-blur-md border border-white/15 p-3.5 rounded-2xl text-white shadow-xl space-y-1 transform hover:scale-105 transition-transform">
+            <div className="flex items-center gap-2 text-emerald-400 font-extrabold text-base">
+              <TrendingUp className="w-5 h-5 text-emerald-400 shrink-0" />
+              <span>{formatPlacement(campusMetrics.placementRate)}</span>
             </div>
-            <p className="text-[11px] text-slate-300">Active learners across all faculties</p>
+            <p className="text-[11px] text-slate-300 leading-snug">
+              {campusMetrics.placementSubtitle || 'Graduate employment within 90 days'}
+            </p>
+          </div>
+
+          {/* Box 3: Total Faculty and Admin Staff */}
+          <div className="bg-slate-900/85 backdrop-blur-md border border-white/15 p-3.5 rounded-2xl text-white shadow-xl space-y-1 transform hover:scale-105 transition-transform">
+            <div className="flex items-center gap-2 text-amber-300 font-extrabold text-base">
+              <GraduationCap className="w-5 h-5 text-amber-400 shrink-0" />
+              <span>{formatFaculty(campusMetrics.facultyStaff)}</span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-snug">
+              {campusMetrics.facultySubtitle || 'Academic educators & operational staff'}
+            </p>
           </div>
         </div>
 
@@ -246,6 +334,39 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <Bot className="w-4 h-4" /> Consult AI Agent
             </button>
           </div>
+
+          {/* Mobile Quick Stats Strip (Under lg) */}
+          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-4 border-t border-white/10 mt-3">
+            <div className="bg-white/10 backdrop-blur-md border border-white/15 p-3 rounded-xl text-white space-y-0.5">
+              <div className="flex items-center gap-1.5 text-indigo-300 font-extrabold text-sm">
+                <Users className="w-4 h-4 text-indigo-400 shrink-0" />
+                <span>{formatStudents(campusMetrics.totalStudents)}</span>
+              </div>
+              <p className="text-[10px] text-slate-300 line-clamp-1">
+                {campusMetrics.studentsSubtitle || 'Active learners across all faculties'}
+              </p>
+            </div>
+
+            <div className="bg-white/10 backdrop-blur-md border border-white/15 p-3 rounded-xl text-white space-y-0.5">
+              <div className="flex items-center gap-1.5 text-emerald-300 font-extrabold text-sm">
+                <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{formatPlacement(campusMetrics.placementRate)}</span>
+              </div>
+              <p className="text-[10px] text-slate-300 line-clamp-1">
+                {campusMetrics.placementSubtitle || 'Graduate employment within 90 days'}
+              </p>
+            </div>
+
+            <div className="bg-white/10 backdrop-blur-md border border-white/15 p-3 rounded-xl text-white space-y-0.5">
+              <div className="flex items-center gap-1.5 text-amber-300 font-extrabold text-sm">
+                <GraduationCap className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>{formatFaculty(campusMetrics.facultyStaff)}</span>
+              </div>
+              <p className="text-[10px] text-slate-300 line-clamp-1">
+                {campusMetrics.facultySubtitle || 'Academic educators & operational staff'}
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -282,7 +403,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mb-3 group-hover:scale-105 transition-transform">
             <Award className="w-5 h-5" />
           </div>
-          <div className="text-2xl font-black text-slate-900 tracking-tight">96% Rate</div>
+          <div className="text-2xl font-black text-slate-900 tracking-tight">
+            {formatPlacement(campusMetrics.placementRate).replace(' Placement', '')} Rate
+          </div>
           <div className="text-xs font-bold text-slate-700 mt-0.5">Graduate Employment</div>
           <div className="text-[11px] text-slate-400 mt-1">Top 3 national ranking</div>
         </div>
@@ -545,22 +668,42 @@ export const HomeView: React.FC<HomeViewProps> = ({
           id="blog-carousel-wrapper"
           className="flex gap-6 overflow-x-auto hide-scrollbar scroll-smooth py-2 px-1"
         >
-          {BLOG_POSTS.map((post) => (
+          {blogPosts.map((post) => (
             <div
               key={post.id}
               onClick={() => setSelectedBlogModal(post)}
               className="min-w-[280px] sm:min-w-[340px] bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between group"
             >
               <div>
-                <div className="relative h-44 overflow-hidden">
+                <div className="relative h-44 overflow-hidden bg-slate-100">
                   <img
                     src={post.image}
                     alt={post.title}
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      if (!target.src.includes('/api/blog/proxy-image') && post.image) {
+                        target.src = `/api/blog/proxy-image?url=${encodeURIComponent(post.image)}`;
+                      } else {
+                        target.src =
+                          'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=600&q=80';
+                      }
+                    }}
                   />
-                  <span className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-extrabold px-2.5 py-1 rounded-lg">
-                    {post.tag}
+                  <span className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-extrabold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
+                    {post.type === 'youtube' && <Video className="w-3 h-3 text-red-400" />}
+                    {post.type === 'linkedin' && <FileText className="w-3 h-3 text-blue-400" />}
+                    <span>{post.tag}</span>
                   </span>
+
+                  {post.type === 'youtube' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/35 transition">
+                      <div className="w-11 h-11 rounded-full bg-red-600/90 group-hover:scale-110 text-white flex items-center justify-center shadow-lg transition-transform">
+                        <Play className="w-4 h-4 ml-0.5" />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="p-5 space-y-2">
                   <span className="text-[11px] font-bold text-slate-400">{post.date}</span>
@@ -572,7 +715,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               </div>
 
               <div className="p-5 pt-0 text-xs font-bold text-indigo-600 flex items-center gap-1">
-                <span>Read Full Post</span> &rarr;
+                <span>{post.type === 'youtube' ? 'Watch Video' : 'Read Post'}</span> &rarr;
               </div>
             </div>
           ))}
@@ -630,7 +773,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     <div key={idx} className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex justify-between items-center text-xs">
                       <div>
                         <span className="font-bold text-slate-800">{a.name}</span>
-                        <p className="text-[10px] text-slate-400">Due: Week {a.dueWeek} • {a.type}</p>
+                        <p className="text-[10px] text-slate-400">Due: {typeof a.dueWeek === 'number' ? `Week ${a.dueWeek}` : a.dueWeek} • {a.type}</p>
                       </div>
                       <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 font-extrabold rounded-xl">
                         {a.weight}%
@@ -657,36 +800,116 @@ export const HomeView: React.FC<HomeViewProps> = ({
         </div>
       )}
 
-      {/* MODAL: BLOG POST READER */}
+      {/* MODAL: BLOG POST & IN-APP VIDEO PLAYER */}
       {selectedBlogModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-100 p-6 sm:p-8 space-y-6 relative custom-scrollbar">
             <button
               onClick={() => setSelectedBlogModal(null)}
-              className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-full transition"
+              className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-700 bg-slate-100 rounded-full transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="space-y-4">
-              <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-xs font-extrabold rounded-xl">
-                {selectedBlogModal.tag}
-              </span>
-              <h2 className="text-2xl font-extrabold text-slate-900 leading-snug">
-                {selectedBlogModal.title}
-              </h2>
-              <p className="text-xs text-slate-400 font-semibold">
-                {selectedBlogModal.date} • By EduPulse Editorial Team
-              </p>
-              <img
-                src={selectedBlogModal.image}
-                alt={selectedBlogModal.title}
-                className="w-full h-56 object-cover rounded-2xl my-4"
-              />
-              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">
-                {selectedBlogModal.content}
-              </p>
-            </div>
+            {selectedBlogModal.type === 'youtube' && selectedBlogModal.videoId ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-red-100 text-red-800 text-xs font-extrabold rounded-xl flex items-center gap-1.5">
+                    <Video className="w-3.5 h-3.5 text-red-600" />
+                    <span>{selectedBlogModal.tag || 'YouTube Video'}</span>
+                  </span>
+                  <span className="text-xs text-slate-400 font-semibold">• {selectedBlogModal.date}</span>
+                </div>
+
+                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-snug">
+                  {selectedBlogModal.title}
+                </h2>
+
+                {/* In-App Responsive Video Modal Player */}
+                <div className="aspect-video w-full rounded-2xl overflow-hidden bg-black shadow-xl">
+                  <iframe
+                    src={`https://www.youtube-nocookie.com/embed/${selectedBlogModal.videoId}?autoplay=1&rel=0`}
+                    title={selectedBlogModal.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="w-full h-full border-0"
+                  />
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                  <div className="text-xs font-bold text-slate-700">Video Overview:</div>
+                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
+                    {selectedBlogModal.content || selectedBlogModal.snippet}
+                  </p>
+                </div>
+
+                {selectedBlogModal.url && (
+                  <div className="flex justify-end pt-2">
+                    <a
+                      href={selectedBlogModal.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition shadow-sm"
+                    >
+                      <span>Open on YouTube</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-xs font-extrabold rounded-xl flex items-center gap-1.5">
+                    {selectedBlogModal.type === 'linkedin' && <FileText className="w-3.5 h-3.5 text-blue-600" />}
+                    <span>{selectedBlogModal.tag}</span>
+                  </span>
+                  <span className="text-xs text-slate-400 font-semibold">• {selectedBlogModal.date}</span>
+                </div>
+
+                <h2 className="text-2xl font-extrabold text-slate-900 leading-snug">
+                  {selectedBlogModal.title}
+                </h2>
+
+                <p className="text-xs text-slate-400 font-semibold">
+                  By {selectedBlogModal.author || 'EduPulse Editorial Team'}
+                </p>
+
+                <img
+                  src={selectedBlogModal.image}
+                  alt={selectedBlogModal.title}
+                  referrerPolicy="no-referrer"
+                  className="w-full h-56 object-cover rounded-2xl my-4"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (!target.src.includes('/api/blog/proxy-image') && selectedBlogModal.image) {
+                      target.src = `/api/blog/proxy-image?url=${encodeURIComponent(selectedBlogModal.image)}`;
+                    } else {
+                      target.src =
+                        'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=600&q=80';
+                    }
+                  }}
+                />
+
+                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">
+                  {selectedBlogModal.content || selectedBlogModal.snippet}
+                </p>
+
+                {selectedBlogModal.url && (
+                  <div className="pt-4 flex justify-end">
+                    <a
+                      href={selectedBlogModal.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-md"
+                    >
+                      <span>Read Full Post on LinkedIn</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,0 +1,387 @@
+================================================================================
+AI FOUNDATION ENTERPRISE ECOSYSTEM
+UNIVERSAL MULTI-PROJECT SUPERADMIN RBAC & FIREBASE SETUP SPECIFICATION
+================================================================================
+Document: SuperAdminRole.txt
+Version: 2.0.0 (Universal Multi-Project / Shared-Database Standard)
+Author: AI Foundation Architecture & Security Directorate
+Target Environments: Development, Staging, Production (1,000+ Projects)
+Central Database Project: ai-foundation-firebase
+
+--------------------------------------------------------------------------------
+1. EXECUTIVE SUMMARY & CORE MANDATES
+--------------------------------------------------------------------------------
+This specification governs user authentication, cross-project identity
+synchronization, and Role-Based Access Control (RBAC) across all applications,
+deployments, and tenant instances connected to the shared Firebase backend.
+
+Every installation, project deployment, or tenant instance MUST comply with the
+following foundational security rules:
+
+RULE 1: STRICT FIRST-TIME REGISTRATION POLICY
+  When any user registers for the first time via Google Authentication on ANY
+  project in the ecosystem, they MUST strictly and unconditionally receive
+  role = "supporter" only.
+  No new account may ever automatically self-elevate or receive administrative
+  privileges upon registration.
+
+RULE 2: STRICT DATABASE-DRIVEN SUPERADMIN RBAC (IMMUTABLE GLOBAL SUPERADMIN)
+  Only accounts that possess an explicit database string of role = "superadmin"
+  in the central Cloud Firestore "users" collection receive Superadmin privileges.
+  The Master Superadmin identity is globally immutable across all projects.
+  If and only if role = "superadmin", the user receives:
+    - isSuperAdmin = true
+    - Superadmin Firebase Auth Custom Claims (request.auth.token.role = 'superadmin')
+    - Unrestricted access to the Admin & Operations Panel across all projects
+    - Full authoring, configuration, and module management permissions
+    - Global RBAC user management access
+
+RULE 3: MULTI-PROJECT SHARED-DATABASE ISOLATION & NON-DESTRUCTIVE SYNC
+  Because 1,000+ projects share the central "users" collection:
+    - Logging into a secondary project MUST NEVER overwrite an existing user's
+      global "role", "status", "classification", or "isSuperAdmin" flags.
+    - Project-specific identifiers (tenantId, tenantTag, databaseCode, source)
+      are dynamically injected via environment variables (NEXT_PUBLIC_TENANT_ID)
+      and appended non-destructively to the user's "tags" array.
+
+RULE 4: ZERO TYPOS & UTMOST HIGH SECURITY PROTOCOLS
+  No typos are permitted in user records (e.g. "supprot" vs "support").
+  Domain-wide wildcards or email heuristics MUST NOT be used to grant roles.
+  Client-side self-elevation buttons or client-controlled role overrides are
+  strictly prohibited. Role elevation must occur exclusively via authenticated
+  Superadmin actions in the Admin Panel or through secure server-side CLI tools.
+
+--------------------------------------------------------------------------------
+2. UNIVERSAL SYSTEM ROLES & ACCESS HIERARCHY
+--------------------------------------------------------------------------------
+The ecosystem defines 11 standardized system roles with hierarchical permissions
+applicable across all enterprise, SaaS, service, and educational projects:
+
+  Level | Role           | Classification | Universal Scope & Capabilities
+  ------+----------------+----------------+-------------------------------------------------
+   100  | superadmin     | Superadmin     | Full master control across all projects & RBAC
+    90  | chancellor     | Executive      | Institutional governance & top-level authority
+    85  | president      | Executive      | Ecosystem-wide operations & executive strategy
+    80  | ceo            | Executive      | Business leadership & operational approvals
+    75  | coo            | Operations     | Operational workflows, scheduling & logistics
+    70  | cfo            | Executive      | Budget management, fiscal governance & audits
+    60  | accounting     | Operations     | Ledger management, billing, invoices & payouts
+    50  | administration | Operations     | Onboarding, client/user records & administration
+    40  | teacher        | Specialist     | Content delivery, service execution & assessments
+    30  | student        | Member         | Active user/client/learner portal & module access
+    10  | supporter      | Public         | Default assigned to ALL users upon registration
+
+--------------------------------------------------------------------------------
+3. FIRESTORE DATABASE SCHEMA ("users" COLLECTION)
+--------------------------------------------------------------------------------
+In Cloud Firestore, all user accounts reside in the root "users" collection.
+The document ID MUST match the user's Firebase Authentication UID.
+
+A. Verified Global Superadmin User Document (users/{uid}) — IMMUTABLE:
+--------------------------------------------------------------------------------
+{
+  "id": "L5euSJAfNKdDOX6mT0qmrCGjUA53",
+  "uid": "L5euSJAfNKdDOX6mT0qmrCGjUA53",
+  "email": "support@aifoundation.net.au",
+  "displayName": "AI Foundation Support",
+  "name": "AI Foundation Support",
+  "photoURL": "https://...",
+  "role": "superadmin",
+  "status": "superadmin",
+  "classification": "Superadmin",
+  "isSuperAdmin": true,
+  "tags": ["superadmin", "owner", "global", "<PROJECT_TENANT_ID>"],
+  "tag": "<PROJECT_TENANT_ID>",
+  "tenantTag": "<PROJECT_TENANT_ID>",
+  "tenantId": "<PROJECT_TENANT_ID>",
+  "databaseCode": "<PROJECT_TENANT_ID>",
+  "source": "<PROJECT_TENANT_ID>",
+  "businessId": "aifoundation",
+  "businessName": "AI Foundation",
+  "authProvider": "google",
+  "dept": "Executive Directorate & Superadmin Control",
+  "registeredAt": "2026-10-16T07:01:21.269Z",
+  "lastLoginAt": "2026-10-17T01:45:00.000Z",
+  "last_login_at": "2026-10-17T01:45:00.000Z",
+  "login_count": 48
+}
+
+B. Standard First-Time Supporter Document (users/{uid}):
+--------------------------------------------------------------------------------
+{
+  "id": "new_user_uid_12345",
+  "uid": "new_user_uid_12345",
+  "email": "newuser@example.com",
+  "displayName": "New Supporter",
+  "name": "New Supporter",
+  "photoURL": "https://...",
+  "role": "supporter",
+  "status": "supporter",
+  "classification": "Supporter",
+  "isSuperAdmin": false,
+  "tags": ["supporter", "<PROJECT_TENANT_ID>"],
+  "tag": "<PROJECT_TENANT_ID>",
+  "tenantTag": "<PROJECT_TENANT_ID>",
+  "tenantId": "<PROJECT_TENANT_ID>",
+  "databaseCode": "<PROJECT_TENANT_ID>",
+  "source": "<PROJECT_TENANT_ID>",
+  "businessId": "aifoundation",
+  "businessName": "AI Foundation",
+  "authProvider": "google",
+  "dept": "General",
+  "registeredAt": "2026-10-17T02:00:00.000Z",
+  "lastLoginAt": "2026-10-17T02:00:00.000Z",
+  "last_login_at": "2026-10-17T02:00:00.000Z",
+  "login_count": 1
+}
+
+C. Firebase Authentication Custom User Claims:
+--------------------------------------------------------------------------------
+Every user in Firebase Auth must have custom claims synchronized with their
+exact Firestore document:
+
+For Superadmins:
+  {
+    "role": "superadmin",
+    "isSuperAdmin": true,
+    "roles": ["superadmin"],
+    "dept": "Executive Directorate & Superadmin Control"
+  }
+
+For Supporters:
+  {
+    "role": "supporter",
+    "isSuperAdmin": false,
+    "roles": ["supporter"],
+    "dept": "General"
+  }
+
+--------------------------------------------------------------------------------
+4. STEP-BY-STEP PROVISIONING GUIDE FOR ANY NEW PROJECT INSTALLATION
+--------------------------------------------------------------------------------
+
+STEP 1: FIREBASE CONSOLE & DOMAIN AUTHORIZATION
+  1. Connect the project to the central Firebase project (or target database):
+     https://console.firebase.google.com/project/ai-foundation-firebase
+  2. Under "Authentication" -> "Settings" -> "Authorized domains":
+     - Ensure "localhost", "127.0.0.1", and the new project's production domain
+       are added to the authorized domains list.
+  3. Ensure "Cloud Firestore" is active in Production mode with global
+     Superadmin security rules deployed.
+  4. Use the shared Service Account credentials for "ai-foundation-firebase"
+     (Project Settings -> Service accounts -> Firebase Admin SDK).
+
+STEP 2: CONFIGURE PROJECT ENVIRONMENT VARIABLES
+  Create or update .firebaserc and .env.local in the root of the project:
+
+  A. .firebaserc:
+     {
+       "projects": {
+         "default": "ai-foundation-firebase"
+       }
+     }
+
+  B. .env.local:
+     # Dynamic Project / Tenant Identifiers (Change per project out of 1,000+)
+     NEXT_PUBLIC_TENANT_ID="project-slug-here"
+     NEXT_PUBLIC_BUSINESS_ID="aifoundation"
+     NEXT_PUBLIC_BUSINESS_NAME="AI Foundation"
+
+     # Firebase Admin SDK Credentials (Central Database)
+     FIREBASE_PROJECT_ID="ai-foundation-firebase"
+     FIREBASE_CLIENT_EMAIL="firebase-adminsdk-...@ai-foundation-firebase.iam.gserviceaccount.com"
+     FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+
+     # Firebase Client SDK Keys (Central Database)
+     NEXT_PUBLIC_FIREBASE_API_KEY="AIzaSy..."
+     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="ai-foundation-firebase.firebaseapp.com"
+     NEXT_PUBLIC_FIREBASE_PROJECT_ID="ai-foundation-firebase"
+     NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="ai-foundation-firebase.firebasestorage.app"
+     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="676643666286"
+     NEXT_PUBLIC_FIREBASE_APP_ID="1:676643666286:web:..."
+
+     # Immutable Designated Superadmin Emails (comma-separated, zero typos)
+     FIREBASE_PROJECT_OWNERS="support@aifoundation.net.au,admin@aifoundation.net.au,davidrobertson.info@gmail.com"
+     SUPERADMIN_EMAILS="support@aifoundation.net.au,admin@aifoundation.net.au,davidrobertson.info@gmail.com"
+
+STEP 3: DEPLOY CLOUD FIRESTORE SECURITY RULES
+  Deploy the security rules using the Firebase CLI:
+    firebase deploy --only firestore:rules
+
+  Verify that the rule gates read/write access based on role = "superadmin":
+    function isSuperAdmin() {
+      return request.auth != null && (
+        request.auth.token.role == 'superadmin' ||
+        request.auth.token.role == 'SUPERADMIN' ||
+        ('roles' in request.auth.token && (
+          'superadmin' in request.auth.token.roles ||
+          'SUPERADMIN' in request.auth.token.roles
+        ))
+      );
+    }
+
+STEP 4: SEED OR VERIFY THE IMMUTABLE SUPERADMIN ACCOUNT
+  To ensure the global Superadmin exists and is tagged for the current project:
+
+  A. Run the universal superadmin preparation script:
+     npx ts-node scripts/prepare-superadmin.ts
+
+  B. Or execute the universal Node.js provisioning one-liner:
+     node -e "
+     const { initializeApp, cert } = require('firebase-admin/app');
+     const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+     const { getAuth } = require('firebase-admin/auth');
+     const fs = require('fs');
+
+     const env = fs.readFileSync('.env.local', 'utf8');
+     const vars = {};
+     for (const l of env.split('\n')) {
+       const m = l.match(/^([^=]+)=(.*)$/);
+       if (m) vars[m[1].trim()] = m[2].trim().replace(/^[\"']|[\"']$/g, '');
+     }
+
+     const tenantId = vars.NEXT_PUBLIC_TENANT_ID || 'global';
+     const businessId = vars.NEXT_PUBLIC_BUSINESS_ID || 'aifoundation';
+     const businessName = vars.NEXT_PUBLIC_BUSINESS_NAME || 'AI Foundation';
+
+     initializeApp({
+       credential: cert({
+         projectId: vars.FIREBASE_PROJECT_ID,
+         clientEmail: vars.FIREBASE_CLIENT_EMAIL,
+         privateKey: vars.FIREBASE_PRIVATE_KEY.replace(/\\\\n/g, '\n'),
+       }),
+     });
+
+     const db = getFirestore();
+     const auth = getAuth();
+
+     async function seedSuperadmin(email, uid, name) {
+       console.log('Verifying Global Superadmin:', email, 'for tenant:', tenantId);
+       const userRef = db.collection('users').doc(uid);
+       const snap = await userRef.get();
+       const now = new Date().toISOString();
+
+       await userRef.set({
+         id: uid,
+         uid: uid,
+         email: email,
+         displayName: name,
+         name: name,
+         role: 'superadmin',
+         status: 'superadmin',
+         classification: 'Superadmin',
+         isSuperAdmin: true,
+         tags: FieldValue.arrayUnion('superadmin', 'owner', 'global', tenantId),
+         tag: tenantId,
+         tenantTag: tenantId,
+         tenantId: tenantId,
+         databaseCode: tenantId,
+         source: tenantId,
+         businessId: businessId,
+         businessName: businessName,
+         authProvider: 'google',
+         dept: 'Executive Directorate & Superadmin Control',
+         registeredAt: snap.exists && snap.data().registeredAt ? snap.data().registeredAt : now,
+         lastLoginAt: now,
+         last_login_at: now,
+         login_count: snap.exists && typeof snap.data().login_count === 'number' ? snap.data().login_count : 1,
+       }, { merge: true });
+
+       await auth.setCustomUserClaims(uid, {
+         role: 'superadmin',
+         isSuperAdmin: true,
+         roles: ['superadmin'],
+         dept: 'Executive Directorate & Superadmin Control'
+       });
+       console.log('Superadmin provisioning complete for:', email);
+     }
+
+     seedSuperadmin('support@aifoundation.net.au', 'L5euSJAfNKdDOX6mT0qmrCGjUA53', 'AI Foundation Support');
+     "
+
+STEP 5: RUN AUTOMATED INTEGRATION TESTS
+  Execute the test suite to verify that first-time registrations strictly receive
+  supporter and that only verified superadmin accounts receive superadmin:
+    node scripts/verify_strict_supporter_registration.js
+
+  All checks must output:
+    ✅ PASS: API assigned role: supporter and isSuperAdmin: false for first-time registration.
+    ✅ PASS: Firestore record strictly has role: supporter and isSuperAdmin: false.
+    ✅ PASS: support@aifoundation.net.au retains role: superadmin and isSuperAdmin: true.
+    🏆 ALL STRICT RBAC & FIRST-TIME REGISTRATION TESTS PASSED PERFECTLY!
+
+--------------------------------------------------------------------------------
+5. SECURITY ARCHITECTURE: HOW API ENDPOINTS ENFORCE THE RULES ACROSS PROJECTS
+--------------------------------------------------------------------------------
+
+CRYPTOGRAPHIC IDENTITY VERIFICATION REQUIREMENT (NO BODY SPOOFING):
+  The server MUST NEVER trust 'uid' or 'email' provided in HTTP request bodies or
+  query parameters.
+  All mutating or privileged API requests MUST supply a cryptographically signed
+  Google/Firebase ID token via:
+    Authorization: Bearer <idToken>
+  The server verifies this token using Firebase Admin SDK:
+    const verifiedToken = await auth.verifyIdToken(idToken);
+  The caller's identity (UID and email) is derived EXCLUSIVELY from the verified
+  cryptographic signature of Google's identity servers. Any spoofed client values
+  in the JSON body are discarded immediately.
+
+A. POST /api/users (User Registration & Multi-Project Synchronization)
+   - Requires valid Authorization: Bearer <idToken>. Unauthenticated or forged
+     tokens are rejected immediately with 401 Unauthorized.
+   - Derives verified uid and email directly from verifiedToken (never from body).
+   - Reads NEXT_PUBLIC_TENANT_ID from environment variables.
+   - If the user document does NOT exist in Firestore:
+     - They are treated as a First-Time Registrant.
+     - Role is set strictly to 'supporter'.
+     - isSuperAdmin is set strictly to false.
+     - tags is initialized as ['supporter', NEXT_PUBLIC_TENANT_ID].
+     - Firebase Auth custom claims are set strictly to role = 'supporter'.
+     - Exception: Only the immutable Superadmin UID (L5euSJAfNKdDOX6mT0qmrCGjUA53)
+       or explicitly configured verified project owner emails
+       (FIREBASE_PROJECT_OWNERS) receive 'superadmin' upon initial seeding.
+   - If the user document DOES exist in Firestore (e.g. created via another project):
+     - The existing document's role is strictly preserved.
+     - Superadmin RBAC is granted IF AND ONLY IF document.role === 'superadmin'.
+     - NEXT_PUBLIC_TENANT_ID is appended to the user's tags array via arrayUnion.
+     - Custom claims are synchronized to match the exact Firestore role.
+
+B. PATCH /api/users & POST /api/assign-role (Role Updates & Management)
+   - Cryptographically verifies the caller's Firebase ID token.
+   - Verifies that the caller is an authorized Superadmin (either by checking
+     isProjectOwnerEmail(caller.email) OR checking that the caller's Firestore
+     document role === 'superadmin').
+   - Rejects non-superadmins or unauthenticated callers with 403 Forbidden / 401 Unauthorized.
+   - Validates that the requested target role is one of the 11 allowed SYSTEM_ROLES.
+   - Updates Firestore document: role, status, isSuperAdmin, classification.
+   - Updates Firebase Auth custom claims: request.auth.token.role.
+
+C. GET /api/users
+   - Querying a single user by ?uid=... or ?email=... returns sanitized profile.
+   - Listing the complete user directory requires verified Superadmin Bearer token;
+     unauthorized callers are rejected with 401/403 to prevent directory scraping.
+   - Computes isSuperAdmin: true if and only if role === 'superadmin'.
+
+--------------------------------------------------------------------------------
+6. DEPLOYMENT AUDIT & VERIFICATION CHECKLIST
+--------------------------------------------------------------------------------
+Before signing off any project installation, verify each item:
+
+[ ] 1. .firebaserc contains correct project ID: ai-foundation-firebase
+[ ] 2. .env.local has valid FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, and
+       a unique NEXT_PUBLIC_TENANT_ID for the project
+[ ] 3. Cloud Firestore users collection contains the immutable superadmin document
+       (UID: L5euSJAfNKdDOX6mT0qmrCGjUA53 / support@aifoundation.net.au)
+       with exact string role: "superadmin" and isSuperAdmin: true
+[ ] 4. No typo emails exist in Firestore or Firebase Authentication (e.g. "supprot" purged)
+[ ] 5. All non-admin accounts have role: "supporter" and isSuperAdmin: false
+[ ] 6. Test registration of a random new email confirms role: "supporter" is assigned
+[ ] 7. Existing user sign-in on a new project preserves their existing role and
+       appends NEXT_PUBLIC_TENANT_ID to their tags array without data loss
+[ ] 8. Firebase Auth custom claims match Firestore document role for every active user
+[ ] 9. Type check passes with 0 errors: npx tsc --noEmit
+[ ] 10. Automated RBAC test script passes: node scripts/verify_strict_supporter_registration.js
+
+================================================================================
+END OF SPECIFICATION: SuperAdminRole.txt
+================================================================================

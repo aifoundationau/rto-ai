@@ -51,9 +51,22 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
   const [activeStep, setActiveStep] = useState(isRegistered ? 2 : 1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(application.status === 'Submitted');
+  const [submitError, setSubmitError] = useState('');
   const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
   const [isVerifyingAcademic, setIsVerifyingAcademic] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
+
+  // Fields marked * in the form must be filled before submission
+  const missingRequiredFields = [
+    !application.personalDetails.fullName.trim() && 'Full Legal Name',
+    !application.personalDetails.email.trim() && 'Email Address',
+    !application.personalDetails.phone.trim() && 'Contact Phone',
+    !application.personalDetails.citizenship && 'Citizenship Status',
+    !application.academicDetails.highestEducation && 'Highest Qualification',
+    !application.coursePreferences.firstChoiceCourseName && 'First Choice Degree',
+    !application.coursePreferences.intakeSemester && 'Intake Semester',
+    !application.coursePreferences.studyMode && 'Study Mode'
+  ].filter(Boolean) as string[];
 
   const handleUploadDocument = async (category: 'identity' | 'academic', file: File) => {
     if (!file) return;
@@ -435,7 +448,12 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
   };
 
   const handleSubmitApplication = async () => {
+    if (missingRequiredFields.length > 0) {
+      setSubmitError(`Please complete: ${missingRequiredFields.join(', ')}.`);
+      return;
+    }
     setIsSubmitting(true);
+    setSubmitError('');
     try {
       const updated: StudentApplication = {
         ...application,
@@ -447,11 +465,15 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
         updatedAt: new Date().toISOString()
       };
 
-      await fetch('/api/applications', {
+      const res = await fetch('/api/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application: updated })
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Server responded with ${res.status}`);
+      }
 
       onUpdateApplication(updated);
       setSubmitSuccess(true);
@@ -466,8 +488,9 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
       } catch {
         // ignore
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to submit application:', err);
+      setSubmitError(`Submission failed: ${err?.message || 'network error'}. Your draft is saved — please try again.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -2100,6 +2123,21 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
               </label>
             )}
 
+            {!submitSuccess && missingRequiredFields.length > 0 && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2 mb-3">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Required before submitting:</strong> {missingRequiredFields.join(', ')}
+                </span>
+              </div>
+            )}
+
+            {submitError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700 mb-3">
+                {submitError}
+              </div>
+            )}
+
             {/* Action Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-200">
               <button
@@ -2123,7 +2161,7 @@ export const ApplicationPortalView: React.FC<ApplicationPortalViewProps> = ({
                 ) : (
                   <button
                     onClick={handleSubmitApplication}
-                    disabled={!application.statementsAndDocuments.declarationAgreed || isSubmitting}
+                    disabled={!application.statementsAndDocuments.declarationAgreed || missingRequiredFields.length > 0 || isSubmitting}
                     className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
                   >
                     <Send className="w-4 h-4" />

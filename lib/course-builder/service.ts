@@ -586,7 +586,8 @@ export async function getUnits(programId?: string): Promise<UnitDocument[]> {
     if (!snap.empty) {
       const items: UnitDocument[] = [];
       snap.forEach((d: any) => items.push({ id: d.id, ...d.data() } as UnitDocument));
-      cachedUnits = items;
+      // Only a full (unfiltered) read may replace the cache; a per-program read would drop other programs' units
+      if (!programId) cachedUnits = items;
       return items;
     }
   } catch (e) {

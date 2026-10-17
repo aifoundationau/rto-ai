@@ -5,6 +5,7 @@ import { EVENTS_DATA, ProspectiveEvent } from '@/data/events';
 import { StudentApplication } from '@/data/applications';
 import { createGoogleCalendarUrl, createIcsContent } from '@/lib/calendar/googleCalendar';
 import { getDynamicCourses, getDynamicUnits, getDynamicFaqs } from '@/data/dynamicStore';
+import { queryMultilingualRag } from '@/lib/rag/ragPipeline';
 
 export interface ToolDefinition {
   name: string;
@@ -22,6 +23,18 @@ export interface ToolDefinition {
 }
 
 export const AGENT_TOOLS: ToolDefinition[] = [
+  {
+    name: 'query_multilingual_rag',
+    description: 'Perform semantic vector search across accredited institutional documents, course architectures, ASQA/TEQSA compliance policies, and multilingual knowledge bases using Google 768-dimensional embeddings and Firestore Vector Search. Supports all languages (English, Japanese, Chinese, Vietnamese, Thai, etc.).',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'The semantic search query in any language' },
+        categoryFilter: { type: 'string', description: 'Optional category filter: Vocational Compliance, Degree Programs, Course Architecture, General' }
+      },
+      required: ['query']
+    }
+  },
   {
     name: 'search_faq',
     description: 'Search the university FAQ database for questions on admissions, tuition fees, scholarships, international student visas, accommodation, campus life, credit transfers, and study loads.',
@@ -222,10 +235,10 @@ export function executeAgentTool(
 
             return { faq, score };
           })
-          .filter(item => item.score > 0)
+          .filter(item => item.score >= 40)
           .sort((a, b) => b.score - a.score);
 
-        results = scoredFaqs.length > 0 ? scoredFaqs.map(s => s.faq) : allFaqs;
+        results = scoredFaqs.length > 0 ? scoredFaqs.map(s => s.faq) : [];
       }
 
       return {
@@ -233,6 +246,7 @@ export function executeAgentTool(
           toolName,
           output: {
             query: args.query || 'all',
+            matched: results.length > 0,
             category: args.category || 'all',
             count: results.length,
             faqs: results
@@ -394,6 +408,14 @@ export function executeAgentTool(
 
       if (args.slotId && targetEvent.availableSlots) {
         const slot = targetEvent.availableSlots.find(s => s.slotId === args.slotId);
+        if (slot && slot.isBooked) {
+          return {
+            result: {
+              toolName,
+              output: { status: 'Unavailable', error: `Slot ${slot.slotId} is already booked. Choose another slot.` }
+            }
+          };
+        }
         if (slot) {
           slot.isBooked = true;
           startTime = slot.startTime;
@@ -586,4 +608,48 @@ export function executeAgentTool(
         }
       };
   }
+}
+
+/**
+ * Asynchronous tool executor supporting async tools like query_multilingual_rag
+ */
+export async function executeAgentToolAsync(
+  toolName: string,
+  args: Record<string, any>,
+  currentApplication: StudentApplication,
+  apiKey?: string
+): Promise<{ result: ToolExecutionResult; updatedApplication?: StudentApplication }> {
+  if (toolName === 'query_multilingual_rag') {
+    const q = args.query || '';
+    const ragRes = await queryMultilingualRag(q, {
+      categoryFilter: args.categoryFilter,
+      apiKey
+    });
+
+    return {
+      result: {
+        toolName: 'query_multilingual_rag',
+        output: {
+          query: ragRes.query,
+          queryLanguage: ragRes.queryLanguage,
+          confidence: ragRes.confidence,
+          totalRetrieved: ragRes.totalRetrieved,
+          answer: ragRes.answer,
+          sources: ragRes.sources
+        },
+        uiWidget: ragRes.sources && ragRes.sources.length > 0 ? {
+          type: 'faq_list',
+          data: ragRes.sources.map(s => ({
+            id: `rag-${s.title}`,
+            question: s.title,
+            answer: s.excerpt,
+            category: s.category,
+            keywords: [s.language]
+          }))
+        } : undefined
+      }
+    };
+  }
+
+  return executeAgentTool(toolName, args, currentApplication);
 }

@@ -1,10 +1,11 @@
-import { AGENT_TOOLS, executeAgentTool, ToolExecutionResult } from './tools';
+import { AGENT_TOOLS, executeAgentTool, executeAgentToolAsync, ToolExecutionResult, activeEventsState } from './tools';
 import { StudentApplication, INITIAL_APPLICATION_STATE } from '@/data/applications';
 import { COURSES_DATA, CourseProgram } from '@/data/courses';
 import { UNITS_DATA, UnitDetail } from '@/data/units';
 import { EVENTS_DATA, ProspectiveEvent } from '@/data/events';
 import { FAQS_DATA, FAQItem } from '@/data/faqs';
 import { getDynamicCourses, getDynamicUnits, getDynamicFaqs } from '@/data/dynamicStore';
+import { queryMultilingualRag } from '@/lib/rag/ragPipeline';
 
 export interface ChatMessage {
   id: string;
@@ -76,7 +77,8 @@ export async function processAgentConversation(
   // 1. Try Gemini API if API key is provided
   if (apiKey && apiKey.trim().length > 10) {
     try {
-      const geminiResult = await callGeminiWithTools(messages, currentApplication, apiKey.trim());
+      // Pass the normalised draft so tools never receive a missing/partial application
+      const geminiResult = await callGeminiWithTools(messages, updatedApp, apiKey.trim());
       if (geminiResult) {
         return geminiResult;
       }
@@ -89,13 +91,28 @@ export async function processAgentConversation(
 
   // A. Check for Unit Syllabus Inquiries (e.g. COMP1001, COMP2004, DATA3001, CYBR2002, AI5001, BUSS2010, "unit description", "syllabus")
   const allUnits = getDynamicUnits();
+  // Unit-code-like tokens (e.g. COMP1001, AI5001), ignoring email addresses such as alex2024@...
+  const unitCodeTokens = (userText.replace(/[\w.-]+@[\w.-]+\.\w+/g, ' ').toUpperCase().match(/\b[A-Z]{2,4}\d{4}\b/g) || []);
   const unitMatch = allUnits.find(u =>
     lower.includes(u.code.toLowerCase()) ||
     lower.includes(u.title.toLowerCase()) ||
-    (lower.includes('syllabus') && lower.includes(u.code.toLowerCase().slice(0, 4)))
+    // Prefix fallback ("comp syllabus") only when no explicit code was given, so an
+    // unknown code such as DATA2001 is not silently answered with DATA3001
+    (unitCodeTokens.length === 0 && lower.includes('syllabus') && lower.includes(u.code.toLowerCase().slice(0, 4)))
   );
 
   const isAskingUnit = unitMatch || lower.includes('unit description') || lower.includes('syllabus') || lower.includes('assessment') || lower.includes('prerequisite');
+
+  if (!unitMatch && unitCodeTokens.length > 0 && /\b(unit|units|syllabus|subject|assessment|prerequisites?)\b/.test(lower)) {
+    return {
+      message: `I couldn't find **${unitCodeTokens[0]}** in the AI assistant's unit syllabus database.\n\n` +
+        `Units I can describe in detail: ${allUnits.map(u => `**${u.code}**`).join(', ')}.\n\n` +
+        `You can also browse the **Unit Syllabuses** tab for the full published list.`,
+      toolsExecuted,
+      uiWidgets,
+      updatedApplication: updatedApp
+    };
+  }
 
   if (unitMatch) {
     const { result } = executeAgentTool('get_unit_syllabus', { unitCode: unitMatch.code }, updatedApp);
@@ -231,16 +248,21 @@ export async function processAgentConversation(
     const hasBookingIntent = lower.includes('register me') || lower.includes('book me') || lower.includes('i want to book') || lower.includes('i want to register') || lower.includes('reserve a slot');
 
     if (hasBookingIntent) {
-      // Find event
-      let targetEvent = EVENTS_DATA[0]; // default Open Day
-      if (lower.includes('advis') || lower.includes('consult') || lower.includes('1-on-1') || lower.includes('slot')) {
-        targetEvent = EVENTS_DATA.find(e => e.id === 'event-advising-consultation') || EVENTS_DATA[1];
-      } else if (lower.includes('ai') || lower.includes('workshop') || lower.includes('masterclass')) {
-        targetEvent = EVENTS_DATA.find(e => e.id === 'event-ai-taster-workshop') || EVENTS_DATA[2];
-      } else if (lower.includes('intl') || lower.includes('international') || lower.includes('webinar') || lower.includes('visa')) {
-        targetEvent = EVENTS_DATA.find(e => e.id === 'event-intl-webinar') || EVENTS_DATA[3];
-      } else if (lower.includes('tour')) {
-        targetEvent = EVENTS_DATA.find(e => e.id === 'event-campus-tour-sep') || EVENTS_DATA[4];
+      // Find event: an exact title match wins (the Events page sends the full title),
+      // otherwise fall back to keywords. Uses the live state so booked slots are respected.
+      const findEvent = (id: string) => activeEventsState.find(e => e.id === id);
+      const titleMatch = activeEventsState.find(e => lower.includes(e.title.toLowerCase()));
+      let targetEvent = titleMatch || activeEventsState[0]; // default Open Day
+      if (!titleMatch) {
+        if (lower.includes('advis') || lower.includes('consult') || lower.includes('1-on-1') || lower.includes('slot')) {
+          targetEvent = findEvent('event-advising-consultation') || targetEvent;
+        } else if (/\bai\b/.test(lower) || lower.includes('workshop') || lower.includes('masterclass')) {
+          targetEvent = findEvent('event-ai-taster-workshop') || targetEvent;
+        } else if (lower.includes('intl') || lower.includes('international') || lower.includes('webinar') || lower.includes('visa')) {
+          targetEvent = findEvent('event-intl-webinar') || targetEvent;
+        } else if (lower.includes('tour')) {
+          targetEvent = findEvent('event-campus-tour-sep') || targetEvent;
+        }
       }
 
       // Extract email or name if provided, or use application state
@@ -249,16 +271,25 @@ export async function processAgentConversation(
       const studentEmail = emailMatch ? emailMatch[0] : (updatedApp?.personalDetails.email || 'prospective.student@example.com');
 
       let studentName = updatedApp?.personalDetails.fullName || 'Prospective Student';
-      const nameMatch = userText.match(/(?:my name is|i am|name:?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+      // Case-sensitive on the name itself so "I am interested in..." is not read as a name
+      const nameMatch = userText.match(/(?:[Mm]y name is|[Nn]ame is|[Nn]ame:|I am|I'm)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
       if (nameMatch) {
         studentName = nameMatch[1].replace(/[,.;:]+$/, '').trim();
       }
 
       // Check slot
       let slotId: string | undefined = undefined;
-      if (targetEvent.availableSlots) {
+      if (targetEvent.availableSlots && targetEvent.availableSlots.length > 0) {
         const slotMatch = targetEvent.availableSlots.find(s => !s.isBooked);
-        if (slotMatch) slotId = slotMatch.slotId;
+        if (!slotMatch) {
+          return {
+            message: `😔 All consultation slots for **${targetEvent.title}** are fully booked. Please check the **Events & Calendar** tab for other sessions.`,
+            toolsExecuted,
+            uiWidgets,
+            updatedApplication: updatedApp
+          };
+        }
+        slotId = slotMatch.slotId;
       }
 
       const { result } = executeAgentTool('book_event_or_consultation', {
@@ -273,7 +304,7 @@ export async function processAgentConversation(
       if (result.uiWidget) uiWidgets.push(result.uiWidget);
 
       const responseText = `🎉 **You're registered for ${targetEvent.title}!**\n\n` +
-        `📅 **Date & Time**: ${new Date(result.output.startTime).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}\n` +
+        `📅 **Date & Time**: ${new Date(result.output.startTime).toLocaleString('en-AU', { dateStyle: 'full', timeStyle: 'short' })}\n` +
         `📍 **Location**: ${targetEvent.location}\n` +
         `👤 **Attendee**: ${studentName} (${studentEmail})\n\n` +
         `I've generated your **Google Calendar Invite** below. You can click **"Add to Google Calendar"** for 1-click sync or download the **.ics calendar file** directly.`;
@@ -291,8 +322,8 @@ export async function processAgentConversation(
       if (result.uiWidget) uiWidgets.push(result.uiWidget);
 
       let msg = `### 📅 Upcoming Prospective Student Events & Consultations\n\nHere are our upcoming admissions sessions:\n\n`;
-      for (const ev of EVENTS_DATA) {
-        const dateStr = new Date(ev.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      for (const ev of activeEventsState) {
+        const dateStr = new Date(ev.startDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
         msg += `• **${ev.title}** (${ev.category})\n  *Date*: ${dateStr} | *Location*: ${ev.location}\n`;
       }
       msg += `\nWould you like me to register you for any of these and generate your Google Calendar invite? Simply reply with the event name and your email!`;
@@ -307,8 +338,45 @@ export async function processAgentConversation(
   }
 
   // D. Conversational Student Application Form Filling
-  if (isApplicationIntent) {
-    if (lower.includes('submit') || lower.includes('finalize') || lower.includes('send application')) {
+  const updates: Record<string, any> = {};
+
+  // Case-sensitive on the name itself so "I am interested in..." is not read as a name
+  const appNameMatch = userText.match(/(?:[Mm]y name is|[Nn]ame is|[Nn]ame:|I am|I'm)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/);
+  if (appNameMatch) {
+    updates.fullName = appNameMatch[1].replace(/[,.;:]+$/, '').trim();
+  }
+
+  const appEmailMatch = userText.match(/[\w.-]+@[\w.-]+\.\w+/);
+  if (appEmailMatch) updates.email = appEmailMatch[0].replace(/[,.;:]+$/, '').trim();
+
+  const phoneMatch = userText.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+  if (phoneMatch) updates.phone = phoneMatch[0];
+
+  const gpaMatch = userText.match(/(?:gpa|atar|score|wam|grade)(?:\s+is|\s*:|\s+of)?\s*([0-9]+(?:\.[0-9]+)?)/i);
+  if (gpaMatch) updates.atarOrGpa = gpaMatch[1];
+
+  const looksLikeQuestion = /\?\s*$/.test(userText.trim()) || /^(how|what|when|where|which|who|why|can|could|do|does|is|are|will|should)\b/i.test(userText.trim());
+  const hasPersonalData = Boolean(updates.fullName || updates.email || updates.phone || updates.atarOrGpa);
+  const isFaqQuestion = isApplicationIntent && looksLikeQuestion && !hasPersonalData &&
+    Boolean(executeAgentTool('search_faq', { query: userText }, updatedApp).result.output.matched);
+
+  if (isApplicationIntent && !isFaqQuestion) {
+    if ((lower.includes('submit') || lower.includes('finalize') || lower.includes('send application')) && !/^how\b/i.test(userText.trim())) {
+      // Do not submit an incomplete application
+      const { result: statusResult } = executeAgentTool('get_application_status', {}, updatedApp);
+      const missing: string[] = statusResult.output.missingFields || [];
+      if (missing.length > 0) {
+        toolsExecuted.push({ toolName: 'get_application_status', args: {}, output: statusResult.output });
+        if (statusResult.uiWidget) uiWidgets.push(statusResult.uiWidget);
+        return {
+          message: `⚠️ **Your application isn't ready to submit yet.**\n\nPlease provide: **${missing.join(', ')}**.\n\n` +
+            `You can tell me these details here, or complete them in the **Live Application Form** tab.`,
+          toolsExecuted,
+          uiWidgets,
+          updatedApplication: updatedApp
+        };
+      }
+
       const { result, updatedApplication: finalApp } = executeAgentTool('submit_student_application', { declarationConfirmed: true }, updatedApp);
       toolsExecuted.push({ toolName: 'submit_student_application', args: { declarationConfirmed: true }, output: result.output });
       if (result.uiWidget) uiWidgets.push(result.uiWidget);
@@ -330,36 +398,21 @@ export async function processAgentConversation(
       };
     }
 
-    // Extract fields from user message
-    const updates: Record<string, any> = {};
-
-    const nameMatch = userText.match(/(?:my name is|i am|name is|name:)\s+([A-Za-z]+(?:\s+[A-Za-z]+)+)/i);
-    if (nameMatch) {
-      updates.fullName = nameMatch[1].replace(/[,.;:]+$/, '').trim();
-    }
-
-    const emailMatch = userText.match(/[\w.-]+@[\w.-]+\.\w+/);
-    if (emailMatch) updates.email = emailMatch[0].replace(/[,.;:]+$/, '').trim();
-
-    const phoneMatch = userText.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
-    if (phoneMatch) updates.phone = phoneMatch[0];
-
     if (lower.includes('domestic') || lower.includes('australian citizen') || lower.includes('permanent resident')) {
       updates.citizenship = 'Domestic';
     } else if (lower.includes('international') || lower.includes('overseas')) {
       updates.citizenship = 'International';
     }
 
+    // The degree being applied for ("apply for Master of AI") is not the applicant's own qualification
+    const ownEducationText = lower.replace(/\b(apply(ing)?|enrol(l)?(ing)?|study(ing)?|interested in)\b[^.!?]*?\b(bachelor|master)('?s)?\b/g, ' ');
     if (lower.includes('high school') || lower.includes('year 12') || lower.includes('atar')) {
       updates.highestEducation = 'High School';
-    } else if (lower.includes('bachelor') || lower.includes('undergrad degree')) {
+    } else if (/\bbachelor/.test(ownEducationText) || ownEducationText.includes('undergrad degree')) {
       updates.highestEducation = 'Bachelor Degree';
-    } else if (lower.includes('master')) {
+    } else if (/\bmaster('?s)?\b/.test(ownEducationText)) {
       updates.highestEducation = 'Master Degree';
     }
-
-    const gpaMatch = userText.match(/(?:gpa|atar|score|wam|grade)(?:\s+is|\s*:|\s+of)?\s*([0-9]+(?:\.[0-9]+)?)/i);
-    if (gpaMatch) updates.atarOrGpa = gpaMatch[1];
 
     if (lower.includes('computer science') || lower.includes('b-cs') || lower.includes('cs100')) {
       updates.courseId = 'b-cs';
@@ -489,10 +542,10 @@ export async function processAgentConversation(
 
   // Specific FAQ search query
   const { result: faqResult } = executeAgentTool('search_faq', { query: userText }, updatedApp);
-  toolsExecuted.push({ toolName: 'search_faq', args: { query: userText }, output: faqResult.output });
-
   const matchedFaqs = faqResult.output.faqs;
+
   if (matchedFaqs && matchedFaqs.length > 0) {
+    toolsExecuted.push({ toolName: 'search_faq', args: { query: userText }, output: faqResult.output });
     if (faqResult.uiWidget) uiWidgets.push(faqResult.uiWidget);
     const topFaq = matchedFaqs[0];
     let msg = `### 💡 ${topFaq.question}\n\n${topFaq.answer}\n\n`;
@@ -512,6 +565,35 @@ export async function processAgentConversation(
       uiWidgets,
       updatedApplication: updatedApp
     };
+  }
+
+  // G. Multilingual Vector RAG Search & Knowledge Retrieval
+  // Handles queries in any language (Japanese, Chinese, Vietnamese, Thai, English, etc.)
+  if (userText && userText.trim().length > 3 && !['hi', 'hello', 'hey', 'start', 'help', 'menu'].includes(lower.trim())) {
+    try {
+      const ragRes = await queryMultilingualRag(userText, { apiKey });
+      if (ragRes && (ragRes.totalRetrieved > 0 || (ragRes.answer && ragRes.answer.length > 20))) {
+        return {
+          message: ragRes.answer,
+          toolsExecuted: [
+            ...toolsExecuted,
+            {
+              toolName: 'query_multilingual_rag',
+              args: { query: userText, detectedLanguage: ragRes.queryLanguage },
+              output: {
+                confidence: ragRes.confidence,
+                sources: ragRes.sources,
+                totalRetrieved: ragRes.totalRetrieved
+              }
+            }
+          ],
+          uiWidgets,
+          updatedApplication: updatedApp
+        };
+      }
+    } catch (ragErr) {
+      console.warn('[processAgentConversation] RAG fallback query failed:', ragErr);
+    }
   }
 
   // Default fallback welcome / guidance
@@ -583,6 +665,17 @@ function synthesizeToolResponse(toolName: string, output: any): string {
              `**Rankings**: ${k.employabilityRanking}\n\n` +
              `**Campuses**: ${k.campuses?.map((c: any) => `${c.name} (${c.location})`).join(', ')}`;
     }
+    case 'query_multilingual_rag': {
+      if (output.answer) return output.answer;
+      if (output.sources && output.sources.length > 0) {
+        let msg = `### 📚 Retrieved Educational & Compliance Resources\n\n`;
+        for (const s of output.sources) {
+          msg += `#### 📄 **${s.title}** (${s.category} | ${s.language})\n${s.excerpt}\n\n`;
+        }
+        return msg;
+      }
+      return 'No specific document chunks were retrieved for this inquiry.';
+    }
     default:
       return 'I have retrieved the requested information from the university systems.';
   }
@@ -596,22 +689,28 @@ async function callGeminiWithTools(
   currentApplication: StudentApplication,
   apiKey: string
 ): Promise<AgentProcessResult | null> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
 
-  const geminiContents = messages.map(m => ({
+  const rawContents = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }]
   }));
 
+  // Gemini API requires the first turn to have role 'user'
+  const firstUserIdx = rawContents.findIndex(c => c.role === 'user');
+  if (firstUserIdx === -1) return null;
+  const geminiContents = rawContents.slice(firstUserIdx);
+
   const systemInstruction = {
     parts: [{
-      text: `You are EduPulse AI, an intelligent, empathetic, and highly capable university admissions and student assistant.
+      text: `You are EduPulse AI, an intelligent, empathetic, and highly capable university admissions, course, and RTO compliance assistant.
 Your job is to answer prospective and current student inquiries accurately:
+- Use 'query_multilingual_rag' to retrieve authoritative institutional documents, TEQSA/ASQA/CRICOS standards, course architectures, and knowledge in any language (Japanese, Chinese, Vietnamese, Thai, English, etc.).
 - Provide rich details on courses (degrees) and individual unit syllabuses (prerequisites, assessment breakdowns, weekly topics).
 - Help students fill in their application forms progressively.
 - Register prospective students for upcoming admissions events and 1-on-1 consultations with Google Calendar invites.
 - Answer university FAQs regarding scholarships, tuition, visas, accommodation, deadlines, and campus life.
-Always be polite, structured, and use markdown formatting.`
+Always be polite, structured, and use markdown formatting. Match the user's inquiry language naturally.`
     }]
   };
 
@@ -631,7 +730,10 @@ Always be polite, structured, and use markdown formatting.`
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey
+    },
     body: JSON.stringify(body)
   });
 
@@ -666,7 +768,7 @@ Always be polite, structured, and use markdown formatting.`
 
     for (const fc of functionCalls) {
       const { name, args } = fc;
-      const { result, updatedApplication: newApp } = executeAgentTool(name, args || {}, updatedApp);
+      const { result, updatedApplication: newApp } = await executeAgentToolAsync(name, args || {}, updatedApp, apiKey);
       toolsExecuted.push({ toolName: name, args: args || {}, output: result.output });
       if (result.uiWidget) uiWidgets.push(result.uiWidget);
       if (newApp) updatedApp = newApp;
@@ -694,7 +796,10 @@ Always be polite, structured, and use markdown formatting.`
 
       const secondRes = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
         body: JSON.stringify({
           contents: secondTurnContents,
           systemInstruction,

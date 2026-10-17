@@ -656,7 +656,7 @@ Trả lời 2: Điểm IELTS Academic yêu cầu là tối thiểu 6.5 không c�
                     {faq.createdAt && (
                       <span className="text-[10px] text-slate-400 flex items-center gap-1">
                         <Clock className="w-2.5 h-2.5" />
-                        {new Date(faq.createdAt).toLocaleDateString()}
+                        {new Date(faq.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </span>
                     )}
                   </div>

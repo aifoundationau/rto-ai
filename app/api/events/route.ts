@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { eventId, studentName, studentEmail, slotId, notes } = body;
 
+    if (!studentName?.trim() || !studentEmail?.trim()) {
+      return NextResponse.json({ error: 'Name and email are required' }, { status: 400 });
+    }
+
     const event = activeEventsState.find(e => e.id === eventId);
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
@@ -32,6 +36,9 @@ export async function POST(req: NextRequest) {
     if (slotId && event.availableSlots) {
       const slot = event.availableSlots.find(s => s.slotId === slotId);
       if (slot) {
+        if (slot.isBooked) {
+          return NextResponse.json({ error: 'That time slot has already been booked. Please choose another.' }, { status: 409 });
+        }
         slot.isBooked = true;
         startTime = slot.startTime;
         endTime = slot.endTime;
@@ -77,6 +84,8 @@ export async function POST(req: NextRequest) {
       startTime,
       endTime,
       googleCalendarUrl,
+      // EventBookingCard (shared with the chat widget) reads `googleCalUrl`
+      googleCalUrl: googleCalendarUrl,
       icsContent
     });
   } catch (error: any) {

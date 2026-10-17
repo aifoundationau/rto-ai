@@ -56,9 +56,13 @@ export function createIcsContent(event: CalendarEventPayload): string {
   const now = formatGoogleCalendarDate(new Date());
   const uid = `edupulse-${Date.now()}-${Math.random().toString(36).substring(2, 9)}@university.edu.au`;
 
-  let description = event.description.replace(/\n/g, '\\n');
+  // RFC 5545 TEXT values must escape backslashes, commas, semicolons and newlines
+  const escapeText = (value: string) =>
+    value.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+
+  let description = escapeText(event.description);
   if (event.meetingLink) {
-    description += `\\n\\nMeeting Link: ${event.meetingLink}`;
+    description += `\\n\\nMeeting Link: ${escapeText(event.meetingLink)}`;
   }
 
   return [
@@ -72,9 +76,9 @@ export function createIcsContent(event: CalendarEventPayload): string {
     `DTSTAMP:${now}`,
     `DTSTART:${start}`,
     `DTEND:${end}`,
-    `SUMMARY:${event.title}`,
+    `SUMMARY:${escapeText(event.title)}`,
     `DESCRIPTION:${description}`,
-    `LOCATION:${event.location}`,
+    `LOCATION:${escapeText(event.location)}`,
     `STATUS:CONFIRMED`,
     event.organizerEmail ? `ORGANIZER;CN=University Admissions:MAILTO:${event.organizerEmail}` : 'ORGANIZER;CN=University Admissions:MAILTO:admissions@university.edu.au',
     event.attendeeEmail ? `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN=${event.attendeeEmail}:MAILTO:${event.attendeeEmail}` : '',

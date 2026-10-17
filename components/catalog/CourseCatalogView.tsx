@@ -25,26 +25,32 @@ export const CourseCatalogView: React.FC<CourseCatalogViewProps> = ({
         if (data.programs && data.programs.length > 0) {
           const publishedProgs = data.programs.filter((p: any) => p.status === 'published');
           if (publishedProgs.length > 0) {
+            // Course Builder unitIds are document ids (e.g. "unit-comp1001"); show unit codes instead
+            const unitCodeById = new Map<string, string>(
+              (data.units || []).map((u: any) => [u.id, u.code])
+            );
+            // Map Course Builder ProgramDocuments onto the CourseProgram shape the cards render
             const mappedCourses: CourseProgram[] = publishedProgs.map((p: any) => ({
               id: p.id,
               code: p.code,
               title: p.title,
               degreeLevel: p.degreeLevel,
               faculty: p.faculty,
-              duration: `${p.durationYears} Years Full-time`,
-              totalCreditPoints: p.totalCredits,
-              atarRequirement: p.atarRequirement ? `ATAR ${p.atarRequirement}` : 'Competitive Entry / GPA',
-              annualFeeAud: `$${(p.annualFeeAud || 36000).toLocaleString()} AUD/year`,
-              overview: p.overview,
-              careerOutcomes: p.careerOutcomes || ['AI Engineer', 'Software Developer'],
-              majors: [{ name: 'Core Specialization', description: 'Accredited Curriculum' }],
-              coreUnits: p.unitIds || [],
-              electivesSample: [],
-              admissionRequirements: [
-                p.atarRequirement ? `Minimum ATAR: ${p.atarRequirement}` : 'Recognized previous qualification',
-                'English language proficiency'
-              ],
-              intakes: ['February (Semester 1)', 'July (Semester 2)']
+              durationYears: Number(p.durationYears) || 0,
+              studyModes: ['Full-time', 'Part-time'],
+              campus: ['Main Campus'],
+              intakes: ['February (Semester 1)', 'July (Semester 2)'],
+              atarRequirement: p.atarRequirement || undefined,
+              gpaRequirement: p.gpaRequirement || undefined,
+              // Course Builder stores a single annual fee
+              annualTuitionDomestic: Number(p.annualFeeAud) || 0,
+              annualTuitionInternational: Number(p.annualFeeAud) || 0,
+              overview: p.overview || '',
+              highlights: [],
+              careerOutcomes: p.careerOutcomes || [],
+              majors: [],
+              coreUnits: (p.unitIds || []).map((id: string) => unitCodeById.get(id) || id),
+              electiveUnits: []
             }));
             setCourses(mappedCourses);
             return;
@@ -156,7 +162,9 @@ export const CourseCatalogView: React.FC<CourseCatalogViewProps> = ({
                   <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-center">
                     <div className="text-[10px] text-slate-500 font-medium">Entry Req</div>
                     <div className="text-xs font-bold text-slate-800 mt-0.5">
-                      {course.atarRequirement ? `ATAR ${course.atarRequirement}` : `GPA ${course.gpaRequirement}`}
+                      {course.atarRequirement
+                        ? `ATAR ${course.atarRequirement}`
+                        : course.gpaRequirement ? `GPA ${course.gpaRequirement}` : 'See requirements'}
                     </div>
                   </div>
 

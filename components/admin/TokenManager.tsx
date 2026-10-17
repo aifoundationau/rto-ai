@@ -300,7 +300,8 @@ export const TokenManager: React.FC = () => {
   };
 
   const simulateDailyDeduction = () => {
-    const todayISO = "2026-09-28";
+    // Local calendar date (YYYY-MM-DD); was hard-coded, so only one deduction could ever happen
+    const todayISO = new Date().toLocaleDateString('en-CA');
     if (currentUser.tokenBalance <= 0) {
       showToast("Access Denied: 0 tokens remaining.", "error");
       return;

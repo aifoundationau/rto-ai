@@ -12,6 +12,7 @@ import {
   DEFAULT_ROLE_PERMISSIONS,
   PERMISSION_CATEGORIES
 } from '@/lib/auth/permissions';
+import { requireSuperAdminCaller } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,6 +67,11 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await requireSuperAdminCaller(req);
+    if ('errorResponse' in authCheck) {
+      return authCheck.errorResponse;
+    }
+
     const body = await req.json();
     const now = new Date().toISOString();
 
@@ -176,6 +182,11 @@ export async function POST(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
+    const authCheck = await requireSuperAdminCaller(req);
+    if ('errorResponse' in authCheck) {
+      return authCheck.errorResponse;
+    }
+
     const { searchParams } = new URL(req.url);
     const roleParam = searchParams.get('role');
 

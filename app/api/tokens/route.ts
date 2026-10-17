@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
       metadata: metadata || {},
     });
 
+    if (!result.success) {
+      return NextResponse.json({ success: false, error: String(result.error) }, { status: 500 });
+    }
     return NextResponse.json({ success: true, id: result.id });
   } catch (error: any) {
     console.error('Error in /api/tokens POST:', error);

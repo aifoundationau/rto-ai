@@ -10,7 +10,8 @@ const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   id: 'msg-welcome-embed',
   role: 'assistant',
   content: `👋 Hello! I am the **EduPulse AI Student Assistant**.\n\nI can help you with:\n• ❓ **University FAQs** (Scholarships, tuition fees, visas, deadlines)\n• 📚 **Degree Programs & Courses** (ATAR/GPA requirements, majors)\n• 🔬 **Individual Unit Syllabuses** (e.g. *COMP1001, COMP2004, DATA3001, AI5001*)\n• 📝 **Starting your student application form**\n• 📅 **Admissions Events & 1-Click Google Calendar RSVPs**\n\nHow can I help you today?`,
-  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  // ChatInterface formats timestamps with new Date(...), so they must be ISO strings
+  timestamp: new Date().toISOString()
 };
 
 export default function EmbedPage() {
@@ -20,15 +21,17 @@ export default function EmbedPage() {
   const [apiKey, setApiKey] = useState<string>('');
 
   const handleSendMessage = async (text: string) => {
+    if (!text.trim()) return;
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       role: 'user',
       content: text,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      timestamp: new Date().toISOString()
     };
 
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
+    setIsLoading(true);
 
     try {
       const res = await fetch('/api/chat', {
@@ -48,7 +51,7 @@ export default function EmbedPage() {
         id: `msg-${Date.now() + 1}`,
         role: 'assistant',
         content: data.message,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: new Date().toISOString(),
         toolsExecuted: data.toolsExecuted,
         uiWidgets: data.uiWidgets
       };
@@ -63,10 +66,22 @@ export default function EmbedPage() {
         id: `msg-${Date.now() + 1}`,
         role: 'assistant',
         content: `I encountered an issue processing your request. Please try again.`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        timestamp: new Date().toISOString()
       };
       setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // The embed has no portal of its own: hand the draft to the full site (same origin) and open it
+  const handleOpenFullPortal = () => {
+    try {
+      localStorage.setItem('edupulse_active_application', JSON.stringify(application));
+    } catch {
+      // ignore
+    }
+    window.open('/', '_blank', 'noopener');
   };
 
   return (
@@ -86,10 +101,10 @@ export default function EmbedPage() {
             currentApplication={application}
             onSendMessage={handleSendMessage}
             isLoading={isLoading}
-            onOpenApplicationPortal={() => {}}
-            onSelectCourse={() => {}}
-            onSelectUnit={() => {}}
-            onResetChat={() => {}}
+            onOpenApplicationPortal={handleOpenFullPortal}
+            onSelectCourse={(course: CourseProgram) => handleSendMessage(`I want to apply for ${course.title}`)}
+            onSelectUnit={(unitCode: string) => handleSendMessage(`Show me the unit syllabus, coordinator, prerequisites, and assessment breakdown for ${unitCode}.`)}
+            onResetChat={() => setMessages([INITIAL_WELCOME_MESSAGE])}
           />
         </div>
       </div>

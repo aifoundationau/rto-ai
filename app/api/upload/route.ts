@@ -16,13 +16,21 @@ export async function POST(request: Request) {
       );
     }
 
+    // Only allow simple folder/file names so uploads cannot escape public/images
+    if (!/^[a-z0-9_-]+$/i.test(folder) || !/^[\w-]+\.(jpe?g|png|gif|webp|svg|avif)$/i.test(filename)) {
+      return NextResponse.json(
+        { error: 'Invalid folder or filename. Use letters, numbers, "-" or "_" and an image extension.' },
+        { status: 400 }
+      );
+    }
+
     // Convert the File object to a Buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     // Ensure the target directory exists
     const publicDir = path.join(process.cwd(), 'public', 'images', folder);
-    
+
     try {
       await fs.access(publicDir);
     } catch {

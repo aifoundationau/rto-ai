@@ -469,10 +469,10 @@ export const AdminEventsManager: React.FC<AdminEventsManagerProps> = ({
                       <td className="p-4 text-slate-700">
                         <div className="flex items-center gap-1 font-semibold">
                           <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{new Date(event.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          <span>{new Date(event.date).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                         </div>
                         <div className="text-[11px] text-slate-400 mt-0.5">
-                          {new Date(event.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(event.date).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true })}
                         </div>
                       </td>
                       <td className="p-4">

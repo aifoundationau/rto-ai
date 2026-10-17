@@ -63,6 +63,10 @@ export const Navbar: React.FC<NavbarProps> = ({
     (currentUser?.role || '').toLowerCase() === 'superadmin' ||
     isProjectOwnerEmail(currentUser?.email);
 
+  const canAccessAdmin =
+    isSuperAdminUser ||
+    (currentUser?.role || '').toLowerCase() === 'administration';
+
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
@@ -74,7 +78,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-primary-600 to-purple-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
             <Sparkles className="w-5 h-5" />
           </div>
-          <div>
+          <div className="notranslate" translate="no">
             <div className="font-extrabold text-base tracking-tight text-slate-900 flex items-center gap-1.5">
               <span>EduPulse</span>
               <span className="text-indigo-600">AI</span>
@@ -106,20 +110,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             );
           })}
 
-          {/* Superadmin Direct Desktop Tab */}
-          {isSuperAdminUser && (
-            <button
-              onClick={() => onSelectTab('admin')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'admin'
-                  ? 'bg-purple-600 text-white shadow-xs'
-                  : 'text-purple-700 hover:text-purple-900 hover:bg-purple-100/70'
-              }`}
-            >
-              <ShieldCheck className={`w-3.5 h-3.5 ${activeTab === 'admin' ? 'text-white' : 'text-purple-600'}`} />
-              <span>Admin Panel</span>
-            </button>
-          )}
         </nav>
 
         {/* Right Action Icons */}
@@ -129,11 +119,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer border ${
-                  activeTab === 'admin'
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer border ${activeTab === 'admin'
                     ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm ring-2 ring-indigo-500/20'
                     : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200/80'
-                }`}
+                  }`}
                 title="Account menu & log out"
               >
                 <img
@@ -145,29 +134,28 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {currentUser.name}
                 </span>
                 <span
-                  className={`px-1.5 py-0.5 text-[9px] font-black rounded-md uppercase tracking-wider ${
-                    isSuperAdminUser
+                  className={`px-1.5 py-0.5 text-[9px] font-black rounded-md uppercase tracking-wider ${isSuperAdminUser
                       ? 'bg-purple-600 text-white'
                       : (currentUser.role || '').toLowerCase() === 'chancellor'
-                      ? 'bg-amber-600 text-white'
-                      : (currentUser.role || '').toLowerCase() === 'president'
-                      ? 'bg-sky-600 text-white'
-                      : (currentUser.role || '').toLowerCase() === 'ceo'
-                      ? 'bg-blue-700 text-white'
-                      : (currentUser.role || '').toLowerCase() === 'coo'
-                      ? 'bg-indigo-600 text-white'
-                      : (currentUser.role || '').toLowerCase() === 'cfo'
-                      ? 'bg-emerald-700 text-white'
-                      : (currentUser.role || '').toLowerCase() === 'accounting'
-                      ? 'bg-teal-600 text-white'
-                      : (currentUser.role || '').toLowerCase() === 'administration'
-                      ? 'bg-slate-700 text-white'
-                      : (currentUser.role || '').toLowerCase() === 'teacher'
-                      ? 'bg-orange-600 text-white'
-                      : (currentUser.role || '').toLowerCase() === 'student'
-                      ? 'bg-cyan-600 text-white'
-                      : 'bg-emerald-600 text-white'
-                  }`}
+                        ? 'bg-amber-600 text-white'
+                        : (currentUser.role || '').toLowerCase() === 'president'
+                          ? 'bg-sky-600 text-white'
+                          : (currentUser.role || '').toLowerCase() === 'ceo'
+                            ? 'bg-blue-700 text-white'
+                            : (currentUser.role || '').toLowerCase() === 'coo'
+                              ? 'bg-indigo-600 text-white'
+                              : (currentUser.role || '').toLowerCase() === 'cfo'
+                                ? 'bg-emerald-700 text-white'
+                                : (currentUser.role || '').toLowerCase() === 'accounting'
+                                  ? 'bg-teal-600 text-white'
+                                  : (currentUser.role || '').toLowerCase() === 'administration'
+                                    ? 'bg-slate-700 text-white'
+                                    : (currentUser.role || '').toLowerCase() === 'teacher'
+                                      ? 'bg-orange-600 text-white'
+                                      : (currentUser.role || '').toLowerCase() === 'student'
+                                        ? 'bg-cyan-600 text-white'
+                                        : 'bg-emerald-600 text-white'
+                    }`}
                 >
                   {isSuperAdminUser
                     ? 'Superadmin'
@@ -201,20 +189,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
 
                   <div className="p-1.5 space-y-0.5 text-xs">
-                    {isSuperAdminUser && (
+                    {canAccessAdmin && (
                       <button
                         type="button"
                         onClick={() => {
                           setIsUserMenuOpen(false);
                           onSelectTab('admin');
                         }}
-                        className={`w-full px-3 py-2 rounded-xl text-left font-semibold flex items-center gap-2.5 transition-colors cursor-pointer ${
-                          activeTab === 'admin'
-                            ? 'bg-indigo-50 text-indigo-700 font-bold'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }`}
+                        className={`w-full px-3 py-2.5 rounded-xl text-left font-bold flex items-center gap-2.5 transition-colors cursor-pointer ${activeTab === 'admin'
+                            ? 'bg-purple-600 text-white shadow-xs'
+                            : 'text-purple-700 hover:bg-purple-50'
+                          }`}
                       >
-                        <ShieldCheck className="w-4 h-4 text-purple-600" />
+                        <ShieldCheck className={`w-4 h-4 ${activeTab === 'admin' ? 'text-white' : 'text-purple-600'}`} />
                         <span>Admin & Operations Panel</span>
                       </button>
                     )}
@@ -225,11 +212,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                         setIsUserMenuOpen(false);
                         onSelectTab('signin');
                       }}
-                      className={`w-full px-3 py-2 rounded-xl text-left font-semibold flex items-center gap-2.5 transition-colors cursor-pointer ${
-                        activeTab === 'signin'
+                      className={`w-full px-3 py-2 rounded-xl text-left font-semibold flex items-center gap-2.5 transition-colors cursor-pointer ${activeTab === 'signin'
                           ? 'bg-indigo-50 text-indigo-700 font-bold'
                           : 'text-slate-700 hover:bg-slate-50'
-                      }`}
+                        }`}
                     >
                       <User className="w-4 h-4 text-indigo-600" />
                       <span>Account & Profile</span>
@@ -291,19 +277,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             );
           })}
-          {currentUser && (
-            <button
-              onClick={() => onSelectTab('admin')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                activeTab === 'admin'
-                  ? 'bg-indigo-600 text-white shadow-xs font-bold'
-                  : 'bg-indigo-50 text-indigo-900 border border-indigo-200'
-              }`}
-            >
-              <img src={currentUser.avatarUrl} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
-              <span>Admin</span>
-            </button>
-          )}
         </div>
       </div>
     </header>

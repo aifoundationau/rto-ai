@@ -145,6 +145,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  // Message times depend on the viewer's clock and locale, so render them only after
+  // hydration (pre-rendered pages such as /embed would otherwise mismatch the server HTML)
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => setHasMounted(true), []);
 
   // Auto-scroll to bottom of messages
   useEffect(() => {
@@ -158,7 +162,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = false;
-      recognition.lang = 'en-US';
+      recognition.lang = 'en-AU';
 
       recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
@@ -210,6 +214,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     // Clean markdown symbols for cleaner speech
     const cleanText = text.replace(/[*#_`[\]]/g, '').replace(/\(.*?\)/g, '');
     const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'en-AU';
+    const voices = window.speechSynthesis.getVoices();
+    const auVoice = voices.find(v => v.lang === 'en-AU' || v.lang.startsWith('en-AU'));
+    if (auVoice) utterance.voice = auVoice;
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
 
@@ -326,7 +334,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   {/* Message Footer: Timestamp & Audio TTS button */}
                   {isAssistant && (
                     <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-slate-400 text-[11px]">
-                      <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>{hasMounted ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
                       <button
                         onClick={() => handleSpeakText(msg.id, msg.content)}
                         className="hover:text-indigo-600 p-1 rounded-md transition-colors flex items-center gap-1"

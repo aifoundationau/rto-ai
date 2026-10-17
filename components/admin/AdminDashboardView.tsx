@@ -34,7 +34,9 @@ import {
   Coins,
   Activity,
   MessageSquare,
-  GraduationCap
+  GraduationCap,
+  TrendingUp,
+  BarChart3
 } from 'lucide-react';
 
 import { ImageManager } from './ImageManager';
@@ -48,24 +50,67 @@ import { CourseBuilderView } from './CourseBuilderView';
 import { RolePermissionsManager } from './RolePermissionsManager';
 import { KnowledgeFaqManager } from './KnowledgeFaqManager';
 import { ApplicationDetailModal } from './ApplicationDetailModal';
-import { SYSTEM_ROLES, ROLE_DEFINITIONS, normalizeRole, getRoleMeta } from '@/lib/auth/roles';
+import { MultilingualRagManager } from './MultilingualRagManager';
+import { BlogInsightsManager } from './BlogInsightsManager';
+import { CampusMetricsManager } from './CampusMetricsManager';
+import { SYSTEM_ROLES, ROLE_DEFINITIONS, normalizeRole, getRoleMeta, isSuperAdmin } from '@/lib/auth/roles';
+import { authenticatedFetch } from '@/lib/firebase/client';
+import { ClassroomUser } from '@/components/auth/GoogleClassroomLoginModal';
 
 interface AdminDashboardViewProps {
   apiKey?: string;
   onSaveApiKey?: (key: string) => void;
   onLogout?: () => void;
+  currentUser?: ClassroomUser | null;
 }
 
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   apiKey = '',
   onSaveApiKey,
-  onLogout
+  onLogout,
+  currentUser
 }) => {
+  // Defense-in-depth: Ensure unauthorized accounts cannot view Admin panel
+  const isSuper = currentUser
+    ? isSuperAdmin(currentUser.role, currentUser.isSuperAdmin, currentUser.email)
+    : true; // fallback if rendered without prop
+
+  const roleNormalized = (currentUser?.role || '').toLowerCase();
+  const isAdministration = roleNormalized === 'administration';
+  const hasAccess = isSuper || isAdministration;
+
+  if (currentUser && !hasAccess) {
+    return (
+      <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-3xl border border-rose-200 shadow-xl text-center space-y-4">
+        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+          <ShieldAlert className="w-6 h-6" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900">Administrative Privileges Required</h2>
+        <p className="text-xs text-slate-600 max-w-md mx-auto">
+          Access to this operations panel is reserved exclusively for verified administration and superadmin accounts.
+        </p>
+        <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-600 inline-block text-left font-mono border border-slate-200">
+          <div>Signed in as: <span className="font-bold text-slate-900">{currentUser.email}</span></div>
+          <div>Role: <span className="font-bold uppercase text-indigo-600">{currentUser.role || 'supporter'}</span></div>
+        </div>
+        <div className="pt-2 flex justify-center gap-3">
+          <button
+            onClick={onLogout}
+            className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl transition cursor-pointer hover:bg-slate-800"
+          >
+            Sign Out / Switch Account
+          </button>
+        </div>
+      </div>
+    );
+  }
   const [applications, setApplications] = useState<StudentApplication[]>([]);
   const [selectedApp, setSelectedApp] = useState<StudentApplication | null>(null);
   const [appSearchTerm, setAppSearchTerm] = useState('');
   const [appStatusFilter, setAppStatusFilter] = useState('ALL');
-  const [activeTab, setActiveTab] = useState<'course_builder' | 'role_permissions' | 'api_key' | 'telemetry' | 'staff_messaging' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens' | 'calendar'>('course_builder');
+  const [activeTab, setActiveTab] = useState<'campus_metrics' | 'course_builder' | 'role_permissions' | 'rag_pipeline' | 'blog_insights' | 'api_key' | 'telemetry' | 'staff_messaging' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens' | 'calendar'>(
+    isAdministration && !isSuper ? 'campus_metrics' : 'course_builder'
+  );
   const [apiKeys, setApiKeys] = useState({
     gemini: apiKey || '',
     firebase: '',
@@ -149,7 +194,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('/api/users');
+      const res = await authenticatedFetch('/api/users');
       const data = await res.json();
       if (data.users) {
         setUsers(data.users);
@@ -242,7 +287,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
     try {
       const targetUid = roleForm.uid.trim() || `user_${Date.now()}`;
-      const res = await fetch('/api/assign-role', {
+      const res = await authenticatedFetch('/api/assign-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -336,6 +381,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
           <div className="flex flex-wrap items-center gap-1.5 bg-white/10 p-1.5 rounded-2xl">
           <button
+            onClick={() => setActiveTab('campus_metrics')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'campus_metrics' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <TrendingUp className="w-3.5 h-3.5 text-amber-300" />
+            <span>Front Page Metrics</span>
+            <span className="px-1.5 py-0.2 bg-amber-500 text-white text-[9px] font-extrabold rounded-full">Live Hero</span>
+          </button>
+          <button
             onClick={() => setActiveTab('course_builder')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeTab === 'course_builder' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
@@ -354,6 +409,26 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <ShieldCheck className="w-3.5 h-3.5 text-purple-300" />
             <span>Role Permissions</span>
             <span className="px-1.5 py-0.2 bg-purple-500 text-white text-[9px] font-extrabold rounded-full">RBAC</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('rag_pipeline')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'rag_pipeline' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5 text-indigo-300" />
+            <span>Multilingual RAG</span>
+            <span className="px-1.5 py-0.2 bg-indigo-500 text-white text-[9px] font-extrabold rounded-full">Vector 768d</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('blog_insights')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'blog_insights' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-pink-300" />
+            <span>Blog & Insights Spot</span>
+            <span className="px-1.5 py-0.2 bg-pink-500 text-white text-[9px] font-extrabold rounded-full">New</span>
           </button>
           <button
             onClick={() => setActiveTab('api_key')}
@@ -522,6 +597,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         </div>
       </div>
 
+      {/* Tab: Front Page Campus Metrics Manager */}
+      {activeTab === 'campus_metrics' && (
+        <CampusMetricsManager />
+      )}
+
       {/* Tab: Course Builder (LMS & Website) */}
       {activeTab === 'course_builder' && (
         <CourseBuilderView apiKey={apiKeys.gemini} />
@@ -530,6 +610,21 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       {/* Tab: Role Permissions Manager */}
       {activeTab === 'role_permissions' && (
         <RolePermissionsManager />
+      )}
+
+      {/* Tab: Multilingual Vector RAG */}
+      {activeTab === 'rag_pipeline' && (
+        <MultilingualRagManager
+          apiKey={apiKeys.gemini}
+          currentUser={currentUser}
+          isSuperAdmin={isSuper}
+        />
+      )}
+
+
+      {/* Tab: Blog & Insights Spot Panel */}
+      {activeTab === 'blog_insights' && (
+        <BlogInsightsManager />
       )}
 
       {/* Tab: API Configuration */}

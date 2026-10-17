@@ -44,8 +44,15 @@ export async function GET(req: NextRequest) {
   }
 }
 
+import { requireSuperAdminCaller } from '@/lib/auth/serverAuth';
+
 export async function POST(req: NextRequest) {
   try {
+    const authCheck = await requireSuperAdminCaller(req);
+    if ('errorResponse' in authCheck) {
+      return authCheck.errorResponse;
+    }
+
     const body = await req.json();
     const { action, payload } = body;
 

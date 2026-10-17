@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { GoogleTranslate } from '@/components/GoogleTranslate';
 
 export const metadata: Metadata = {
   title: 'EduPulse AI - University Student Admissions Agent & Calendar Portal',
@@ -12,8 +13,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="antialiased selection:bg-indigo-500 selection:text-white">
+    <html lang="en-AU" suppressHydrationWarning>
+      <body className="antialiased selection:bg-indigo-500 selection:text-white" suppressHydrationWarning>
+        <GoogleTranslate />
         {children}
       </body>
     </html>

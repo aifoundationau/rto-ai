@@ -114,12 +114,14 @@ export const SignInView: React.FC<SignInViewProps> = ({
       let finalRole = 'supporter';
       let isSuper = false;
       try {
+        const idToken = await result.user.getIdToken();
         const syncRes = await fetch('/api/users', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+          },
           body: JSON.stringify({
-            uid: result.user.uid,
-            email: result.user.email,
             displayName: result.user.displayName,
             photoURL: result.user.photoURL,
           }),
@@ -318,19 +320,21 @@ export const SignInView: React.FC<SignInViewProps> = ({
 
           {/* Quick Shortcuts */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div
-              onClick={() => onNavigateTab('admin')}
-              className="p-5 bg-white rounded-2xl border-2 border-indigo-200 hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                <Layers className="w-5 h-5" />
+            {((currentUser.role || '').toLowerCase() === 'superadmin' || currentUser.isSuperAdmin) && (
+              <div
+                onClick={() => onNavigateTab('admin')}
+                className="p-5 bg-white rounded-2xl border-2 border-indigo-200 hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <h3 className="font-bold text-slate-900 text-sm">Admin Panel</h3>
+                <p className="text-xs text-slate-500 mt-1">Full control over courses, telemetry, sheets sync, and staff tools.</p>
+                <span className="text-xs font-bold text-indigo-600 flex items-center gap-1 mt-3">
+                  Open Admin Panel &rarr;
+                </span>
               </div>
-              <h3 className="font-bold text-slate-900 text-sm">Admin Panel</h3>
-              <p className="text-xs text-slate-500 mt-1">Full control over courses, telemetry, sheets sync, and staff tools.</p>
-              <span className="text-xs font-bold text-indigo-600 flex items-center gap-1 mt-3">
-                Open Admin Panel &rarr;
-              </span>
-            </div>
+            )}
 
             <div
               onClick={() => onNavigateTab('application')}

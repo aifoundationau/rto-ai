@@ -61,14 +61,14 @@ export const EventBookingCard: React.FC<EventBookingCardProps> = ({ booking }) =
   const startDate = new Date(booking.startTime);
   const endDate = new Date(booking.endTime);
 
-  const formattedDate = startDate.toLocaleDateString('en-US', {
+  const formattedDate = startDate.toLocaleDateString('en-AU', {
     weekday: 'long',
-    month: 'long',
     day: 'numeric',
+    month: 'long',
     year: 'numeric'
   });
 
-  const formattedTime = `${startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+  const formattedTime = `${startDate.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })} - ${endDate.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
 
   return (
     <div className="my-3 bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
