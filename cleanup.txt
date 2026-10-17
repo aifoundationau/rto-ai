@@ -334,8 +334,7 @@ P3 - DEAD CODE, DUPLICATION AND TIDY-UP
    - Root-level working docs (AUDIT_FRONTEND_DATA_ENTRY_CATALOG.txt,
      FUTURE_FIREBASE_AUTH_AND_GOOGLE_SSO_PROMPT.txt, data-contracts.md)
      could move to /docs.
-   - .agent/skills/course-builder-skill/SKILLS.md.txt has an odd name
-     (others are SKILL.md).
+   - [RESOLVED] Consolidated all skills into .agents/skills/ with standardized SKILL.md.
    - Decide whether to commit or discard the uncommitted server.js /
      package.json / next.config.js changes.
 

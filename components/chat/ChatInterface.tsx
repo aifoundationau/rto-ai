@@ -38,6 +38,98 @@ interface ChatInterfaceProps {
   onResetChat: () => void;
 }
 
+const FormattedMessage: React.FC<{ content: string; isAssistant: boolean }> = ({ content, isAssistant }) => {
+  if (!isAssistant) {
+    return <div className="whitespace-pre-wrap text-inherit text-sm">{content}</div>;
+  }
+
+  const parseInline = (text: string): React.ReactNode[] => {
+    const parts: React.ReactNode[] = [];
+    const regex = /(\*\*.*?\*\*|`.*?`)/g;
+    const split = text.split(regex);
+
+    split.forEach((seg, i) => {
+      if (seg.startsWith('**') && seg.endsWith('**')) {
+        parts.push(<strong key={i} className="font-bold text-slate-900">{seg.slice(2, -2)}</strong>);
+      } else if (seg.startsWith('`') && seg.endsWith('`')) {
+        parts.push(
+          <code key={i} className="px-1.5 py-0.5 mx-0.5 bg-slate-100 text-indigo-700 rounded font-mono text-[11px] border border-slate-200">
+            {seg.slice(1, -1)}
+          </code>
+        );
+      } else if (seg) {
+        parts.push(seg);
+      }
+    });
+
+    return parts;
+  };
+
+  const lines = content.split('\n');
+  const elements: React.ReactNode[] = [];
+  let listItems: React.ReactNode[] = [];
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      elements.push(
+        <ul key={`ul-${elements.length}`} className="my-1.5 space-y-1">
+          {listItems}
+        </ul>
+      );
+      listItems = [];
+    }
+  };
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('#### ')) {
+      flushList();
+      elements.push(
+        <h4 key={`h4-${idx}`} className="font-bold text-xs uppercase tracking-wide text-slate-800 mt-2.5 mb-1">
+          {parseInline(trimmed.slice(5))}
+        </h4>
+      );
+    } else if (trimmed.startsWith('### ')) {
+      flushList();
+      elements.push(
+        <h3 key={`h3-${idx}`} className="font-bold text-sm text-slate-900 mt-3 mb-1.5 border-b border-slate-100 pb-1 flex items-center gap-1.5">
+          {parseInline(trimmed.slice(4))}
+        </h3>
+      );
+    } else if (trimmed.startsWith('## ')) {
+      flushList();
+      elements.push(
+        <h2 key={`h2-${idx}`} className="font-extrabold text-base text-slate-900 mt-3.5 mb-1.5">
+          {parseInline(trimmed.slice(3))}
+        </h2>
+      );
+    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
+      const itemText = trimmed.replace(/^[-*•]\s+/, '');
+      listItems.push(
+        <li key={`li-${idx}`} className="flex items-start gap-2 text-xs leading-relaxed text-slate-700">
+          <span className="text-indigo-500 font-bold shrink-0 mt-0.5">•</span>
+          <div className="flex-1">{parseInline(itemText)}</div>
+        </li>
+      );
+    } else if (!trimmed) {
+      flushList();
+      elements.push(<div key={`sp-${idx}`} className="h-1" />);
+    } else {
+      flushList();
+      elements.push(
+        <p key={`p-${idx}`} className="text-xs text-slate-700 leading-relaxed my-1">
+          {parseInline(trimmed)}
+        </p>
+      );
+    }
+  });
+
+  flushList();
+
+  return <div className="space-y-0.5 text-inherit">{elements}</div>;
+};
+
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   messages,
   onSendMessage,
@@ -138,12 +230,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   // Preset quick prompt pills
   const promptSuggestions = [
+    { label: '🏛️ All Degree Programs', prompt: 'What courses and degree programs are available at the university?' },
+    { label: '❓ Browse All FAQs', prompt: 'Show me all university FAQs and knowledge base categories.' },
     { label: '🎓 Bachelor of Computer Science', prompt: 'Tell me about Bachelor of Computer Science, entry requirements, and majors.' },
     { label: '📘 COMP1001 Unit Syllabus', prompt: 'Show me the unit description, prerequisites, and assessment breakdown for COMP1001.' },
-    { label: '📅 Book Open Day (Google Calendar)', prompt: 'Register me for the University Open Day 2026 and generate my Google Calendar invite.' },
-    { label: '📝 Start My Application', prompt: 'I want to apply for Master of Artificial Intelligence. My name is Alex Taylor, email alex@example.com, GPA 3.8.' },
     { label: '💰 Scholarships & Deadlines', prompt: 'What scholarships are available and what are the application deadlines for Semester 1?' },
-    { label: '🌐 International Visa & Work Rights', prompt: 'Can international students work while studying and what English tests are accepted?' }
+    { label: '🌐 International Visa & Work Rights', prompt: 'Can international students work while studying on a student visa and what are the rules?' },
+    { label: '📅 Book Open Day (Google Calendar)', prompt: 'Register me for the University Open Day 2026 and generate my Google Calendar invite.' },
+    { label: '📝 Start My Application', prompt: 'I want to apply for Master of Artificial Intelligence. My name is Alex Taylor, email alex@example.com, GPA 3.8.' }
   ];
 
   return (
@@ -227,9 +321,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       : 'bg-indigo-600 text-white rounded-tr-sm text-left ml-auto'
                   }`}
                 >
-                  <div className="whitespace-pre-wrap prose prose-sm max-w-none text-inherit">
-                    {msg.content.replace(/[*#_`\[\]]/g, '')}
-                  </div>
+                  <FormattedMessage content={msg.content} isAssistant={isAssistant} />
 
                   {/* Message Footer: Timestamp & Audio TTS button */}
                   {isAssistant && (

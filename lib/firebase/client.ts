@@ -5,33 +5,43 @@
  * a custom token with RBAC role claims.
  */
 
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, multiFactor, TotpSecret, TotpMultiFactorGenerator, EmailAuthProvider, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth, multiFactor, TotpSecret, TotpMultiFactorGenerator, EmailAuthProvider, signInWithEmailAndPassword } from 'firebase/auth';
+import { getFirestore, type Firestore } from 'firebase/firestore';
 
-// Initialize Firebase App using environment variables with config fallback.
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
+// Complete centralized Firebase client configuration for ai-foundation-firebase (Tenant: rto-ai)
+export const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCPeAOWQj8456TeIWDIPsyxyWT7QLrC8J8",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "ai-foundation-firebase.firebaseapp.com",
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "ai-foundation-firebase",
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "ai-foundation-firebase.firebasestorage.app",
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "614773274800",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:614773274800:web:bcfa9d363de884cf9ea375"
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:614773274800:web:bcfa9d363de884cf9ea375",
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-9V4X460YRL"
 };
 
 export const DATABASE_CODE = process.env.NEXT_PUBLIC_DATABASE_CODE || 'rto-ai';
 export const APP_ID = 'rto-ai';
+export const TENANT_TAG = 'rto-ai';
 
-const isConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
-const app = !getApps().length ? (isConfigured ? initializeApp(firebaseConfig) : ({} as any)) : getApp();
-export const auth = isConfigured && app && 'name' in app ? getAuth(app) : ({} as any);
+// Safely obtain or initialize the Firebase App instance
+function getOrCreateClientApp(): FirebaseApp {
+  const apps = getApps();
+  if (apps.length > 0) {
+    const existing = apps.find(a => a.name === '[DEFAULT]' || a.options.projectId === firebaseConfig.projectId);
+    if (existing) return existing;
+    return apps[0];
+  }
+  return initializeApp(firebaseConfig);
+}
+
+const app: FirebaseApp = getOrCreateClientApp();
+export const auth: Auth = getAuth(app);
 
 const clientDatabaseId = process.env.NEXT_PUBLIC_FIRESTORE_DATABASE_ID;
-export const db = isConfigured && app && 'name' in app
-  ? (clientDatabaseId && clientDatabaseId !== '(default)'
-      ? getFirestore(app, clientDatabaseId)
-      : getFirestore(app))
-  : ({} as any);
+export const db: Firestore = (clientDatabaseId && clientDatabaseId !== '(default)')
+  ? getFirestore(app, clientDatabaseId)
+  : getFirestore(app);
 
 /**
  * Enroll the signed‑in user in TOTP MFA using Google Authenticator.

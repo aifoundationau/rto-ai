@@ -244,8 +244,20 @@ export default function HomePage() {
         userRole: finalRole,
       });
 
+      // Pre-fill application personal details with Google user info
+      setApplication((prev) => ({
+        ...prev,
+        personalDetails: {
+          ...prev.personalDetails,
+          fullName: prev.personalDetails.fullName || authenticatedUser.name || '',
+          email: authenticatedUser.email || prev.personalDetails.email,
+        },
+      }));
+
       if (isSuper) {
         setActiveTab('admin');
+      } else if (activeTab === 'application') {
+        // Keep the user on the application form!
       } else {
         setActiveTab('chat');
       }
@@ -510,6 +522,8 @@ export default function HomePage() {
             application={application}
             onUpdateApplication={handleUpdateApplication}
             onBackToChat={() => setActiveTab('chat')}
+            currentUser={classroomUser}
+            onGoogleSignIn={handleGoogleSignInDirect}
           />
         )}
 

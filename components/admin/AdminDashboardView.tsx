@@ -30,7 +30,6 @@ import {
   UserPlus,
   Lock,
   Key,
-  LogOut,
   Image as ImageIcon,
   Coins,
   Activity,
@@ -46,6 +45,10 @@ import { FirebaseTelemetryView } from './FirebaseTelemetryView';
 import { StaffMessagingView } from './StaffMessagingView';
 import { AdminCalendarManager } from './AdminCalendarManager';
 import { CourseBuilderView } from './CourseBuilderView';
+import { RolePermissionsManager } from './RolePermissionsManager';
+import { KnowledgeFaqManager } from './KnowledgeFaqManager';
+import { ApplicationDetailModal } from './ApplicationDetailModal';
+import { SYSTEM_ROLES, ROLE_DEFINITIONS, normalizeRole, getRoleMeta } from '@/lib/auth/roles';
 
 interface AdminDashboardViewProps {
   apiKey?: string;
@@ -60,7 +63,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 }) => {
   const [applications, setApplications] = useState<StudentApplication[]>([]);
   const [selectedApp, setSelectedApp] = useState<StudentApplication | null>(null);
-  const [activeTab, setActiveTab] = useState<'course_builder' | 'api_key' | 'telemetry' | 'staff_messaging' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens' | 'calendar'>('course_builder');
+  const [appSearchTerm, setAppSearchTerm] = useState('');
+  const [appStatusFilter, setAppStatusFilter] = useState('ALL');
+  const [activeTab, setActiveTab] = useState<'course_builder' | 'role_permissions' | 'api_key' | 'telemetry' | 'staff_messaging' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens' | 'calendar'>('course_builder');
   const [apiKeys, setApiKeys] = useState({
     gemini: apiKey || '',
     firebase: '',
@@ -113,6 +118,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
     source: 'default_database',
     status: 'idle'
   });
+  const [faqsCount, setFaqsCount] = useState<number>(FAQS_DATA.length);
 
   const fetchApplications = async () => {
     try {
@@ -125,6 +131,21 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       console.error('Failed to fetch applications:', err);
     }
   };
+
+  const filteredApplications = applications.filter((app) => {
+    const matchesStatus = appStatusFilter === 'ALL' || app.status.toLowerCase() === appStatusFilter.toLowerCase();
+    const term = appSearchTerm.toLowerCase().trim();
+    if (!term) return matchesStatus;
+
+    const matchesSearch =
+      app.id.toLowerCase().includes(term) ||
+      (app.personalDetails?.fullName && app.personalDetails.fullName.toLowerCase().includes(term)) ||
+      (app.personalDetails?.email && app.personalDetails.email.toLowerCase().includes(term)) ||
+      (app.coursePreferences?.firstChoiceCourseName && app.coursePreferences.firstChoiceCourseName.toLowerCase().includes(term)) ||
+      (app.studentNumber && app.studentNumber.toLowerCase().includes(term));
+
+    return matchesStatus && matchesSearch;
+  });
 
   const fetchUsers = async () => {
     try {
@@ -311,16 +332,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             </p>
           </div>
 
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 hover:text-white border border-rose-400/30 transition-all flex items-center gap-2 shrink-0 cursor-pointer shadow-sm"
-              title="Log out from Admin Portal"
-            >
-              <LogOut className="w-4 h-4 text-rose-300" />
-              <span>Log Out</span>
-            </button>
-          )}
+
 
           <div className="flex flex-wrap items-center gap-1.5 bg-white/10 p-1.5 rounded-2xl">
           <button
@@ -332,6 +344,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <GraduationCap className="w-4 h-4 text-indigo-300" />
             <span>Course Builder</span>
             <span className="px-1.5 py-0.2 bg-emerald-500 text-white text-[9px] font-extrabold rounded-full">LMS</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('role_permissions')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'role_permissions' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-purple-300" />
+            <span>Role Permissions</span>
+            <span className="px-1.5 py-0.2 bg-purple-500 text-white text-[9px] font-extrabold rounded-full">RBAC</span>
           </button>
           <button
             onClick={() => setActiveTab('api_key')}
@@ -429,7 +451,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               activeTab === 'knowledge' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
             }`}
           >
-            Knowledge & FAQs ({FAQS_DATA.length})
+            Knowledge & FAQs ({faqsCount})
           </button>
           <button
             onClick={() => setActiveTab('tokens')}
@@ -449,16 +471,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <Calendar className="w-3.5 h-3.5" />
             <span>Google Calendar</span>
           </button>
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              className="px-3 py-2 rounded-xl text-xs font-semibold bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-400/20 transition-all flex items-center gap-1.5 ml-auto"
-              title="Log out from Admin Portal"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Log Out</span>
-            </button>
-          )}
+
         </div>
       </div>
     </div>
@@ -512,6 +525,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       {/* Tab: Course Builder (LMS & Website) */}
       {activeTab === 'course_builder' && (
         <CourseBuilderView apiKey={apiKeys.gemini} />
+      )}
+
+      {/* Tab: Role Permissions Manager */}
+      {activeTab === 'role_permissions' && (
+        <RolePermissionsManager />
       )}
 
       {/* Tab: API Configuration */}
@@ -702,13 +720,22 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               </p>
             </div>
 
-            <button
-              onClick={() => setShowRoleModal(true)}
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 shadow-xs shrink-0"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Assign Role & Issue Student ID</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                onClick={() => setActiveTab('role_permissions')}
+                className="px-3.5 py-2.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4 text-purple-600" />
+                <span>Configure Role Permissions</span>
+              </button>
+              <button
+                onClick={() => setShowRoleModal(true)}
+                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 shadow-xs cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Assign Role & Issue Student ID</span>
+              </button>
+            </div>
           </div>
 
           {/* Search & Filter Control Bar */}
@@ -724,12 +751,12 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               />
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
-              {['ALL', 'superadmin', 'supporter', 'STUDENT', 'ACADEMIC_STAFF', 'REGISTRAR'].map((role) => (
+            <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto py-1">
+              {['ALL', ...SYSTEM_ROLES].map((role) => (
                 <button
                   key={role}
                   onClick={() => setRoleFilter(role)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap capitalize ${
                     roleFilter === role
                       ? 'bg-indigo-600 text-white shadow-xs'
                       : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
@@ -793,21 +820,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                         <div className="text-slate-500 text-[11px]">{u.email}</div>
                       </td>
                       <td className="p-3.5 whitespace-nowrap">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                            (u.role || '').toLowerCase() === 'superadmin' || u.isSuperAdmin
-                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                              : (u.role || '').toLowerCase() === 'supporter'
-                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                              : (u.role || '').toUpperCase() === 'STUDENT'
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                              : (u.role || '').toUpperCase() === 'REGISTRAR'
-                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                              : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
-                          }`}
-                        >
-                          {u.role || 'supporter'}
-                        </span>
+                        {(() => {
+                          const meta = getRoleMeta(u.role);
+                          return (
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[11px] font-bold border ${meta.badgeBg} ${meta.badgeText} ${meta.badgeBorder}`}
+                            >
+                              {meta.label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="p-3.5 text-slate-600 max-w-[200px] truncate">
                         {u.dept || 'Computer Science & Engineering'}
@@ -1015,76 +1037,370 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
       {/* Tab 1: Applications Management */}
       {activeTab === 'applications' && (
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex items-center justify-between gap-4">
-            <h3 className="font-bold text-slate-800 text-sm">Submitted Student Applications</h3>
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden space-y-4 p-5 sm:p-6">
+          {/* Header & Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-slate-900 text-base sm:text-lg">Submitted Student Applications</h3>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                  {applications.length} Dossiers
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Inspect complete student applications, verify credentials, and issue admissions decisions in a responsive view.
+              </p>
+            </div>
             <button
               onClick={fetchApplications}
-              className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
             >
-              Refresh Table
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Refresh Table</span>
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
-                <tr>
-                  <th className="py-3.5 px-4">Application ID</th>
-                  <th className="py-3.5 px-4">Applicant Name</th>
-                  <th className="py-3.5 px-4">Applied Course</th>
-                  <th className="py-3.5 px-4">Qualifications</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {applications.map((app) => (
-                  <tr key={app.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{app.id}</td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-semibold text-slate-800">{app.personalDetails.fullName || 'Unnamed Draft'}</div>
-                      <div className="text-[11px] text-slate-400">{app.personalDetails.email}</div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-medium text-slate-800">{app.coursePreferences.firstChoiceCourseName || 'Not Selected'}</div>
-                      <div className="text-[11px] text-slate-400">{app.coursePreferences.intakeSemester}</div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div>{app.academicDetails.highestEducation || '—'}</div>
-                      <div className="text-[11px] text-slate-400 font-semibold">
-                        {app.academicDetails.atarOrGpa ? `Score: ${app.academicDetails.atarOrGpa}` : ''}
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setAppStatusFilter('ALL')}
+              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                appStatusFilter === 'ALL'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200/80 hover:bg-slate-100'
+              }`}
+            >
+              <div className="text-[11px] opacity-75 font-semibold">All Applications</div>
+              <div className="text-lg font-extrabold mt-0.5">{applications.length}</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAppStatusFilter('Submitted')}
+              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                appStatusFilter.toLowerCase() === 'submitted'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                  : 'bg-emerald-50/50 text-emerald-900 border-emerald-100 hover:bg-emerald-100/50'
+              }`}
+            >
+              <div className="text-[11px] opacity-75 font-semibold">Submitted</div>
+              <div className="text-lg font-extrabold mt-0.5">
+                {applications.filter(a => a.status === 'Submitted').length}
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAppStatusFilter('Under Review')}
+              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                appStatusFilter.toLowerCase() === 'under review'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                  : 'bg-blue-50/50 text-blue-900 border-blue-100 hover:bg-blue-100/50'
+              }`}
+            >
+              <div className="text-[11px] opacity-75 font-semibold">Under Review</div>
+              <div className="text-lg font-extrabold mt-0.5">
+                {applications.filter(a => a.status === 'Under Review').length}
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAppStatusFilter('Accepted')}
+              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                appStatusFilter.toLowerCase() === 'accepted'
+                  ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                  : 'bg-purple-50/50 text-purple-900 border-purple-100 hover:bg-purple-100/50'
+              }`}
+            >
+              <div className="text-[11px] opacity-75 font-semibold">Accepted</div>
+              <div className="text-lg font-extrabold mt-0.5">
+                {applications.filter(a => a.status === 'Accepted').length}
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAppStatusFilter('Requires Additional Documents')}
+              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer col-span-2 sm:col-span-1 ${
+                appStatusFilter.toLowerCase() === 'requires additional documents'
+                  ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                  : 'bg-amber-50/50 text-amber-900 border-amber-100 hover:bg-amber-100/50'
+              }`}
+            >
+              <div className="text-[11px] opacity-75 font-semibold">Needs Docs</div>
+              <div className="text-lg font-extrabold mt-0.5">
+                {applications.filter(a => a.status === 'Requires Additional Documents').length}
+              </div>
+            </button>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={appSearchTerm}
+              onChange={(e) => setAppSearchTerm(e.target.value)}
+              placeholder="Search by applicant name, email, application ID, or target degree..."
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            />
+            {appSearchTerm && (
+              <button
+                type="button"
+                onClick={() => setAppSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Dual-View: Desktop Table & Mobile Cards */}
+          {filteredApplications.length === 0 ? (
+            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+              <FileText className="w-8 h-8 text-slate-300 mx-auto" />
+              <div className="font-bold text-slate-700 text-xs">No applications match your search or filter</div>
+              <button
+                type="button"
+                onClick={() => { setAppSearchTerm(''); setAppStatusFilter('ALL'); }}
+                className="px-3 py-1.5 bg-white border border-slate-200 text-indigo-600 hover:text-indigo-800 rounded-lg text-xs font-bold cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Desktop / Tablet Table View */}
+              <div className="hidden md:block overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="py-3.5 px-4">Application ID</th>
+                      <th className="py-3.5 px-4">Applicant Profile</th>
+                      <th className="py-3.5 px-4">Target Program</th>
+                      <th className="py-3.5 px-4">AI Verified Documents & Description</th>
+                      <th className="py-3.5 px-4">Status</th>
+                      <th className="py-3.5 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {filteredApplications.map((app) => (
+                      <tr
+                        key={app.id}
+                        onClick={() => setSelectedApp(app)}
+                        className="hover:bg-indigo-50/40 transition-colors cursor-pointer group"
+                      >
+                        <td className="py-3.5 px-4">
+                          <div className="font-mono font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                            {app.id}
+                          </div>
+                          {app.studentNumber && (
+                            <div className="text-[10px] font-mono text-slate-400">
+                              {app.studentNumber}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-bold text-slate-900">{app.personalDetails.fullName || 'Unnamed Draft'}</div>
+                          <div className="text-[11px] text-slate-400">{app.personalDetails.email}</div>
+                          {app.personalDetails.phone && (
+                            <div className="text-[10px] text-slate-400">{app.personalDetails.phone}</div>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-slate-800">
+                            {app.coursePreferences.firstChoiceCourseName || 'Not Selected'}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {app.coursePreferences.intakeSemester} • {app.coursePreferences.studyMode || 'Full-time'}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 max-w-[280px]">
+                          {(() => {
+                            const acadAudits = (app.academicVerificationAudits && app.academicVerificationAudits.length > 0)
+                              ? app.academicVerificationAudits
+                              : (app.academicVerificationAudit ? [app.academicVerificationAudit] : []);
+                            const hasDocs = app.identityVerificationAudit || acadAudits.length > 0;
+
+                            if (!hasDocs) {
+                              return (
+                                <div className="text-slate-400 text-[11px] italic">
+                                  <div>{app.academicDetails.highestEducation || 'Self-declared background'}</div>
+                                  <div className="text-[10px] text-slate-400">No verification documents uploaded</div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="space-y-1.5 text-[11px]">
+                                {app.identityVerificationAudit && (
+                                  <div className="space-y-0.5">
+                                    <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[10px]">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                      <span>ID: {app.identityVerificationAudit.documentType}</span>
+                                      <span className="text-emerald-700 font-mono text-[9px] bg-emerald-50 px-1 rounded">
+                                        {app.identityVerificationAudit.authenticityStatus}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 line-clamp-1 italic" title={app.identityVerificationAudit.briefDescription}>
+                                      &quot;{app.identityVerificationAudit.briefDescription}&quot;
+                                    </p>
+                                  </div>
+                                )}
+                                {acadAudits.map((a, i) => (
+                                  <div key={a.id || i} className="space-y-0.5">
+                                    <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[10px]">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                      <span>{acadAudits.length > 1 ? `Acad #${i + 1}: ` : 'Acad: '}{a.documentType}</span>
+                                      <span className="text-indigo-700 font-mono text-[9px] bg-indigo-50 px-1 rounded">
+                                        {a.authenticityStatus}
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 line-clamp-1 italic" title={a.briefDescription}>
+                                      &quot;{a.briefDescription}&quot;
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                            app.status === 'Submitted'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : app.status === 'Under Review'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : app.status === 'Accepted'
+                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                              : app.status === 'Requires Additional Documents'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}>
+                            {app.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedApp(app);
+                            }}
+                            className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-1.5 shadow-2xs border border-indigo-200/60 cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Inspect</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View (md:hidden) */}
+              <div className="md:hidden space-y-3">
+                {filteredApplications.map((app) => (
+                  <div
+                    key={app.id}
+                    onClick={() => setSelectedApp(app)}
+                    className="p-4 bg-slate-50/70 hover:bg-indigo-50/30 rounded-2xl border border-slate-200/80 space-y-3 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-xs text-indigo-700 bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {app.id}
+                        </span>
+                        {app.studentNumber && (
+                          <span className="text-[10px] font-mono text-slate-500">
+                            {app.studentNumber}
+                          </span>
+                        )}
                       </div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                         app.status === 'Submitted'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                           : app.status === 'Under Review'
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          ? 'bg-blue-50 text-blue-700 border-blue-200'
                           : app.status === 'Accepted'
-                          ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          ? 'bg-purple-50 text-purple-700 border-purple-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
                       }`}>
                         {app.status}
                       </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => setSelectedApp(app)}
-                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Inspect</span>
-                        </button>
+                    </div>
+
+                    <div>
+                      <h4 className="font-extrabold text-slate-900 text-sm">
+                        {app.personalDetails.fullName || 'Unnamed Applicant'}
+                      </h4>
+                      <div className="text-[11px] text-slate-500">
+                        {app.personalDetails.email} {app.personalDetails.phone ? `• ${app.personalDetails.phone}` : ''}
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+
+                    <div className="p-2.5 bg-white rounded-xl border border-slate-200/70 text-xs space-y-1">
+                      <div className="font-bold text-indigo-950">
+                        {app.coursePreferences.firstChoiceCourseName || 'Not Selected'}
+                      </div>
+                      <div className="text-[11px] text-slate-500 flex items-center justify-between">
+                        <span>{app.coursePreferences.intakeSemester}</span>
+                        <span>{app.academicDetails.highestEducation} {app.academicDetails.atarOrGpa ? `(${app.academicDetails.atarOrGpa})` : ''}</span>
+                      </div>
+                    </div>
+
+                    {/* Document Brief Descriptions */}
+                    {(() => {
+                      const acadAudits = (app.academicVerificationAudits && app.academicVerificationAudits.length > 0)
+                        ? app.academicVerificationAudits
+                        : (app.academicVerificationAudit ? [app.academicVerificationAudit] : []);
+                      const hasDocs = app.identityVerificationAudit || acadAudits.length > 0;
+
+                      if (!hasDocs) return null;
+
+                      return (
+                        <div className="p-2.5 bg-indigo-50/60 rounded-xl border border-indigo-100/80 text-[11px] space-y-1.5">
+                          <div className="font-extrabold text-indigo-950 text-[10px] uppercase tracking-wider flex items-center gap-1">
+                            <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>AI Verified Documents Overview</span>
+                          </div>
+                          {app.identityVerificationAudit && (
+                            <div className="text-slate-700">
+                              <span className="font-bold text-slate-900">ID: </span>
+                              <span className="text-indigo-950">{app.identityVerificationAudit.briefDescription}</span>
+                            </div>
+                          )}
+                          {acadAudits.map((a, i) => (
+                            <div key={a.id || i} className="text-slate-700">
+                              <span className="font-bold text-slate-900">
+                                {acadAudits.length > 1 ? `Academic #${i + 1}: ` : 'Academic: '}
+                              </span>
+                              <span className="text-indigo-950">{a.briefDescription}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedApp(app);
+                      }}
+                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Inspect Complete Application</span>
+                    </button>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1093,27 +1409,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         <AdminEventsManager userPermissions={['super_admin', 'manage_events']} />
       )}
 
-      {/* Tab 3: Knowledge Base & FAQs */}
+      {/* Tab 3: Knowledge Base & Multilingual FAQs */}
       {activeTab === 'knowledge' && (
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4">
-          <h3 className="font-bold text-slate-800 text-sm">University Knowledge Base & FAQ Items</h3>
-          <div className="space-y-3">
-            {FAQS_DATA.map((faq) => (
-              <div key={faq.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded font-semibold text-[10px] border border-indigo-100">
-                    {faq.category}
-                  </span>
-                  <h4 className="font-bold text-slate-900 text-sm">{faq.question}</h4>
-                </div>
-                <p className="text-slate-600 leading-relaxed pl-2 border-l-2 border-indigo-200">{faq.answer}</p>
-                <div className="text-[10px] text-slate-400">
-                  Keywords: {faq.keywords.join(', ')}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <KnowledgeFaqManager onFaqCountChange={(count) => setFaqsCount(count)} />
       )}
 
       {/* Tab 4: Images Folders */}
@@ -1136,112 +1434,13 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         <StaffMessagingView />
       )}
 
-      {/* Inspect Application Modal */}
+      {/* Complete Responsive Student Application Inspection Modal */}
       {selectedApp && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 space-y-5 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
-                  Application File Inspection
-                </span>
-                <h3 className="text-lg font-bold text-slate-900 mt-1">
-                  {selectedApp.personalDetails.fullName} ({selectedApp.id})
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedApp(null)}
-                className="text-slate-400 hover:text-slate-600 text-xl font-bold p-1"
-              >
-                &times;
-              </button>
-            </div>
-
-            {/* Application Data Grid */}
-            <div className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <div>
-                  <span className="text-slate-400">Applicant Email:</span>
-                  <div className="font-semibold text-slate-800">{selectedApp.personalDetails.email || '—'}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Phone:</span>
-                  <div className="font-semibold text-slate-800">{selectedApp.personalDetails.phone || '—'}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Citizenship:</span>
-                  <div className="font-semibold text-slate-800">{selectedApp.personalDetails.citizenship || '—'}</div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Country of Residence:</span>
-                  <div className="font-semibold text-slate-800">{selectedApp.personalDetails.countryOfResidence || '—'}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <div>
-                  <span className="text-slate-400">Target Degree:</span>
-                  <div className="font-bold text-indigo-700 text-sm">
-                    {selectedApp.coursePreferences.firstChoiceCourseName}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Intake & Commencing Year:</span>
-                  <div className="font-semibold text-slate-800">
-                    {selectedApp.coursePreferences.intakeSemester} {selectedApp.coursePreferences.commencingYear}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-400">Academic Background:</span>
-                  <div className="font-semibold text-slate-800">
-                    {selectedApp.academicDetails.highestEducation} (Score: {selectedApp.academicDetails.atarOrGpa || 'N/A'})
-                  </div>
-                </div>
-                <div>
-                  <span className="text-slate-400">English Proficiency:</span>
-                  <div className="font-semibold text-slate-800">
-                    {selectedApp.academicDetails.englishProficiencyTest || 'Native / Verified'}
-                  </div>
-                </div>
-              </div>
-
-              {selectedApp.statementsAndDocuments.statementOfPurpose && (
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-slate-400 font-medium">Statement of Purpose:</span>
-                  <p className="mt-1 text-slate-700 italic leading-relaxed">
-                    &quot;{selectedApp.statementsAndDocuments.statementOfPurpose}&quot;
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Status Change Buttons */}
-            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs text-slate-500">Update Decision:</span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleUpdateAppStatus(selectedApp.id, 'Accepted')}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition-colors flex items-center gap-1"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Issue Letter of Offer (Accept)</span>
-                </button>
-                <button
-                  onClick={() => handleUpdateAppStatus(selectedApp.id, 'Requires Additional Documents')}
-                  className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-semibold transition-colors"
-                >
-                  Request Additional Docs
-                </button>
-                <button
-                  onClick={() => handleUpdateAppStatus(selectedApp.id, 'Under Review')}
-                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors"
-                >
-                  Set Under Review
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ApplicationDetailModal
+          application={selectedApp}
+          onClose={() => setSelectedApp(null)}
+          onUpdateStatus={handleUpdateAppStatus}
+        />
       )}
       {/* Assign Role & Issue Student ID Modal */}
       {showRoleModal && (
@@ -1302,15 +1501,18 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">University Role *</label>
                 <select
-                  value={roleForm.role}
+                  value={roleForm.role.toLowerCase()}
                   onChange={(e) => setRoleForm({ ...roleForm, role: e.target.value })}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-bold"
                 >
-                  <option value="superadmin">superadmin (Complete Website Admin Access)</option>
-                  <option value="supporter">supporter (First-time Registration Default)</option>
-                  <option value="STUDENT">STUDENT (Auto-generates STU-2026-XXXXX)</option>
-                  <option value="ACADEMIC_STAFF">ACADEMIC_STAFF</option>
-                  <option value="REGISTRAR">REGISTRAR</option>
+                  {SYSTEM_ROLES.map((r) => {
+                    const meta = ROLE_DEFINITIONS[r];
+                    return (
+                      <option key={r} value={r}>
+                        {meta.label} ({meta.category}) — {meta.description}
+                      </option>
+                    );
+                  })}
                 </select>
                 {roleForm.role === 'STUDENT' && (
                   <p className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">

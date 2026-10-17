@@ -16,7 +16,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js';
 
 export const firebaseConfig = {
-    apiKey: (typeof window !== 'undefined' && window.__FIREBASE_CONFIG__?.apiKey) || "",
+    apiKey: (typeof window !== 'undefined' && window.__FIREBASE_CONFIG__?.apiKey) || "AIzaSyCPeAOWQj8456TeIWDIPsyxyWT7QLrC8J8",
     authDomain: (typeof window !== 'undefined' && window.__FIREBASE_CONFIG__?.authDomain) || "ai-foundation-firebase.firebaseapp.com",
     projectId: (typeof window !== 'undefined' && window.__FIREBASE_CONFIG__?.projectId) || "ai-foundation-firebase",
     storageBucket: (typeof window !== 'undefined' && window.__FIREBASE_CONFIG__?.storageBucket) || "ai-foundation-firebase.firebasestorage.app",

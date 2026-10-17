@@ -1,9 +1,13 @@
 export interface FAQItem {
   id: string;
-  category: 'Admissions' | 'Fees & Scholarships' | 'Courses & Study' | 'International' | 'Campus Life' | 'Applications';
+  category: 'Admissions' | 'Fees & Scholarships' | 'Courses & Study' | 'International' | 'Campus Life' | 'Applications' | string;
   question: string;
   answer: string;
   keywords: string[];
+  language?: string;
+  authorEmail?: string;
+  createdAt?: string;
+  isCustom?: boolean;
   relatedLinks?: { title: string; action: string }[];
 }
 

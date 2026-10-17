@@ -62,6 +62,23 @@ class DynamicStore {
     }
   }
 
+  addFaq(faq: FAQItem): void {
+    const existingIndex = this.faqs.findIndex(f => f.id === faq.id);
+    if (existingIndex >= 0) {
+      this.faqs[existingIndex] = faq;
+    } else {
+      this.faqs.unshift(faq);
+    }
+    this.syncStatus.faqsCount = this.faqs.length;
+  }
+
+  removeFaq(faqId: string): boolean {
+    const initialLength = this.faqs.length;
+    this.faqs = this.faqs.filter(f => f.id !== faqId);
+    this.syncStatus.faqsCount = this.faqs.length;
+    return this.faqs.length < initialLength;
+  }
+
   getSyncStatus(): GoogleSheetsSyncStatus {
     return {
       ...this.syncStatus,
@@ -104,6 +121,14 @@ export function getDynamicFaqs(): FAQItem[] {
 
 export function setDynamicFaqs(faqs: FAQItem[]): void {
   globalStore.setFaqs(faqs);
+}
+
+export function addDynamicFaq(faq: FAQItem): void {
+  globalStore.addFaq(faq);
+}
+
+export function removeDynamicFaq(faqId: string): boolean {
+  return globalStore.removeFaq(faqId);
 }
 
 export function getGoogleSheetsSyncStatus(): GoogleSheetsSyncStatus {

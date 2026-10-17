@@ -128,14 +128,48 @@ export async function processAgentConversation(
     lower.includes(c.code.toLowerCase()) ||
     lower.includes(c.title.toLowerCase()) ||
     (lower.includes('computer science') && c.id === 'b-cs') ||
-    (lower.includes('artificial intelligence') && c.id === 'm-ai') ||
-    (lower.includes('data analytics') && c.id === 'b-ba') ||
-    (lower.includes('cybersecurity') && c.id === 'm-cyber')
+    ((lower.includes('artificial intelligence') || lower.includes('machine learning')) && c.id === 'm-ai') ||
+    ((lower.includes('business') || lower.includes('data analytics')) && c.id === 'b-ba') ||
+    ((lower.includes('cybersecurity') || lower.includes('threat intelligence') || lower.includes('cyber')) && c.id === 'm-cyber')
   );
 
-  const isAskingCourseList = lower.includes('what courses') || lower.includes('list courses') || lower.includes('degrees') || lower.includes('programs offered') || lower.includes('undergraduate programs') || lower.includes('postgraduate programs');
-  const isApplicationIntent = lower.includes('apply') || lower.includes('application') || lower.includes('fill form') || lower.includes('start application') || lower.includes('my name is') || lower.includes('my email') || lower.includes('my gpa') || lower.includes('my atar') || lower.includes('submit application') || (lower.includes('name:') && lower.includes('email:'));
-  const isAskingEventBooking = lower.includes('register') || lower.includes('book') || lower.includes('rsvp') || lower.includes('schedule') || lower.includes('calendar') || lower.includes('open day') || lower.includes('campus tour') || lower.includes('webinar') || lower.includes('consultation') || lower.includes('advising');
+  const isAskingCourseList =
+    lower.includes('what course') ||
+    lower.includes('list course') ||
+    lower.includes('all courses') ||
+    lower.includes('show courses') ||
+    lower.includes('available courses') ||
+    lower.includes('degrees') ||
+    lower.includes('what degrees') ||
+    lower.includes('programs offered') ||
+    lower.includes('undergraduate') ||
+    lower.includes('postgraduate') ||
+    lower === 'courses' ||
+    lower.startsWith('courses');
+
+  const isApplicationIntent =
+    lower.includes('apply') ||
+    lower.includes('application') ||
+    lower.includes('fill form') ||
+    lower.includes('start application') ||
+    lower.includes('my name is') ||
+    lower.includes('my email') ||
+    lower.includes('my gpa') ||
+    lower.includes('my atar') ||
+    lower.includes('submit application') ||
+    (lower.includes('name:') && lower.includes('email:'));
+
+  const isAskingEventBooking =
+    lower.includes('register') ||
+    lower.includes('book') ||
+    lower.includes('rsvp') ||
+    lower.includes('schedule') ||
+    lower.includes('calendar') ||
+    lower.includes('open day') ||
+    lower.includes('campus tour') ||
+    lower.includes('webinar') ||
+    lower.includes('consultation') ||
+    lower.includes('advising');
 
   if (courseMatch && !isAskingCourseList && !isApplicationIntent && !isAskingEventBooking) {
     const { result } = executeAgentTool('get_course_details', { courseIdOrCode: courseMatch.id }, updatedApp);
@@ -169,12 +203,19 @@ export async function processAgentConversation(
     const degreeLevel = lower.includes('postgrad') ? 'Postgraduate' : lower.includes('undergrad') ? 'Undergraduate' : undefined;
     const { result } = executeAgentTool('list_courses', { degreeLevel }, updatedApp);
     toolsExecuted.push({ toolName: 'list_courses', args: { degreeLevel }, output: result.output });
+    if (result.uiWidget) uiWidgets.push(result.uiWidget);
 
-    let msg = `Here are the available degree programs at our university:\n\n`;
+    let msg = `### 🎓 Degree Programs Offered at EduPulse\n\n`;
     for (const c of allCourses) {
-      msg += `• **${c.title}** (${c.code}) - *${c.degreeLevel}, ${c.durationYears} yrs* | ${c.faculty}\n`;
+      if (degreeLevel && c.degreeLevel !== degreeLevel) continue;
+      msg += `#### 🏛️ **${c.title}** (\`${c.code}\`)\n` +
+        `- **Level & Duration**: ${c.degreeLevel} (${c.durationYears} Years Full-time)\n` +
+        `- **Annual Tuition**: Domestic: \$${c.annualTuitionDomestic.toLocaleString()} AUD | International: \$${c.annualTuitionInternational.toLocaleString()} AUD\n` +
+        `- **Entry Requirements**: ${c.atarRequirement ? `Minimum ATAR: ${c.atarRequirement}` : `Minimum GPA: ${c.gpaRequirement}/7.0`}\n` +
+        `- **Faculty**: ${c.faculty}\n` +
+        `- **Key Majors**: ${c.majors.map(m => m.name).join(', ')}\n\n`;
     }
-    msg += `\nYou can ask me about any specific course to view majors, fees, entry requirements, or syllabus unit breakdowns!`;
+    msg += `Ask me about any specific course to view majors, fees, entry requirements, or syllabus unit breakdowns!`;
 
     return {
       message: msg,
@@ -366,18 +407,99 @@ export async function processAgentConversation(
     };
   }
 
-  // E. FAQ & General Knowledge Base Search
+  // E. Campus, Accreditation & University Knowledge Search
+  const isAskingWebsiteKnowledge =
+    lower.includes('campus') ||
+    lower.includes('campuses') ||
+    lower.includes('sydney') ||
+    lower.includes('melbourne') ||
+    lower.includes('accreditation') ||
+    lower.includes('acs') ||
+    lower.includes('teqsa') ||
+    lower.includes('aacsb') ||
+    lower.includes('ranking') ||
+    lower.includes('employability') ||
+    lower.includes('research group') ||
+    lower.includes('compute hub');
+
+  if (isAskingWebsiteKnowledge) {
+    const { result } = executeAgentTool('get_website_knowledge', {}, updatedApp);
+    toolsExecuted.push({ toolName: 'get_website_knowledge', args: {}, output: result.output });
+
+    const k = result.output;
+    const campusesText = k.campuses.map((c: any) => `• **${c.name}** (${c.location}): ${c.features}`).join('\n');
+    const accreditationsText = k.accreditations.map((a: string) => `• ${a}`).join('\n');
+
+    const msg = `### 🏛️ About ${k.institutionName}\n\n` +
+      `EduPulse is an Australian higher education and technology institute leading innovation in Artificial Intelligence, Computer Science, and Data Analytics.\n\n` +
+      `#### 📍 Campuses & Learning Precincts\n${campusesText}\n\n` +
+      `#### 🛡️ Accreditations & Quality Standards\n${accreditationsText}\n\n` +
+      `#### 🏆 Employability & Recognition\n` +
+      `- **${k.employabilityRanking}**\n` +
+      `- **Admissions Intakes**: ${k.admissionsIntakes.join(' and ')}\n` +
+      `- **Early Entry Schemes**: ${k.earlyEntry}\n\n` +
+      `Would you like to explore our **degree programs**, check **scholarship options**, or **book an Open Day tour**?`;
+
+    return {
+      message: msg,
+      toolsExecuted,
+      uiWidgets,
+      updatedApplication: updatedApp
+    };
+  }
+
+  // F. Comprehensive University FAQ Knowledge Base Search
+  const isBroadFaqQuery =
+    lower.includes('faq') ||
+    lower.includes('faqs') ||
+    lower.includes('frequently asked') ||
+    lower.includes('questions') ||
+    lower.includes('help topics') ||
+    lower.includes('knowledge base');
+
+  const allFaqs = getDynamicFaqs();
+
+  if (isBroadFaqQuery) {
+    const { result: faqResult } = executeAgentTool('search_faq', { query: 'all' }, updatedApp);
+    toolsExecuted.push({ toolName: 'search_faq', args: { query: 'all' }, output: faqResult.output });
+    if (faqResult.uiWidget) uiWidgets.push(faqResult.uiWidget);
+
+    let msg = `### ❓ University Knowledge Base & Frequently Asked Questions\n\n` +
+      `Here is a summary of the most common admissions, tuition, visa, and study questions at EduPulse:\n\n`;
+
+    const categories = ['Admissions', 'Fees & Scholarships', 'International', 'Campus Life', 'Applications', 'Courses & Study'];
+    for (const cat of categories) {
+      const catFaqs = allFaqs.filter(f => f.category === cat);
+      if (catFaqs.length > 0) {
+        msg += `#### 📁 **${cat}**\n`;
+        for (const f of catFaqs) {
+          msg += `• **${f.question}**\n  ${f.answer}\n\n`;
+        }
+      }
+    }
+    msg += `*You can expand and explore all questions in the interactive FAQ card below, or ask me any question directly!*`;
+
+    return {
+      message: msg,
+      toolsExecuted,
+      uiWidgets,
+      updatedApplication: updatedApp
+    };
+  }
+
+  // Specific FAQ search query
   const { result: faqResult } = executeAgentTool('search_faq', { query: userText }, updatedApp);
   toolsExecuted.push({ toolName: 'search_faq', args: { query: userText }, output: faqResult.output });
 
   const matchedFaqs = faqResult.output.faqs;
   if (matchedFaqs && matchedFaqs.length > 0) {
+    if (faqResult.uiWidget) uiWidgets.push(faqResult.uiWidget);
     const topFaq = matchedFaqs[0];
     let msg = `### 💡 ${topFaq.question}\n\n${topFaq.answer}\n\n`;
 
     if (matchedFaqs.length > 1) {
       msg += `#### 🔍 Related FAQs:\n`;
-      for (const f of matchedFaqs.slice(1, 3)) {
+      for (const f of matchedFaqs.slice(1, 4)) {
         msg += `• **${f.question}**\n  ${f.answer}\n\n`;
       }
     }
@@ -408,7 +530,66 @@ export async function processAgentConversation(
 }
 
 /**
- * Direct Gemini API caller with function calling support
+ * Synthesizes a grounded markdown response when tools are executed
+ */
+function synthesizeToolResponse(toolName: string, output: any): string {
+  switch (toolName) {
+    case 'search_faq': {
+      const faqs = output.faqs || [];
+      if (faqs.length === 0) return 'I could not find a matching FAQ. Please ask another question or browse our categories.';
+      const top = faqs[0];
+      let res = `### 💡 ${top.question}\n\n${top.answer}\n\n`;
+      if (faqs.length > 1) {
+        res += `#### 🔍 Related FAQs:\n`;
+        for (const f of faqs.slice(1, 3)) {
+          res += `• **${f.question}**\n  ${f.answer}\n\n`;
+        }
+      }
+      return res;
+    }
+    case 'list_courses': {
+      const courses = output.courses || [];
+      let res = `### 🎓 University Degree Programs\n\n`;
+      for (const c of courses) {
+        res += `#### 🏛️ **${c.title}** (\`${c.code}\`)\n` +
+               `- **Level**: ${c.degreeLevel} (${c.duration})\n` +
+               `- **Tuition**: Domestic: ${c.domesticFee} | International: ${c.intlFee}\n` +
+               `- **Entry**: ATAR: ${c.atar} | GPA: ${c.gpa}\n` +
+               `- **Faculty**: ${c.faculty}\n\n`;
+      }
+      return res;
+    }
+    case 'get_course_details': {
+      const c = output;
+      return `### 🎓 ${c.title} (${c.code})\n\n${c.overview}\n\n` +
+             `- **Degree Level**: ${c.degreeLevel} (${c.durationYears} Years)\n` +
+             `- **Entry Cutoffs**: ${c.atarRequirement ? `ATAR ${c.atarRequirement}` : `GPA ${c.gpaRequirement}/7.0`}\n` +
+             `- **Tuition**: Dom: \$${c.annualTuitionDomestic?.toLocaleString()}/yr | Intl: \$${c.annualTuitionInternational?.toLocaleString()}/yr\n` +
+             `- **Core Units**: ${c.coreUnits?.join(', ')}\n` +
+             `- **Majors**: ${c.majors?.map((m: any) => m.name).join(', ')}`;
+    }
+    case 'get_unit_syllabus': {
+      const u = output;
+      return `### 📘 ${u.code}: ${u.title}\n\n${u.overview}\n\n` +
+             `- **Level & Credits**: ${u.level} | ${u.creditPoints} CP\n` +
+             `- **Coordinator**: ${u.coordinator?.name} (${u.coordinator?.email})\n` +
+             `- **Prerequisites**: ${u.prerequisites?.join(', ') || 'None'}\n` +
+             `- **Assessments**: ${u.assessments?.map((a: any) => `${a.name} (${a.weight}%)`).join(', ')}`;
+    }
+    case 'get_website_knowledge': {
+      const k = output;
+      return `### 🏛️ About ${k.institutionName}\n\n` +
+             `**Accreditation**: ${k.accreditations?.join('; ')}\n\n` +
+             `**Rankings**: ${k.employabilityRanking}\n\n` +
+             `**Campuses**: ${k.campuses?.map((c: any) => `${c.name} (${c.location})`).join(', ')}`;
+    }
+    default:
+      return 'I have retrieved the requested information from the university systems.';
+  }
+}
+
+/**
+ * Direct Gemini API caller with function calling support and grounded multi-turn synthesis
  */
 async function callGeminiWithTools(
   messages: ChatMessage[],
@@ -429,7 +610,7 @@ Your job is to answer prospective and current student inquiries accurately:
 - Provide rich details on courses (degrees) and individual unit syllabuses (prerequisites, assessment breakdowns, weekly topics).
 - Help students fill in their application forms progressively.
 - Register prospective students for upcoming admissions events and 1-on-1 consultations with Google Calendar invites.
-- Answer university FAQs regarding scholarships, tuition, visas, and campus life.
+- Answer university FAQs regarding scholarships, tuition, visas, accommodation, deadlines, and campus life.
 Always be polite, structured, and use markdown formatting.`
     }]
   };
@@ -470,26 +651,77 @@ Always be polite, structured, and use markdown formatting.`
   let updatedApp = currentApplication ? JSON.parse(JSON.stringify(currentApplication)) : undefined;
   let textResponse = '';
 
+  const functionCalls: any[] = [];
   for (const part of contentParts) {
     if (part.text) {
       textResponse += part.text;
     }
     if (part.functionCall) {
-      const { name, args } = part.functionCall;
+      functionCalls.push(part.functionCall);
+    }
+  }
+
+  if (functionCalls.length > 0) {
+    const functionResponseParts = [];
+
+    for (const fc of functionCalls) {
+      const { name, args } = fc;
       const { result, updatedApplication: newApp } = executeAgentTool(name, args || {}, updatedApp);
       toolsExecuted.push({ toolName: name, args: args || {}, output: result.output });
       if (result.uiWidget) uiWidgets.push(result.uiWidget);
       if (newApp) updatedApp = newApp;
+
+      functionResponseParts.push({
+        functionResponse: {
+          name,
+          response: {
+            output: result.output
+          }
+        }
+      });
+    }
+
+    // Try follow-up call to Gemini to synthesize grounded prose
+    try {
+      const secondTurnContents = [
+        ...geminiContents,
+        candidate.content,
+        {
+          role: 'user',
+          parts: functionResponseParts
+        }
+      ];
+
+      const secondRes = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: secondTurnContents,
+          systemInstruction,
+          tools: body.tools
+        })
+      });
+
+      if (secondRes.ok) {
+        const secondData = await secondRes.json();
+        const secondCandidate = secondData.candidates?.[0];
+        const secondText = secondCandidate?.content?.parts?.map((p: any) => p.text || '').join('') || '';
+        if (secondText.trim()) {
+          textResponse = secondText;
+        }
+      }
+    } catch (secondErr) {
+      console.warn('Second turn Gemini call failed:', secondErr);
+    }
+
+    // If second call didn't yield text, synthesize from tool execution
+    if (!textResponse && toolsExecuted.length > 0) {
+      textResponse = synthesizeToolResponse(toolsExecuted[0].toolName, toolsExecuted[0].output);
     }
   }
 
-  // If only function call was returned without prose text, provide synthesized summary
-  if (!textResponse && toolsExecuted.length > 0) {
-    textResponse = `I have executed the requested action for you.`;
-  }
-
   return {
-    message: textResponse,
+    message: textResponse || 'How can I assist you with EduPulse courses and admissions today?',
     toolsExecuted,
     uiWidgets,
     updatedApplication: updatedApp

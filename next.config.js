@@ -1,13 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
-  webpack: (config, { dev }) => {
-    if (dev) {
-      // Use in-memory cache to prevent file lock contention with Google Drive file stream
-      config.cache = {
-        type: 'memory',
-      };
-    }
+  webpack: (config) => {
+    // Disable filesystem pack caching on Windows drive mounts to prevent EISDIR readlink errors
+    config.cache = false;
     return config;
   },
   typescript: {

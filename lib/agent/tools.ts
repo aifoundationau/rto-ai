@@ -24,24 +24,34 @@ export interface ToolDefinition {
 export const AGENT_TOOLS: ToolDefinition[] = [
   {
     name: 'search_faq',
-    description: 'Search the university FAQ database for questions on admissions, tuition fees, scholarships, international student visas, accommodation, and campus life.',
+    description: 'Search the university FAQ database for questions on admissions, tuition fees, scholarships, international student visas, accommodation, campus life, credit transfers, and study loads.',
     parameters: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'The search query or student question keywords (e.g. "scholarships", "visa work hours", "application deadlines")' },
+        query: { type: 'string', description: 'The search query or student question keywords (e.g. "scholarships", "visa work hours", "application deadlines", "all")' },
         category: { type: 'string', description: 'Optional category filter: Admissions, Fees & Scholarships, Courses & Study, International, Campus Life, Applications' }
-      },
-      required: ['query']
+      }
     }
   },
   {
     name: 'list_courses',
-    description: 'List all available degree programs or filter by degree level (Undergraduate / Postgraduate) or Faculty.',
+    description: 'List all available degree programs or filter by degree level (Undergraduate / Postgraduate), Faculty, or search keyword.',
     parameters: {
       type: 'object',
       properties: {
         degreeLevel: { type: 'string', description: 'Undergraduate or Postgraduate', enum: ['Undergraduate', 'Postgraduate'] },
-        faculty: { type: 'string', description: 'Optional faculty name' }
+        faculty: { type: 'string', description: 'Optional faculty name' },
+        query: { type: 'string', description: 'Optional search keyword (e.g. "artificial intelligence", "data", "cyber", "business")' }
+      }
+    }
+  },
+  {
+    name: 'get_website_knowledge',
+    description: 'Retrieve official university facts: campus locations (Sydney, Melbourne, Online), accreditation (ACS, AACSB, EQUIS, TEQSA AQF), rankings, and recent campus research news.',
+    parameters: {
+      type: 'object',
+      properties: {
+        topic: { type: 'string', description: 'Specific topic: "campuses", "accreditations", "rankings", "news", or "all"' }
       }
     }
   },
@@ -154,23 +164,79 @@ export function executeAgentTool(
 ): { result: ToolExecutionResult; updatedApplication?: StudentApplication } {
   switch (toolName) {
     case 'search_faq': {
-      const q = (args.query || '').toLowerCase();
-      const cat = args.category;
+      const q = (args.query || '').toLowerCase().trim();
+      const cat = (args.category || '').toLowerCase().trim();
       const allFaqs = getDynamicFaqs();
-      const matches = allFaqs.filter(faq => {
-        const matchesQuery =
-          faq.question.toLowerCase().includes(q) ||
-          faq.answer.toLowerCase().includes(q) ||
-          faq.keywords.some(k => k.toLowerCase().includes(q));
-        const matchesCat = !cat || faq.category.toLowerCase() === cat.toLowerCase();
-        return matchesQuery && matchesCat;
-      });
 
-      const results = matches.length > 0 ? matches : allFaqs.slice(0, 3);
+      const isBroadSearch =
+        !q ||
+        q === 'all' ||
+        q === 'faq' ||
+        q === 'faqs' ||
+        q === 'help' ||
+        q.includes('what faq') ||
+        q.includes('what are the faq') ||
+        q.includes('show faq') ||
+        q.includes('list faq') ||
+        q.includes('frequently asked');
+
+      let results: FAQItem[] = [];
+
+      if (isBroadSearch) {
+        results = cat
+          ? allFaqs.filter(f => f.category.toLowerCase().includes(cat))
+          : allFaqs;
+      } else {
+        const stopWords = ['what', 'how', 'when', 'where', 'the', 'and', 'for', 'are', 'can', 'you', 'about', 'tell', 'i', 'a', 'an', 'is', 'on', 'in', 'at', 'to', 'do'];
+        const tokens = q.split(/\s+/).filter((t: string) => t.length > 2 && !stopWords.includes(t));
+
+        const scoredFaqs = allFaqs
+          .filter(faq => !cat || faq.category.toLowerCase().includes(cat))
+          .map(faq => {
+            let score = 0;
+            const qLower = faq.question.toLowerCase();
+            const aLower = faq.answer.toLowerCase();
+            const cLower = faq.category.toLowerCase();
+
+            // Direct full phrase match (both directions)
+            if (qLower.includes(q) || (q.length > 2 && q.includes(qLower))) score += 60;
+            if (aLower.includes(q)) score += 30;
+            if (cLower.includes(q)) score += 20;
+
+            // Multilingual / language match
+            if (faq.language && qLower.includes(faq.language.toLowerCase())) score += 15;
+
+            // Keyword match
+            for (const kw of faq.keywords) {
+              const kwl = kw.toLowerCase();
+              if (q.includes(kwl)) score += 35;
+              if (kwl.includes(q)) score += 25;
+            }
+
+            // Token match
+            for (const t of tokens) {
+              if (qLower.includes(t)) score += 15;
+              if (aLower.includes(t)) score += 5;
+              if (faq.keywords.some((k: string) => k.toLowerCase().includes(t))) score += 20;
+            }
+
+            return { faq, score };
+          })
+          .filter(item => item.score > 0)
+          .sort((a, b) => b.score - a.score);
+
+        results = scoredFaqs.length > 0 ? scoredFaqs.map(s => s.faq) : allFaqs;
+      }
+
       return {
         result: {
           toolName,
-          output: { query: args.query, count: results.length, faqs: results },
+          output: {
+            query: args.query || 'all',
+            category: args.category || 'all',
+            count: results.length,
+            faqs: results
+          },
           uiWidget: {
             type: 'faq_list',
             data: results
@@ -181,11 +247,20 @@ export function executeAgentTool(
 
     case 'list_courses': {
       let courses = getDynamicCourses();
+      const q = (args.query || '').toLowerCase().trim();
       if (args.degreeLevel) {
         courses = courses.filter(c => c.degreeLevel.toLowerCase() === args.degreeLevel.toLowerCase());
       }
       if (args.faculty) {
         courses = courses.filter(c => c.faculty.toLowerCase().includes(args.faculty.toLowerCase()));
+      }
+      if (q) {
+        courses = courses.filter(c =>
+          c.title.toLowerCase().includes(q) ||
+          c.code.toLowerCase().includes(q) ||
+          c.overview.toLowerCase().includes(q) ||
+          c.majors.some(m => m.name.toLowerCase().includes(q))
+        );
       }
       return {
         result: {
@@ -197,13 +272,21 @@ export function executeAgentTool(
               code: c.code,
               title: c.title,
               degreeLevel: c.degreeLevel,
+              faculty: c.faculty,
               duration: `${c.durationYears} years`,
               domesticFee: `$${c.annualTuitionDomestic.toLocaleString()}/yr`,
               intlFee: `$${c.annualTuitionInternational.toLocaleString()}/yr`,
               atar: c.atarRequirement || 'N/A',
-              gpa: c.gpaRequirement || 'N/A'
+              gpa: c.gpaRequirement ? `${c.gpaRequirement}/7.0` : 'N/A',
+              campuses: c.campus.join(', '),
+              intakes: c.intakes.join(', '),
+              majors: c.majors.map(m => m.name).join(', ')
             }))
-          }
+          },
+          uiWidget: courses.length > 0 ? {
+            type: 'course',
+            data: courses[0]
+          } : undefined
         }
       };
     }
@@ -214,7 +297,11 @@ export function executeAgentTool(
       const course = allCourses.find(c =>
         c.id.toLowerCase() === term ||
         c.code.toLowerCase() === term ||
-        c.title.toLowerCase().includes(term)
+        c.title.toLowerCase().includes(term) ||
+        (term.includes('computer science') && c.id === 'b-cs') ||
+        ((term.includes('ai') || term.includes('artificial')) && c.id === 'm-ai') ||
+        ((term.includes('business') || term.includes('analytics')) && c.id === 'b-ba') ||
+        ((term.includes('cyber') || term.includes('security')) && c.id === 'm-cyber')
       ) || allCourses[0];
 
       return {
@@ -225,6 +312,39 @@ export function executeAgentTool(
             type: 'course',
             data: course
           }
+        }
+      };
+    }
+
+    case 'get_website_knowledge': {
+      const knowledge = {
+        institutionName: 'EduPulse Institute of Technology & AI',
+        campuses: [
+          { name: 'Main Campus (Sydney)', location: 'Sydney, NSW, Australia', features: 'War Room Cyber Range, High-Performance GPU Hub, Student Village' },
+          { name: 'Innovation Precinct (Melbourne)', location: 'Melbourne, VIC, Australia', features: 'Robotics labs, AI Incubator, Quantum computing simulators' },
+          { name: 'City Executive Center', location: 'Sydney CBD', features: 'Bloomberg Financial Trading Lab, Executive Classrooms' },
+          { name: 'Online Global Campus', location: 'Cloud / Remote', features: 'Interactive virtual classes, 24/7 AI tutoring agents' }
+        ],
+        accreditations: [
+          'TEQSA Registered Australian Higher Education Provider (AQF Levels 5-10)',
+          'Australian Computer Society (ACS) - Professional Level Accreditation',
+          'AACSB & EQUIS International Business School Accreditation'
+        ],
+        employabilityRanking: 'Top 3 Australian University for Graduate Employability (96% placed within 3 months)',
+        admissionsIntakes: ['February (Semester 1)', 'July (Semester 2)'],
+        earlyEntry: '2026 Early Offer Schemes open with conditional offers based on Year 11/12 predicted grades',
+        scholarships: [
+          'Vice-Chancellor\'s Academic Excellence Award (up to $10,000/year)',
+          'Women in STEM Scholarship ($7,500/year)',
+          'International Student Future Leader Grant (25% tuition fee reduction)'
+        ],
+        studentVisas: 'Subclass 500 visa holders can work up to 48 hours per fortnight during study semesters and unlimited during breaks'
+      };
+
+      return {
+        result: {
+          toolName,
+          output: knowledge
         }
       };
     }

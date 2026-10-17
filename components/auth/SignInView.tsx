@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { ClassroomUser } from '@/components/auth/GoogleClassroomLoginModal';
 import { trackClientEvent } from '@/lib/firebase/telemetry';
+import { getRoleMeta } from '@/lib/auth/roles';
 
 interface SignInViewProps {
   currentUser: ClassroomUser | null;
@@ -176,17 +177,15 @@ export const SignInView: React.FC<SignInViewProps> = ({
         </div>
         <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
           {currentUser
-            ? ((currentUser.role || '').toLowerCase() === 'superadmin' || currentUser.isSuperAdmin)
-              ? 'Superadmin Account Active'
-              : 'Supporter Account Active'
-            : 'Sign In with Google'}
+            ? `${getRoleMeta(currentUser.role).label} Account Active`
+            : 'Sign In / Register with Google'}
         </h1>
         <p className="text-sm text-slate-300 mt-2 max-w-2xl leading-relaxed">
           {currentUser
             ? ((currentUser.role || '').toLowerCase() === 'superadmin' || currentUser.isSuperAdmin)
               ? 'Your Google account is verified with complete Superadmin privileges across EduPulse AI.'
-              : 'You are signed in with the Supporter role. Complete Website Admin Panel features are reserved for Superadmin accounts.'
-            : 'Authenticate securely using your Google account. All first-time registrations receive the Supporter role; Superadmins receive full admin control.'}
+              : `You are signed in with the ${getRoleMeta(currentUser.role).label} role (${getRoleMeta(currentUser.role).description}). Full administrative control is reserved for Superadmins.`
+            : 'Authenticate securely using your Google account. All first-time registrations receive the Supporter role; Firebase Project Owners receive instant Superadmin privileges.'}
         </p>
       </div>
 
@@ -209,12 +208,8 @@ export const SignInView: React.FC<SignInViewProps> = ({
                 </div>
                 <p className="text-xs font-mono text-slate-500 mt-0.5">{currentUser.email}</p>
                 <div className="flex items-center gap-2 mt-2">
-                  <span className={`px-2.5 py-0.5 text-white text-[11px] font-black rounded-lg uppercase tracking-wide ${
-                    ((currentUser.role || '').toLowerCase() === 'superadmin' || currentUser.isSuperAdmin)
-                      ? 'bg-purple-600'
-                      : 'bg-emerald-600'
-                  }`}>
-                    {((currentUser.role || '').toLowerCase() === 'superadmin' || currentUser.isSuperAdmin) ? 'SUPERADMIN' : 'SUPPORTER'}
+                  <span className={`px-2.5 py-0.5 text-white text-[11px] font-black rounded-lg uppercase tracking-wide ${getRoleMeta(currentUser.role).badgeBg}`}>
+                    {getRoleMeta(currentUser.role).label}
                   </span>
                   <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[11px] font-semibold rounded-lg flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />

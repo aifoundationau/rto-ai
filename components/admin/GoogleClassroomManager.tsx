@@ -92,7 +92,8 @@ export const GoogleClassroomManager: React.FC<GoogleClassroomManagerProps> = ({
     const checkAuth = async () => {
       try {
         const { auth } = await import('@/lib/firebase/client');
-        unsubscribe = auth.onAuthStateChanged((user) => {
+        const { onAuthStateChanged } = await import('firebase/auth');
+        unsubscribe = onAuthStateChanged(auth, (user) => {
           if (user) {
             setIsOAuthConnected(true);
             setOauthAccount(user.email || 'admin.faculty@edupulse.edu');

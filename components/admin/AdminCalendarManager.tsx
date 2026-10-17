@@ -12,7 +12,8 @@ export const AdminCalendarManager: React.FC = () => {
     const checkAuth = async () => {
       try {
         const { auth } = await import('@/lib/firebase/client');
-        unsubscribe = auth.onAuthStateChanged((user) => {
+        const { onAuthStateChanged } = await import('firebase/auth');
+        unsubscribe = onAuthStateChanged(auth, (user) => {
           if (user) {
             setCalendarUser({
               name: user.displayName,

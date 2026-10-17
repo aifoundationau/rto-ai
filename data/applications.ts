@@ -1,3 +1,30 @@
+export interface AdditionalQualification {
+  id: string;
+  qualificationLevel: string;
+  institutionName: string;
+  graduationYear: string;
+  majorOrFieldOfStudy?: string;
+  atarOrGpa?: string;
+  country?: string;
+}
+
+export interface WorkHistoryItem {
+  id: string;
+  jobTitle: string;
+  companyName: string;
+  workLocation?: string; // e.g. 'Sydney, Australia', 'San Francisco, USA', 'Remote'
+  employmentType?: 'Full-time' | 'Part-time' | 'Contract' | 'Self-Employed / Founder' | 'Internship' | string;
+  startDate?: string;
+  endDate?: string;
+  isCurrentRole?: boolean;
+  responsibilities?: string;
+  supervisorName?: string;
+  supervisorPhone?: string;
+  supervisorEmail?: string;
+  isEntrepreneurialOrSelfEmployed?: boolean;
+  entrepreneurialDetails?: string;
+}
+
 export interface StudentApplication {
   id: string; // e.g. 'APP-2026-88192'
   status: 'Draft' | 'Submitted' | 'Under Review' | 'Accepted' | 'Requires Additional Documents';
@@ -19,14 +46,18 @@ export interface StudentApplication {
 
   // Step 2: Academic Background
   academicDetails: {
-    highestEducation: 'High School / Year 12' | 'Bachelor Degree' | 'Master Degree' | 'Diploma / TAFE' | '';
+    highestEducation: 'High School / Year 12' | 'Bachelor Degree' | 'Master Degree' | 'Diploma / TAFE' | string;
     institutionName: string;
     graduationYear: string;
     atarOrGpa: string;
     englishProficiencyTest?: string; // e.g. 'IELTS 7.5' or 'Native Speaker'
+    additionalQualifications?: AdditionalQualification[];
   };
 
-  // Step 3: Course & Study Preferences
+  // Step 4: Work History (Optional)
+  workHistory?: WorkHistoryItem[];
+
+  // Step 5: Course & Study Preferences
   coursePreferences: {
     firstChoiceCourseId: string;
     firstChoiceCourseName: string;
@@ -52,6 +83,27 @@ export interface StudentApplication {
     recommendations: string[];
     missingFields: string[];
   };
+
+  // AI Document Authenticity Verification (Images NOT stored in database - transient in-memory analysis only)
+  identityVerificationAudit?: DocumentAuthenticityAudit;
+  academicVerificationAudit?: DocumentAuthenticityAudit;
+  academicVerificationAudits?: DocumentAuthenticityAudit[];
+}
+
+export interface DocumentAuthenticityAudit {
+  id?: string;
+  documentCategory: 'identity' | 'academic';
+  documentType: string; // e.g. 'Passport', 'Driver Licence', 'Bachelor Degree Certificate', 'Academic Transcript'
+  issuingEntity: string; // e.g. 'Australian Passport Office (DFAT)', 'University of Sydney', 'Department of Transport'
+  country: string; // e.g. 'Australia'
+  briefDescription: string; // Concise 1-2 sentence summary description for Admin & Operations Panel
+  identifiedName?: string;
+  nameMatchesApplicant?: boolean;
+  authenticityStatus: 'Legitimate' | 'Requires Additional Review' | 'Suspect / Irregular';
+  authenticityScore: number; // e.g. 96
+  legitimacyNotes: string; // Forensic analysis of security seals, crests, fonts, and authenticity
+  verifiedAt: string;
+  filename?: string;
 }
 
 export const INITIAL_APPLICATION_STATE: StudentApplication = {
@@ -75,8 +127,27 @@ export const INITIAL_APPLICATION_STATE: StudentApplication = {
     institutionName: '',
     graduationYear: '',
     atarOrGpa: '',
-    englishProficiencyTest: ''
+    englishProficiencyTest: '',
+    additionalQualifications: []
   },
+  workHistory: [
+    {
+      id: 'work_1',
+      jobTitle: '',
+      companyName: '',
+      workLocation: '',
+      employmentType: 'Full-time',
+      startDate: '',
+      endDate: '',
+      isCurrentRole: false,
+      responsibilities: '',
+      supervisorName: '',
+      supervisorPhone: '',
+      supervisorEmail: '',
+      isEntrepreneurialOrSelfEmployed: false,
+      entrepreneurialDetails: ''
+    }
+  ],
   coursePreferences: {
     firstChoiceCourseId: '',
     firstChoiceCourseName: '',
@@ -92,5 +163,6 @@ export const INITIAL_APPLICATION_STATE: StudentApplication = {
     hasProvidedTranscripts: false,
     hasProvidedPassportId: false,
     declarationAgreed: false
-  }
+  },
+  academicVerificationAudits: []
 };
