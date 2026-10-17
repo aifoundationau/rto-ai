@@ -24,6 +24,7 @@ import {
   Send,
   Layers
 } from 'lucide-react';
+import { auth } from '@/lib/firebase/client';
 
 export interface BlogPostItem {
   id: string;
@@ -86,9 +87,23 @@ export const BlogInsightsManager: React.FC = () => {
       setIsLoadingPosts(true);
       const res = await fetch('/api/blog');
       const data = await res.json();
-      if (data && data.posts) {
-        setPublishedPosts(data.posts);
+      let posts: BlogPostItem[] = data && Array.isArray(data.posts) ? data.posts : [];
+
+      // Merge with custom posts saved locally in browser
+      try {
+        const stored = typeof window !== 'undefined' ? localStorage.getItem('edupulse_custom_blog_posts') : null;
+        if (stored) {
+          const localPosts = JSON.parse(stored);
+          if (Array.isArray(localPosts) && localPosts.length > 0) {
+            const seen = new Set(localPosts.map((p: any) => p.id));
+            posts = [...localPosts, ...posts.filter((p: any) => !seen.has(p.id))];
+          }
+        }
+      } catch (e) {
+        console.warn('[BlogInsightsManager] LocalStorage read error:', e);
       }
+
+      setPublishedPosts(posts);
     } catch (err) {
       console.warn('[BlogInsightsManager] Fetch error:', err);
     } finally {
@@ -218,9 +233,19 @@ export const BlogInsightsManager: React.FC = () => {
       // Ensure snippet is capped at 20 words
       const finalSnippet = enforceMaxWords(draftPost.snippet || draftPost.title, 20);
 
+      // Obtain client auth token if signed in
+      let authHeader = '';
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (idToken) authHeader = `Bearer ${idToken}`;
+      } catch (e) {}
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authHeader) headers['Authorization'] = authHeader;
+
       const res = await fetch('/api/blog', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           ...draftPost,
           snippet: finalSnippet,
@@ -230,6 +255,24 @@ export const BlogInsightsManager: React.FC = () => {
       const data = await res.json();
       if (!res.ok || data.error) {
         throw new Error(data.error || 'Failed to publish post.');
+      }
+
+      // Persist to browser localStorage so post is always visible on website & admin panel
+      const publishedPost: BlogPostItem = data.post || {
+        id: `post-${Date.now()}`,
+        ...draftPost,
+        snippet: finalSnippet,
+        createdAt: new Date().toISOString(),
+      };
+
+      try {
+        const stored = localStorage.getItem('edupulse_custom_blog_posts');
+        const existing: BlogPostItem[] = stored ? JSON.parse(stored) : [];
+        const updated = [publishedPost, ...existing.filter((p) => p.id !== publishedPost.id)];
+        localStorage.setItem('edupulse_custom_blog_posts', JSON.stringify(updated));
+        window.dispatchEvent(new Event('edupulse_blog_updated'));
+      } catch (e) {
+        console.warn('[BlogInsightsManager] LocalStorage save error:', e);
       }
 
       setExtractSuccess('Postcard published to EduPulse Blog & Insights Spot Panel successfully!');
@@ -249,11 +292,29 @@ export const BlogInsightsManager: React.FC = () => {
 
   const handleDeletePost = async (id: string) => {
     try {
-      const res = await fetch(`/api/blog?id=${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setPublishedPosts((prev) => prev.filter((p) => p.id !== id));
-        setDeleteConfirmId(null);
-      }
+      // 1. Remove from localStorage
+      try {
+        const stored = localStorage.getItem('edupulse_custom_blog_posts');
+        if (stored) {
+          const localPosts: BlogPostItem[] = JSON.parse(stored).filter((p: any) => p.id !== id);
+          localStorage.setItem('edupulse_custom_blog_posts', JSON.stringify(localPosts));
+          window.dispatchEvent(new Event('edupulse_blog_updated'));
+        }
+      } catch (e) {}
+
+      // 2. Call DELETE endpoint
+      let authHeader = '';
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (idToken) authHeader = `Bearer ${idToken}`;
+      } catch (e) {}
+
+      const headers: Record<string, string> = {};
+      if (authHeader) headers['Authorization'] = authHeader;
+
+      const res = await fetch(`/api/blog?id=${id}`, { method: 'DELETE', headers });
+      setPublishedPosts((prev) => prev.filter((p) => p.id !== id));
+      setDeleteConfirmId(null);
     } catch (err) {
       console.warn('[BlogInsightsManager] Delete error:', err);
     }

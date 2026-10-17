@@ -68,36 +68,151 @@ let inMemoryBlogPosts: BlogPostItem[] = [
   },
 ];
 
-export async function GET() {
-  if (!isFirebaseConfigured) {
-    return NextResponse.json({ posts: inMemoryBlogPosts });
+// Helper to fetch live posts directly from Firestore REST API (works across any platform including Vercel)
+async function fetchPostsFromFirestoreRest(): Promise<BlogPostItem[]> {
+  try {
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'ai-foundation-firebase';
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyCPeAOWQj8456TeIWDIPsyxyWT7QLrC8J8';
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/blog_posts?key=${apiKey}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) {
+      console.warn('[BlogRoute] Firestore REST fetch returned HTTP', res.status);
+      return [];
+    }
+    const data = await res.json();
+    if (!data.documents || !Array.isArray(data.documents)) return [];
+
+    return data.documents.map((doc: any) => {
+      const id = doc.name.split('/').pop();
+      const fields = doc.fields || {};
+      const item: any = { id };
+      for (const [k, v] of Object.entries(fields) as [string, any][]) {
+        item[k] = v.stringValue ?? v.integerValue ?? v.booleanValue ?? v.timestampValue;
+      }
+      return item as BlogPostItem;
+    });
+  } catch (err) {
+    console.warn('[BlogRoute] Firestore REST fetch error:', err);
+    return [];
   }
+}
+
+// Helper to write live post to Firestore REST API
+async function savePostToFirestoreRest(post: BlogPostItem, authToken?: string | null): Promise<boolean> {
+  try {
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'ai-foundation-firebase';
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyCPeAOWQj8456TeIWDIPsyxyWT7QLrC8J8';
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/blog_posts/${post.id}?key=${apiKey}`;
+
+    const fields: Record<string, { stringValue: string }> = {};
+    for (const [key, value] of Object.entries(post)) {
+      if (value !== undefined && value !== null) {
+        fields[key] = { stringValue: String(value) };
+      }
+    }
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (authToken) {
+      headers['Authorization'] = authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`;
+    }
+
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ fields }),
+    });
+
+    return res.ok;
+  } catch (err) {
+    console.warn('[BlogRoute] Firestore REST save error:', err);
+    return false;
+  }
+}
+
+// Helper to delete post from Firestore REST API
+async function deletePostFromFirestoreRest(id: string, authToken?: string | null): Promise<boolean> {
+  try {
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'ai-foundation-firebase';
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyCPeAOWQj8456TeIWDIPsyxyWT7QLrC8J8';
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/blog_posts/${id}?key=${apiKey}`;
+
+    const headers: Record<string, string> = {};
+    if (authToken) {
+      headers['Authorization'] = authToken.startsWith('Bearer ') ? authToken : `Bearer ${authToken}`;
+    }
+
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers,
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[BlogRoute] Firestore REST delete error:', err);
+    return false;
+  }
+}
+
+export async function GET() {
   try {
     const posts: BlogPostItem[] = [];
-    try {
-      const snapshot = await db.collection('blog_posts').orderBy('createdAt', 'desc').get();
-      if (!snapshot.empty) {
-        snapshot.forEach((doc) => {
-          posts.push({ id: doc.id, ...(doc.data() as any) });
-        });
+
+    // 1. First, attempt Firestore Admin SDK if configured
+    if (isFirebaseConfigured && db) {
+      try {
+        const snapshot = await db.collection('blog_posts').orderBy('createdAt', 'desc').get();
+        if (!snapshot.empty) {
+          snapshot.forEach((doc) => {
+            posts.push({ id: doc.id, ...(doc.data() as any) });
+          });
+        }
+      } catch (dbErr) {
+        console.warn('[BlogRoute] Firestore Admin SDK error, will attempt REST API fallback:', dbErr);
       }
-    } catch (dbErr) {
-      console.warn('[BlogRoute] Firestore get error, using fallback:', dbErr);
     }
 
+    // 2. Fallback to Firestore REST API (ensures live cloud data is returned on serverless/Vercel)
     if (posts.length === 0) {
-      return NextResponse.json({ posts: inMemoryBlogPosts });
+      const restPosts = await fetchPostsFromFirestoreRest();
+      if (restPosts.length > 0) {
+        posts.push(...restPosts);
+      }
     }
 
-    // Merge default posts if not already present
+    // 3. Prepend any posts created in current in-memory instance
     const existingIds = new Set(posts.map((p) => p.id));
+    const combined: BlogPostItem[] = [];
+
+    for (const memPost of inMemoryBlogPosts) {
+      if (
+        !existingIds.has(memPost.id) &&
+        memPost.id !== 'post-1' &&
+        memPost.id !== 'post-2' &&
+        memPost.id !== 'post-3' &&
+        memPost.id !== 'post-4'
+      ) {
+        combined.push(memPost);
+        existingIds.add(memPost.id);
+      }
+    }
+
+    combined.push(...posts);
+
+    // 4. Ensure default sample posts are included if not already present
     for (const defPost of inMemoryBlogPosts) {
       if (!existingIds.has(defPost.id)) {
-        posts.push(defPost);
+        combined.push(defPost);
+        existingIds.add(defPost.id);
       }
     }
 
-    return NextResponse.json({ posts });
+    // 5. Sort: newest first
+    combined.sort((a, b) => {
+      const tA = new Date(a.createdAt || a.date).getTime() || 0;
+      const tB = new Date(b.createdAt || b.date).getTime() || 0;
+      return tB - tA;
+    });
+
+    return NextResponse.json({ posts: combined });
   } catch (err: any) {
     console.error('[BlogRoute] GET error:', err);
     return NextResponse.json({ posts: inMemoryBlogPosts });
@@ -129,17 +244,27 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    // Save to Firestore
-    try {
-      await db.collection('blog_posts').doc(postId).set(newPost);
-    } catch (dbErr) {
-      console.warn('[BlogRoute] Firestore save fallback to in-memory:', dbErr);
+    // 1. Try Firestore Admin SDK if configured
+    let savedToFirestore = false;
+    if (isFirebaseConfigured && db) {
+      try {
+        await db.collection('blog_posts').doc(postId).set(newPost);
+        savedToFirestore = true;
+      } catch (dbErr) {
+        console.warn('[BlogRoute] Firestore Admin save failed, falling back to REST:', dbErr);
+      }
     }
 
-    // Always update in-memory cache as well
+    // 2. If Admin SDK wasn't used, try Firestore REST API with client auth token
+    if (!savedToFirestore) {
+      const authHeader = req.headers.get('authorization');
+      savedToFirestore = await savePostToFirestoreRest(newPost, authHeader);
+    }
+
+    // 3. Always update in-memory cache as well
     inMemoryBlogPosts = [newPost, ...inMemoryBlogPosts];
 
-    return NextResponse.json({ success: true, post: newPost });
+    return NextResponse.json({ success: true, post: newPost, savedToFirestore });
   } catch (err: any) {
     console.error('[BlogRoute] POST error:', err);
     return NextResponse.json({ error: err.message || 'Failed to create post' }, { status: 500 });
@@ -155,10 +280,15 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Post ID is required' }, { status: 400 });
     }
 
-    try {
-      await db.collection('blog_posts').doc(id).delete();
-    } catch (dbErr) {
-      console.warn('[BlogRoute] Firestore delete fallback:', dbErr);
+    if (isFirebaseConfigured && db) {
+      try {
+        await db.collection('blog_posts').doc(id).delete();
+      } catch (dbErr) {
+        console.warn('[BlogRoute] Firestore Admin delete fallback:', dbErr);
+      }
+    } else {
+      const authHeader = req.headers.get('authorization');
+      await deletePostFromFirestoreRest(id, authHeader);
     }
 
     inMemoryBlogPosts = inMemoryBlogPosts.filter((p) => p.id !== id);

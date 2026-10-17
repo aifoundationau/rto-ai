@@ -107,19 +107,63 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [selectedBlogModal, setSelectedBlogModal] = useState<BlogPost | null>(null);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>(BLOG_POSTS);
 
-  // Fetch live blog posts from admin submissions API
+  // Fetch live blog posts from admin submissions API & browser storage
   useEffect(() => {
     let isMounted = true;
-    fetch('/api/blog')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (isMounted && data && Array.isArray(data.posts) && data.posts.length > 0) {
-          setBlogPosts(data.posts);
-        }
-      })
-      .catch((err) => console.warn('[HomeView] Blog fetch error:', err));
+
+    const loadPosts = () => {
+      fetch('/api/blog')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (!isMounted) return;
+          let posts: BlogPost[] = data && Array.isArray(data.posts) ? data.posts : [];
+
+          // Merge any client-published posts from localStorage
+          try {
+            const stored = typeof window !== 'undefined' ? localStorage.getItem('edupulse_custom_blog_posts') : null;
+            if (stored) {
+              const localPosts = JSON.parse(stored);
+              if (Array.isArray(localPosts) && localPosts.length > 0) {
+                const seen = new Set(localPosts.map((p: any) => p.id));
+                posts = [...localPosts, ...posts.filter((p: any) => !seen.has(p.id))];
+              }
+            }
+          } catch (e) {
+            console.warn('[HomeView] LocalStorage read error:', e);
+          }
+
+          if (posts.length > 0) {
+            setBlogPosts(posts);
+          }
+        })
+        .catch((err) => {
+          console.warn('[HomeView] Blog fetch error, attempting localStorage fallback:', err);
+          try {
+            const stored = typeof window !== 'undefined' ? localStorage.getItem('edupulse_custom_blog_posts') : null;
+            if (stored && isMounted) {
+              const localPosts = JSON.parse(stored);
+              if (Array.isArray(localPosts) && localPosts.length > 0) {
+                const seen = new Set(localPosts.map((p: any) => p.id));
+                setBlogPosts([...localPosts, ...BLOG_POSTS.filter((p) => !seen.has(p.id))]);
+              }
+            }
+          } catch (e) {}
+        });
+    };
+
+    loadPosts();
+
+    // Listen for live updates when admin publishes from another tab or panel
+    const handleBlogUpdated = () => {
+      loadPosts();
+    };
+    window.addEventListener('edupulse_blog_updated', handleBlogUpdated);
+    window.addEventListener('storage', handleBlogUpdated);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('edupulse_blog_updated', handleBlogUpdated);
+      window.removeEventListener('storage', handleBlogUpdated);
     };
   }, []);
 
