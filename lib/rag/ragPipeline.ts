@@ -154,21 +154,17 @@ ${r.chunk.text}
   if (apiKey && apiKey.length > 10) {
     try {
       const ai = new GoogleGenAI({ apiKey });
+      const isMultiLangRequested = Boolean(options.allTranslations);
 
-      const systemPrompt = `You are EduPulse AI, an authoritative, multilingual Higher Education and Vocational Training (RTO) intelligence assistant.
+      const systemPrompt = isMultiLangRequested
+        ? `You are EduPulse AI, an authoritative, multilingual Higher Education and Vocational Training (RTO) intelligence assistant.
 You specialize in TEQSA, ASQA, CRICOS accreditation, curricula, university degrees, and student admissions.
 
 CRITICAL INSTRUCTIONS:
-1. Cross-Lingual Synthesis: You have retrieved reference documents that may be written in English or other languages. Understand the context regardless of the language it was written in.
-2. Primary Output Language: The user's query is in "${queryLangName}" (${queryLangCode}). Synthesize a full, authoritative answer in ${queryLangName}.
-3. Multi-Language Translations: In addition to the primary answer, provide complete, fluent translations in:
-   - "en": English
-   - "ja": Japanese
-   - "zh": Simplified Chinese
-   - "vi": Vietnamese
-   - "th": Thai
-   - "id": Indonesian
-4. Grounding: Answer strictly using facts and guidelines from the provided Sources. If the information is not fully covered, state clearly what is verified and advise contacting the admissions/compliance office.
+1. Cross-Lingual Synthesis: Understand the retrieved reference documents regardless of their source language.
+2. Primary Output Language: Synthesize a full, authoritative answer in "${queryLangName}" (${queryLangCode}).
+3. Multi-Language Translations: Provide complete translations in "en", "ja", "zh", "vi", "th", "id".
+4. Grounding: Answer strictly using facts and guidelines from the provided Sources.
 5. Format: Return STRICT JSON matching this schema:
 {
   "answer": "Full comprehensive markdown answer in ${queryLangName}",
@@ -180,6 +176,17 @@ CRITICAL INSTRUCTIONS:
     "th": "Full Thai translation markdown",
     "id": "Full Indonesian translation markdown"
   }
+}`
+        : `You are EduPulse AI, an authoritative Higher Education and Vocational Training (RTO) intelligence assistant.
+You specialize in TEQSA, ASQA, CRICOS accreditation, curricula, university degrees, and student admissions.
+
+CRITICAL INSTRUCTIONS:
+1. Grounding: Answer strictly using facts and guidelines from the provided Sources. If the information is not fully covered, advise contacting admissions.
+2. Output Language: Synthesize a direct, clear markdown answer in "${queryLangName}" (${queryLangCode}).
+3. Format: Return STRICT JSON matching this schema:
+{
+  "answer": "Full comprehensive markdown answer in ${queryLangName}",
+  "englishSummary": "English translation if the question was non-English, or empty string if English"
 }`;
 
       const userPrompt = `Retrieved Knowledge Context:
@@ -187,9 +194,9 @@ ${contextText || 'No specific document chunks retrieved. Provide general accredi
 
 User Question: "${query}"
 
-Generate the comprehensive answer in ${queryLangName} and all translations:`;
+Generate the answer in ${queryLangName}:`;
 
-      const response = await ai.models.generateContent({
+      const genPromise = ai.models.generateContent({
         model: GENERATION_MODEL,
         contents: [
           { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }
@@ -199,6 +206,12 @@ Generate the comprehensive answer in ${queryLangName} and all translations:`;
           responseMimeType: 'application/json',
         }
       });
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('RAG generation timeout after 6s')), 6000)
+      );
+
+      const response = await Promise.race([genPromise, timeoutPromise]);
 
       if (response.text) {
         try {
@@ -212,6 +225,11 @@ Generate the comprehensive answer in ${queryLangName} and all translations:`;
               ...parsed.translations,
               [queryLangCode]: answer || parsed.translations[queryLangCode] || '',
             };
+          } else {
+            translations[queryLangCode] = answer;
+            if (parsed.englishSummary && queryLangCode !== 'en') {
+              translations.en = parsed.englishSummary;
+            }
           }
         } catch {
           answer = response.text;

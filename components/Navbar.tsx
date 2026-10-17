@@ -55,7 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'units' as NavTab, label: 'Unit Syllabuses', icon: BookOpen },
     { id: 'application' as NavTab, label: 'Application Form', icon: FileText },
     { id: 'events' as NavTab, label: 'Events & Calendar', icon: Calendar },
-    { id: 'chat' as NavTab, label: 'AI Assistant', icon: Bot },
+    { id: 'chat' as NavTab, label: 'AI Assist', icon: Bot },
   ];
 
   const isSuperAdminUser =

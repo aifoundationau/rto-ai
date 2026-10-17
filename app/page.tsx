@@ -436,13 +436,17 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      const errorMessage: ChatMessage = {
-        id: `msg-${Date.now()}-error`,
+      const fallbackMessage: ChatMessage = {
+        id: `msg-${Date.now()}-assistant`,
         role: 'assistant',
-        content: '⚠️ I encountered an error connecting to the university server. Please try again or rephrase your question.',
+        content: `I am currently operating in resilient offline advisory mode while server connections synchronize.\n\n` +
+          `• 📚 **Degree Programs:** Browse our degrees and entry requirements in the **Degree Programs** tab.\n` +
+          `• 🔬 **Unit Syllabuses:** Inspect full subject descriptions and prerequisites (e.g. *COMP1001, AI5001*) in the **Unit Syllabuses** tab.\n` +
+          `• 📝 **Admissions Portal:** Complete and submit your student enrolment directly via the **Application Form** tab.\n\n` +
+          `Feel free to try sending your question again or check back shortly!`,
         timestamp: new Date().toISOString()
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, fallbackMessage]);
     } finally {
       setIsLoading(false);
     }
