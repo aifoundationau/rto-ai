@@ -184,7 +184,8 @@ export function getRoleMeta(rawRole: string | null | undefined): RoleMeta {
   return ROLE_DEFINITIONS[norm];
 }
 
-export function isSuperAdmin(rawRole: string | null | undefined, flag?: boolean): boolean {
+export function isSuperAdmin(rawRole: string | null | undefined, flag?: boolean, email?: string | null): boolean {
+  if (email && isProjectOwnerEmail(email)) return true;
   if (flag === true && rawRole === 'superadmin') return true;
   return normalizeRole(rawRole) === 'superadmin';
 }

@@ -16,9 +16,8 @@ import { ApiKeyModal } from '@/components/ApiKeyModal';
 import { ChatMessage } from '@/lib/agent/engine';
 import { StudentApplication, INITIAL_APPLICATION_STATE } from '@/data/applications';
 import { CourseProgram, COURSES_DATA } from '@/data/courses';
-import { Sparkles, Calendar, BookOpen, FileText, ArrowRight, ShieldCheck } from 'lucide-react';
-
 import { trackClientEvent, trackPageView } from '@/lib/firebase/telemetry';
+import { isProjectOwnerEmail } from '@/lib/auth/roles';
 
 const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   id: 'msg-welcome',
@@ -67,21 +66,28 @@ export default function HomePage() {
       const savedUser = localStorage.getItem('edupulse_user');
       if (savedUser) {
         const parsed = JSON.parse(savedUser);
-        setClassroomUser(parsed);
-        const isSuper = parsed.isSuperAdmin === true || parsed.role?.toLowerCase() === 'superadmin';
+        const isOwner = isProjectOwnerEmail(parsed.email);
+        const initialRole = isOwner ? 'superadmin' : (parsed.role || 'supporter');
+        const isSuper = isOwner || parsed.isSuperAdmin === true || initialRole.toLowerCase() === 'superadmin';
+        const correctedUser = {
+          ...parsed,
+          role: initialRole,
+          isSuperAdmin: isSuper,
+        };
+        setClassroomUser(correctedUser);
         setIsAdminLoggedIn(isSuper);
 
         // Immediate background refresh against Firestore to ensure any role change in Firebase reflects live
-        const queryParam = parsed.googleWorkspaceId 
-          ? `uid=${encodeURIComponent(parsed.googleWorkspaceId)}`
-          : (parsed.email ? `email=${encodeURIComponent(parsed.email)}` : '');
+        const queryParam = parsed.email 
+          ? `email=${encodeURIComponent(parsed.email)}`
+          : (parsed.googleWorkspaceId ? `uid=${encodeURIComponent(parsed.googleWorkspaceId)}` : '');
         if (queryParam) {
           fetch(`/api/users?${queryParam}`)
             .then((res) => (res.ok ? res.json() : null))
             .then((data) => {
               if (data?.user) {
-                const liveRole = data.user.role || 'supporter';
-                const liveSuper = data.user.isSuperAdmin === true || liveRole.toLowerCase() === 'superadmin';
+                const liveRole = isOwner ? 'superadmin' : (data.user.role || 'supporter');
+                const liveSuper = isOwner || data.user.isSuperAdmin === true || liveRole.toLowerCase() === 'superadmin';
                 const refreshedUser = {
                   ...parsed,
                   role: liveRole,
@@ -98,8 +104,7 @@ export default function HomePage() {
             .catch(() => {});
         }
       } else {
-        const adminState = localStorage.getItem('edupulse_is_admin');
-        if (adminState === 'true') setIsAdminLoggedIn(true);
+        setIsAdminLoggedIn(false);
       }
     } catch {
       // ignore
@@ -134,8 +139,9 @@ export default function HomePage() {
               .then((data) => {
                 if (!isMounted) return;
                 const dbUser = data?.user;
-                const role = dbUser?.role || 'supporter';
-                const isSuper = dbUser?.isSuperAdmin === true || role.toLowerCase() === 'superadmin';
+                const isOwner = isProjectOwnerEmail(firebaseUser.email);
+                const role = isOwner ? 'superadmin' : (dbUser?.role || 'supporter');
+                const isSuper = isOwner || dbUser?.isSuperAdmin === true || role.toLowerCase() === 'superadmin';
                 const syncUser: ClassroomUser = {
                   name: firebaseUser.displayName || dbUser?.name || 'User',
                   email: firebaseUser.email || dbUser?.email || '',
@@ -231,8 +237,9 @@ export default function HomePage() {
         if (syncRes.ok) {
           const syncData = await syncRes.json();
           if (syncData.user) {
-            finalRole = syncData.user.role || 'supporter';
-            isSuper = syncData.user.isSuperAdmin === true || finalRole.toLowerCase() === 'superadmin';
+            const isOwner = isProjectOwnerEmail(result.user.email);
+            finalRole = isOwner ? 'superadmin' : (syncData.user.role || 'supporter');
+            isSuper = isOwner || syncData.user.isSuperAdmin === true || finalRole.toLowerCase() === 'superadmin';
           }
         }
       } catch (syncErr) {
@@ -563,61 +570,26 @@ export default function HomePage() {
 
         {activeTab === 'admin' && (
           (classroomUser || isAdminLoggedIn) ? (
-            (classroomUser?.isSuperAdmin || classroomUser?.role?.toLowerCase() === 'superadmin') ? (
-              <AdminDashboardView
-                apiKey={apiKey}
-                onSaveApiKey={handleSaveApiKey}
-                onLogout={handleLogoutAdmin}
-              />
-            ) : (
-              <div className="max-w-3xl mx-auto py-16 px-4 sm:px-6">
-                <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-8 sm:p-12 shadow-2xl text-center relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-                  <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto mb-6 text-amber-400">
-                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  </div>
-                  <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">
-                    Superadmin Privileges Required
-                  </h2>
-                  <p className="text-slate-300 max-w-lg mx-auto mb-6 leading-relaxed">
-                    Access to the complete website admin panel features is reserved exclusively for verified <span className="font-semibold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">superadmin</span> accounts.
-                  </p>
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700 mb-8 text-sm text-slate-300">
-                    <span>Signed in as:</span>
-                    <span className="font-medium text-white">{classroomUser?.email}</span>
-                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      Role: {classroomUser?.role || 'supporter'}
-                    </span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <button
-                      onClick={() => setActiveTab('chat')}
-                      className="w-full sm:w-auto px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors border border-slate-700 cursor-pointer"
-                    >
-                      Return to Chat Assistant
-                    </button>
-                    <button
-                      onClick={handleLogoutAdmin}
-                      className="w-full sm:w-auto px-6 py-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-300 font-medium transition-colors border border-red-500/30 cursor-pointer"
-                    >
-                      Sign Out / Switch Account
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
+            <AdminDashboardView
+              apiKey={apiKey}
+              onSaveApiKey={handleSaveApiKey}
+              onLogout={handleLogoutAdmin}
+            />
           ) : (
             <SignInView
               currentUser={classroomUser}
               onLoginSuccess={(user) => {
-                setClassroomUser(user);
-                const isSuper = user.isSuperAdmin === true || user.role?.toLowerCase() === 'superadmin';
-                setIsAdminLoggedIn(isSuper);
+                const isSuper = isProjectOwnerEmail(user.email) || user.isSuperAdmin === true || user.role?.toLowerCase() === 'superadmin';
+                const authed = {
+                  ...user,
+                  role: isSuper ? 'superadmin' : (user.role || 'supporter'),
+                  isSuperAdmin: isSuper,
+                };
+                setClassroomUser(authed);
+                setIsAdminLoggedIn(true);
                 try {
-                  localStorage.setItem('edupulse_user', JSON.stringify(user));
-                  localStorage.setItem('edupulse_is_admin', isSuper ? 'true' : 'false');
+                  localStorage.setItem('edupulse_user', JSON.stringify(authed));
+                  localStorage.setItem('edupulse_is_admin', 'true');
                 } catch (e) {}
                 setActiveTab('admin');
               }}

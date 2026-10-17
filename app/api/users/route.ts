@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
           const data = doc.data() || {};
           const isOwner = isProjectOwnerEmail(data.email);
           const role = isOwner ? 'superadmin' : normalizeRole(data.role);
-          const isSuper = isOwner || isSuperAdmin(role, data.isSuperAdmin);
+          const isSuper = isOwner || role === 'superadmin' || data.isSuperAdmin === true;
           return NextResponse.json({
             user: {
               id: doc.id,
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
           const data = doc.data() || {};
           const isOwner = isProjectOwnerEmail(data.email);
           const role = isOwner ? 'superadmin' : normalizeRole(data.role);
-          const isSuper = isOwner || isSuperAdmin(role, data.isSuperAdmin);
+          const isSuper = isOwner || role === 'superadmin' || data.isSuperAdmin === true;
           return NextResponse.json({
             user: {
               id: doc.id,
@@ -124,7 +124,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required parameter "uid".' }, { status: 400 });
     }
 
-    const isOwner = isProjectOwnerEmail(email);
     const userRef = db.collection('users').doc(uid);
     const userDoc = await userRef.get();
 
@@ -165,11 +164,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (wasPreviouslyRegistered && existingData) {
-      // User or email has been registered before -> check and preserve their previously registered role
+      // User or email has been registered before -> check and preserve their strictly assigned Firestore database role
+      const isOwner = isProjectOwnerEmail(email || existingData.email);
       const previousRole = normalizeRole(existingData.role || existingData.status);
-      const isExistingSuper = existingData.isSuperAdmin === true || previousRole === 'superadmin';
-      const updatedRole = (isOwner || isExistingSuper) ? 'superadmin' : previousRole;
-      const isSuper = isOwner || isExistingSuper || isSuperAdmin(updatedRole, existingData.isSuperAdmin);
+      const isSuper = isOwner || previousRole === 'superadmin' || existingData.isSuperAdmin === true;
+      const updatedRole = isSuper ? 'superadmin' : previousRole;
 
       const updatedFields: Record<string, any> = {
         lastLoginAt: new Date().toISOString(),
@@ -221,8 +220,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // First-time registration -> Any email listed as owner becomes superadmin, otherwise default role is supporter
-    const assignedRole: SystemRole = isOwner ? 'superadmin' : DEFAULT_REGISTRATION_ROLE;
+    // First-time registration -> If the email is explicitly a verified project owner / superadmin email (like support@aifoundation.net.au), grant superadmin. Everyone else strictly receives role = supporter only!
+    const isOwner = isProjectOwnerEmail(email);
+    const assignedRole: SystemRole = isOwner ? 'superadmin' : 'supporter';
     const isSuper = isOwner;
 
     const newUserData = {

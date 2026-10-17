@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { ClassroomUser } from '@/components/auth/GoogleClassroomLoginModal';
 import { trackClientEvent } from '@/lib/firebase/telemetry';
-import { getRoleMeta } from '@/lib/auth/roles';
+import { getRoleMeta, isProjectOwnerEmail } from '@/lib/auth/roles';
 
 interface SignInViewProps {
   currentUser: ClassroomUser | null;
@@ -46,14 +46,15 @@ export const SignInView: React.FC<SignInViewProps> = ({
     setElevationMessage('');
     setErrorMessage('');
     try {
-      const query = currentUser.googleWorkspaceId 
-        ? `uid=${encodeURIComponent(currentUser.googleWorkspaceId)}`
-        : `email=${encodeURIComponent(currentUser.email)}`;
+      const isOwner = isProjectOwnerEmail(currentUser.email);
+      const query = currentUser.email 
+        ? `email=${encodeURIComponent(currentUser.email)}`
+        : (currentUser.googleWorkspaceId ? `uid=${encodeURIComponent(currentUser.googleWorkspaceId)}` : '');
       const res = await fetch(`/api/users?${query}`);
       const data = await res.json();
       if (res.ok && data.user) {
-        const role = data.user.role || 'supporter';
-        const isSuper = data.user.isSuperAdmin === true || role.toLowerCase() === 'superadmin';
+        const role = isOwner ? 'superadmin' : (data.user.role || 'supporter');
+        const isSuper = isOwner || data.user.isSuperAdmin === true || role.toLowerCase() === 'superadmin';
         const updated: ClassroomUser = {
           ...currentUser,
           role,
@@ -126,8 +127,9 @@ export const SignInView: React.FC<SignInViewProps> = ({
         if (syncRes.ok) {
           const syncData = await syncRes.json();
           if (syncData.user) {
-            finalRole = syncData.user.role || 'supporter';
-            isSuper = syncData.user.isSuperAdmin === true || finalRole.toLowerCase() === 'superadmin';
+            const isOwner = isProjectOwnerEmail(result.user.email);
+            finalRole = isOwner ? 'superadmin' : (syncData.user.role || 'supporter');
+            isSuper = isOwner || syncData.user.isSuperAdmin === true || finalRole.toLowerCase() === 'superadmin';
           }
         }
       } catch (syncErr) {
@@ -227,7 +229,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
             ? ((currentUser.role || '').toLowerCase() === 'superadmin' || currentUser.isSuperAdmin)
               ? 'Your Google account is verified with complete Superadmin privileges across EduPulse AI.'
               : `You are signed in with the ${getRoleMeta(currentUser.role).label} role (${getRoleMeta(currentUser.role).description}). Full administrative control is reserved for Superadmins.`
-            : 'Authenticate securely using your Google account. All first-time registrations receive the Supporter role; Firebase Project Owners receive instant Superadmin privileges.'}
+            : 'Authenticate securely using your Google account. All first-time registrations strictly receive the Supporter role only. Full administrative control is reserved exclusively for accounts designated as Superadmin in the database.'}
         </p>
       </div>
 
@@ -369,7 +371,7 @@ export const SignInView: React.FC<SignInViewProps> = ({
           <div>
             <h2 className="text-xl sm:text-2xl font-black text-slate-900">Sign In with Google</h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-              All accounts authenticate through Google and receive instant Admin panel access.
+              Sign in securely. When you first register, you strictly receive role = supporter only.
             </p>
           </div>
 
@@ -380,22 +382,22 @@ export const SignInView: React.FC<SignInViewProps> = ({
             </div>
           )}
 
-          {/* Included Ecosystem Integrations */}
+          {/* Registration & RBAC Policy */}
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left space-y-2.5 text-xs text-slate-600">
             <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wider">
-              Admin Google Privileges:
+              Registration &amp; Access Policy:
             </span>
             <div className="flex items-center gap-2 text-slate-700">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Direct access to the Admin Control Center</span>
+              <span>Strict Rule: All new registrants receive role = supporter only</span>
             </div>
             <div className="flex items-center gap-2 text-slate-700">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Google Classroom course &amp; syllabus synchronization</span>
+              <span>Only database users with role = superadmin receive Superadmin RBAC</span>
             </div>
             <div className="flex items-center gap-2 text-slate-700">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Google Calendar event scheduling &amp; booking management</span>
+              <span>Google SSO with strict Cloud Firestore RBAC synchronization</span>
             </div>
           </div>
 
