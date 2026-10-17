@@ -14,7 +14,9 @@ import {
   Layers,
   Lock,
   Mail,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 import { ClassroomUser } from '@/components/auth/GoogleClassroomLoginModal';
 import { trackClientEvent } from '@/lib/firebase/telemetry';
@@ -35,6 +37,46 @@ export const SignInView: React.FC<SignInViewProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isElevating, setIsElevating] = useState(false);
+  const [elevationMessage, setElevationMessage] = useState('');
+
+  const handleRefreshRole = async () => {
+    if (!currentUser) return;
+    setIsElevating(true);
+    setElevationMessage('');
+    setErrorMessage('');
+    try {
+      const query = currentUser.googleWorkspaceId 
+        ? `uid=${encodeURIComponent(currentUser.googleWorkspaceId)}`
+        : `email=${encodeURIComponent(currentUser.email)}`;
+      const res = await fetch(`/api/users?${query}`);
+      const data = await res.json();
+      if (res.ok && data.user) {
+        const role = data.user.role || 'supporter';
+        const isSuper = data.user.isSuperAdmin === true || role.toLowerCase() === 'superadmin';
+        const updated: ClassroomUser = {
+          ...currentUser,
+          role,
+          isSuperAdmin: isSuper,
+        };
+        onLoginSuccess(updated);
+        try {
+          localStorage.setItem('edupulse_user', JSON.stringify(updated));
+          localStorage.setItem('edupulse_is_admin', isSuper ? 'true' : 'false');
+        } catch (e) {}
+        setElevationMessage(`Live role synced from Firebase: ${role.toUpperCase()}`);
+        if (isSuper) {
+          setTimeout(() => onNavigateTab('admin'), 600);
+        }
+      } else {
+        setErrorMessage('Could not fetch user record from Firebase');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to sync role');
+    } finally {
+      setIsElevating(false);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
@@ -219,19 +261,41 @@ export const SignInView: React.FC<SignInViewProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {((currentUser.role || '').toLowerCase() === 'superadmin' || currentUser.isSuperAdmin) ? (
-                <button
-                  onClick={() => onNavigateTab('admin')}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-2 shadow-md shadow-indigo-200 cursor-pointer"
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Go to Admin Panel</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => onNavigateTab('admin')}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-2 shadow-md shadow-indigo-200 cursor-pointer"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Go to Admin Panel</span>
+                  </button>
+                  <button
+                    onClick={handleRefreshRole}
+                    disabled={isElevating}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors flex items-center gap-2 border border-slate-300 cursor-pointer"
+                    title="Verify live role claims from Firestore"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isElevating ? 'animate-spin' : ''}`} />
+                    <span>{isElevating ? 'Syncing...' : 'Sync Role'}</span>
+                  </button>
+                </>
               ) : (
-                <div className="px-4 py-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-semibold">
-                  Admin Panel requires Superadmin
-                </div>
+                <>
+                  <div className="px-4 py-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs font-semibold">
+                    Admin Panel requires Superadmin authorization
+                  </div>
+                  <button
+                    onClick={handleRefreshRole}
+                    disabled={isElevating}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors flex items-center gap-2 border border-slate-300 cursor-pointer"
+                    title="Check live assigned role from Firebase"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isElevating ? 'animate-spin' : ''}`} />
+                    <span>{isElevating ? 'Checking...' : 'Check Assigned Role'}</span>
+                  </button>
+                </>
               )}
               <button
                 onClick={handleSignOut}
@@ -242,6 +306,13 @@ export const SignInView: React.FC<SignInViewProps> = ({
               </button>
             </div>
           </div>
+
+          {elevationMessage && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs flex items-center gap-2.5 shadow-sm">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="font-semibold">{elevationMessage}</span>
+            </div>
+          )}
 
           {/* Quick Shortcuts */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

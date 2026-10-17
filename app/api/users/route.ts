@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase/admin';
+import { db, auth } from '@/lib/firebase/admin';
 import { SAMPLE_STUDENTS, SAMPLE_STAFF } from '@/scripts/seed-database';
 import {
   DEFAULT_REGISTRATION_ROLE,
@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const uid = searchParams.get('uid');
+    const emailParam = searchParams.get('email');
 
     // If querying a single user by UID
     if (uid) {
@@ -24,18 +25,46 @@ export async function GET(req: NextRequest) {
         const doc = await db.collection('users').doc(uid).get();
         if (doc.exists) {
           const data = doc.data() || {};
-          const role = normalizeRole(data.role);
+          const isOwner = isProjectOwnerEmail(data.email);
+          const role = isOwner ? 'superadmin' : normalizeRole(data.role);
+          const isSuper = isOwner || isSuperAdmin(role, data.isSuperAdmin);
           return NextResponse.json({
             user: {
               id: doc.id,
               ...data,
               role,
-              isSuperAdmin: isSuperAdmin(role, data.isSuperAdmin)
+              isSuperAdmin: isSuper
             }
           });
         }
       } catch (dbErr) {
         console.warn(`Firestore fetch for user ${uid} failed:`, dbErr);
+      }
+      return NextResponse.json({ user: null, message: 'User not found' }, { status: 404 });
+    }
+
+    // If querying a single user by Email
+    if (emailParam) {
+      try {
+        const cleanEmail = emailParam.toLowerCase().trim();
+        const emailQuery = await db.collection('users').where('email', '==', cleanEmail).limit(1).get();
+        if (!emailQuery.empty) {
+          const doc = emailQuery.docs[0];
+          const data = doc.data() || {};
+          const isOwner = isProjectOwnerEmail(data.email);
+          const role = isOwner ? 'superadmin' : normalizeRole(data.role);
+          const isSuper = isOwner || isSuperAdmin(role, data.isSuperAdmin);
+          return NextResponse.json({
+            user: {
+              id: doc.id,
+              ...data,
+              role,
+              isSuperAdmin: isSuper
+            }
+          });
+        }
+      } catch (dbErr) {
+        console.warn(`Firestore fetch for user email ${emailParam} failed:`, dbErr);
       }
       return NextResponse.json({ user: null, message: 'User not found' }, { status: 404 });
     }
@@ -138,8 +167,9 @@ export async function POST(req: NextRequest) {
     if (wasPreviouslyRegistered && existingData) {
       // User or email has been registered before -> check and preserve their previously registered role
       const previousRole = normalizeRole(existingData.role || existingData.status);
-      const updatedRole = isOwner ? 'superadmin' : previousRole;
-      const isSuper = isOwner || isSuperAdmin(updatedRole, existingData.isSuperAdmin);
+      const isExistingSuper = existingData.isSuperAdmin === true || previousRole === 'superadmin';
+      const updatedRole = (isOwner || isExistingSuper) ? 'superadmin' : previousRole;
+      const isSuper = isOwner || isExistingSuper || isSuperAdmin(updatedRole, existingData.isSuperAdmin);
 
       const updatedFields: Record<string, any> = {
         lastLoginAt: new Date().toISOString(),
@@ -163,6 +193,18 @@ export async function POST(req: NextRequest) {
         id: uid,
         uid,
       }, { merge: true });
+
+      // Synchronize Firebase Auth Custom Claims
+      try {
+        await auth.setCustomUserClaims(uid, {
+          role: updatedRole,
+          isSuperAdmin: isSuper,
+          roles: [updatedRole],
+          dept: updatedFields.dept || existingData.dept || (isSuper ? 'Executive Directorate & Superadmin Control' : 'General'),
+        });
+      } catch (claimErr) {
+        // non-blocking for mock UIDs
+      }
 
       const finalUser = {
         id: uid,
@@ -211,6 +253,19 @@ export async function POST(req: NextRequest) {
     };
 
     await userRef.set(newUserData);
+
+    // Synchronize Firebase Auth Custom Claims
+    try {
+      await auth.setCustomUserClaims(uid, {
+        role: assignedRole,
+        isSuperAdmin: isSuper,
+        roles: [assignedRole],
+        dept: isSuper ? 'Executive Directorate & Superadmin Control' : 'General',
+      });
+    } catch (claimErr) {
+      // non-blocking for mock UIDs
+    }
+
     return NextResponse.json({
       user: newUserData,
       isNewUser: true,
@@ -256,6 +311,17 @@ export async function PATCH(req: NextRequest) {
 
     await userRef.set(updatePayload, { merge: true });
     const updatedDoc = await userRef.get();
+
+    // Synchronize Firebase Auth Custom Claims
+    try {
+      await auth.setCustomUserClaims(uid, {
+        role: normalizedNewRole,
+        isSuperAdmin: isSuper,
+        roles: [normalizedNewRole],
+      });
+    } catch (claimErr) {
+      // non-blocking for mock UIDs
+    }
 
     return NextResponse.json({
       success: true,

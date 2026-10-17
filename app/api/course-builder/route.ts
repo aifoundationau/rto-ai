@@ -77,6 +77,13 @@ export async function POST(req: NextRequest) {
             fullName: 'Executive Superadmin',
             role: 'SUPERADMIN',
             dept: 'Executive Directorate & Course Governance',
+          },
+          {
+            uid: 'L5euSJAfNKdDOX6mT0qmrCGjUA53',
+            email: 'support@aifoundation.net.au',
+            fullName: 'AI Foundation Support',
+            role: 'SUPERADMIN',
+            dept: 'Executive Directorate & Course Governance',
           }
         ];
 

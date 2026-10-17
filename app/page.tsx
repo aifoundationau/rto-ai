@@ -70,6 +70,33 @@ export default function HomePage() {
         setClassroomUser(parsed);
         const isSuper = parsed.isSuperAdmin === true || parsed.role?.toLowerCase() === 'superadmin';
         setIsAdminLoggedIn(isSuper);
+
+        // Immediate background refresh against Firestore to ensure any role change in Firebase reflects live
+        const queryParam = parsed.googleWorkspaceId 
+          ? `uid=${encodeURIComponent(parsed.googleWorkspaceId)}`
+          : (parsed.email ? `email=${encodeURIComponent(parsed.email)}` : '');
+        if (queryParam) {
+          fetch(`/api/users?${queryParam}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (data?.user) {
+                const liveRole = data.user.role || 'supporter';
+                const liveSuper = data.user.isSuperAdmin === true || liveRole.toLowerCase() === 'superadmin';
+                const refreshedUser = {
+                  ...parsed,
+                  role: liveRole,
+                  isSuperAdmin: liveSuper,
+                };
+                setClassroomUser(refreshedUser);
+                setIsAdminLoggedIn(liveSuper);
+                try {
+                  localStorage.setItem('edupulse_user', JSON.stringify(refreshedUser));
+                  localStorage.setItem('edupulse_is_admin', liveSuper ? 'true' : 'false');
+                } catch (e) {}
+              }
+            })
+            .catch(() => {});
+        }
       } else {
         const adminState = localStorage.getItem('edupulse_is_admin');
         if (adminState === 'true') setIsAdminLoggedIn(true);

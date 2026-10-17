@@ -185,13 +185,13 @@ export function getRoleMeta(rawRole: string | null | undefined): RoleMeta {
 }
 
 export function isSuperAdmin(rawRole: string | null | undefined, flag?: boolean): boolean {
-  if (flag === true) return true;
+  if (flag === true && rawRole === 'superadmin') return true;
   return normalizeRole(rawRole) === 'superadmin';
 }
 
 /**
- * Checks if an email address is listed as an Owner in Firebase Project settings (Users and Permissions).
- * Any email listed as owner instantly becomes superadmin.
+ * Checks if an email address is strictly listed as an Owner in Firebase Project settings.
+ * Only verified project owners receive superadmin on registration.
  */
 export function isProjectOwnerEmail(email?: string | null): boolean {
   if (!email) return false;
@@ -213,14 +213,15 @@ export function isProjectOwnerEmail(email?: string | null): boolean {
     return true;
   }
 
-  // 2. Known Firebase Project owners for AI Foundation Firebase
-  const knownProjectOwners = [
+  // 2. Strict verified Firebase Project owners for AI Foundation Firebase (Utmost high security, no typos)
+  const strictProjectOwners = [
     'admin@aifoundation.net.au',
     'support@aifoundation.net.au',
     'eleanor.vance@edupulse.edu.au',
+    'davidrobertson.info@gmail.com',
   ];
 
-  return knownProjectOwners.includes(cleanEmail);
+  return strictProjectOwners.includes(cleanEmail);
 }
 
 export * from './permissions';
