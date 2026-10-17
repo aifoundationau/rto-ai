@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { recordActivity, getRecentActivityLogs, db } from '@/lib/firebase/admin';
+import { recordActivity, getRecentActivityLogs, db, isFirebaseConfigured } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,13 +44,15 @@ export async function GET(req: NextRequest) {
 
     // Also fetch aggregated platform metrics
     let metrics = null;
-    try {
-      const metricsDoc = await db.collection('metrics').doc('platform_stats').get();
-      if (metricsDoc.exists) {
-        metrics = metricsDoc.data();
+    if (isFirebaseConfigured) {
+      try {
+        const metricsDoc = await db.collection('metrics').doc('platform_stats').get();
+        if (metricsDoc.exists) {
+          metrics = metricsDoc.data();
+        }
+      } catch (e) {
+        // non-fatal
       }
-    } catch (e) {
-      // non-fatal
     }
 
     return NextResponse.json({

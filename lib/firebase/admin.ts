@@ -136,6 +136,9 @@ function cleanUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
  * Enroll a user in TOTP MFA (Google Authenticator).
  */
 export async function enrollTotpMfa(uid: string, totpSecret: string) {
+  if (!isFirebaseConfigured) {
+    return { success: true, uid };
+  }
   const enrollment = await auth.updateUser(uid, {});
   return enrollment;
 }
@@ -144,6 +147,9 @@ export async function enrollTotpMfa(uid: string, totpSecret: string) {
  * Set RBAC role claims for a user.
  */
 export async function setUserRoles(uid: string, roles: string[]) {
+  if (!isFirebaseConfigured) {
+    return;
+  }
   const claims = { roles };
   await auth.setCustomUserClaims(uid, claims);
   console.log(`Set roles ${roles.join(', ')} for user ${uid}`);
@@ -154,6 +160,10 @@ export async function setUserRoles(uid: string, roles: string[]) {
  */
 export async function generateStudentNumber(year?: number): Promise<string> {
   const currentYear = year || new Date().getFullYear();
+  if (!isFirebaseConfigured) {
+    const randomPadded = String(Math.floor(Math.random() * 90000) + 10000);
+    return `STU-${currentYear}-${randomPadded}`;
+  }
   const counterRef = db.collection('counters').doc('student_id_counter');
 
   const studentNumber = await db.runTransaction(async (transaction: any) => {
@@ -198,6 +208,18 @@ export async function assignUniversityRole(params: {
   email?: string;
 }) {
   const { uid, role, dept = 'Computer Science & Engineering', fullName, email } = params;
+
+  if (!isFirebaseConfigured) {
+    const fallbackStudentNumber = role === 'STUDENT' ? `STU-${new Date().getFullYear()}-00001` : null;
+    return {
+      success: true,
+      uid,
+      role,
+      dept,
+      studentNumber: fallbackStudentNumber,
+      customClaims: { role, dept, ...(fallbackStudentNumber ? { studentNumber: fallbackStudentNumber } : {}) },
+    };
+  }
 
   let existingClaims: Record<string, any> = {};
   let userEmail = email || '';

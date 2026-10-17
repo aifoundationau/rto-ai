@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase/admin';
+import { db, isFirebaseConfigured } from '@/lib/firebase/admin';
 
 export interface BlogPostItem {
   id: string;
@@ -69,6 +69,9 @@ let inMemoryBlogPosts: BlogPostItem[] = [
 ];
 
 export async function GET() {
+  if (!isFirebaseConfigured) {
+    return NextResponse.json({ posts: inMemoryBlogPosts });
+  }
   try {
     const posts: BlogPostItem[] = [];
     try {

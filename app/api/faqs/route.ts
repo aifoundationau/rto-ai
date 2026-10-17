@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase/admin';
+import { db, isFirebaseConfigured } from '@/lib/firebase/admin';
 import { FAQS_DATA, FAQItem } from '@/data/faqs';
 import { getDynamicFaqs, setDynamicFaqs, addDynamicFaq, removeDynamicFaq } from '@/data/dynamicStore';
 
@@ -14,8 +14,9 @@ export async function GET() {
   try {
     const customFaqs: FAQItem[] = [];
 
-    try {
-      const snapshot = await db.collection('faqs').get();
+    if (isFirebaseConfigured) {
+      try {
+        const snapshot = await db.collection('faqs').get();
       if (!snapshot.empty) {
         snapshot.forEach((doc: any) => {
           const data = doc.data();
@@ -37,6 +38,7 @@ export async function GET() {
     } catch (dbErr) {
       console.warn('[FAQ API] Firestore query failed, falling back to dynamicStore memory:', dbErr);
     }
+  }
 
     // Merge static baseline FAQS_DATA (10 default) with custom FAQs, ensuring no ID collisions
     const customMap = new Map<string, FAQItem>();

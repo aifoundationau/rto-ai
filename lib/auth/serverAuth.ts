@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { auth, db } from '@/lib/firebase/admin';
+import { auth, db, isFirebaseConfigured } from '@/lib/firebase/admin';
 import { isProjectOwnerEmail, normalizeRole, SystemRole } from '@/lib/auth/roles';
 
 export interface VerifiedCaller {
@@ -26,6 +26,10 @@ export interface VerifiedCaller {
  * Checks "Authorization: Bearer <token>" and session cookies.
  */
 export async function verifyBearerToken(req: NextRequest): Promise<any | null> {
+  if (!isFirebaseConfigured) {
+    return null;
+  }
+
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
   let token = '';
 
@@ -92,29 +96,34 @@ export async function getVerifiedCaller(req: NextRequest): Promise<VerifiedCalle
   let role: SystemRole = 'supporter';
   let isSuper = false;
 
-  try {
-    const userDoc = await db.collection('users').doc(uid).get();
-    if (userDoc.exists) {
-      const data = userDoc.data() || {};
-      const storedRole = normalizeRole(data.role || data.status);
-      if (storedRole === 'superadmin' || data.isSuperAdmin === true) {
-        // Double check owner or existing superadmin flag
-        role = 'superadmin';
-        isSuper = true;
+  if (isFirebaseConfigured) {
+    try {
+      const userDoc = await db.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        const data = userDoc.data() || {};
+        const storedRole = normalizeRole(data.role || data.status);
+        if (storedRole === 'superadmin' || data.isSuperAdmin === true) {
+          // Double check owner or existing superadmin flag
+          role = 'superadmin';
+          isSuper = true;
+        } else {
+          role = storedRole;
+        }
       } else {
-        role = storedRole;
+        // New user -> Strictly default to supporter
+        role = 'supporter';
       }
-    } else {
-      // New user -> Strictly default to supporter
-      role = 'supporter';
+    } catch (dbErr) {
+      console.warn(`[getVerifiedCaller] Firestore lookup failed for uid ${uid}:`, dbErr);
+      // If token has custom claim
+      if (decoded.role) {
+        role = normalizeRole(decoded.role);
+        isSuper = role === 'superadmin' || decoded.isSuperAdmin === true;
+      }
     }
-  } catch (dbErr) {
-    console.warn(`[getVerifiedCaller] Firestore lookup failed for uid ${uid}:`, dbErr);
-    // If token has custom claim
-    if (decoded.role) {
-      role = normalizeRole(decoded.role);
-      isSuper = role === 'superadmin' || decoded.isSuperAdmin === true;
-    }
+  } else if (decoded.role) {
+    role = normalizeRole(decoded.role);
+    isSuper = role === 'superadmin' || decoded.isSuperAdmin === true;
   }
 
   return {

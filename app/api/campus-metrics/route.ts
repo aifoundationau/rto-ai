@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase/admin';
+import { db, isFirebaseConfigured } from '@/lib/firebase/admin';
 import { requireAdministrationOrSuperAdminCaller } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +28,13 @@ const DEFAULT_CAMPUS_METRICS: CampusMetricsData = {
 let runtimeCache: CampusMetricsData = { ...DEFAULT_CAMPUS_METRICS };
 
 export async function GET() {
+  if (!isFirebaseConfigured) {
+    return NextResponse.json({
+      success: true,
+      metrics: runtimeCache,
+      source: 'memory_fallback',
+    });
+  }
   try {
     try {
       const docSnap = await db.collection('site_settings').doc('campus_metrics').get();

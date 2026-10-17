@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase/admin';
+import { db, isFirebaseConfigured } from '@/lib/firebase/admin';
 import {
   SYSTEM_ROLES,
   normalizeRole,
@@ -24,8 +24,9 @@ export async function GET() {
   try {
     const rolePermissions: Record<SystemRole, string[]> = { ...DEFAULT_ROLE_PERMISSIONS };
 
-    try {
-      const snapshot = await db.collection('role_permissions').get();
+    if (isFirebaseConfigured) {
+      try {
+        const snapshot = await db.collection('role_permissions').get();
       if (!snapshot.empty) {
         snapshot.forEach((doc: any) => {
           const roleKey = normalizeRole(doc.id);
@@ -45,6 +46,7 @@ export async function GET() {
     } catch (dbErr) {
       console.warn('Firestore fetch for role_permissions failed, using defaults:', dbErr);
     }
+  }
 
     return NextResponse.json({
       rolePermissions,

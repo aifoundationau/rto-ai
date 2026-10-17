@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveTokenTransaction, db } from '@/lib/firebase/admin';
+import { saveTokenTransaction, db, isFirebaseConfigured } from '@/lib/firebase/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +33,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
+  if (!isFirebaseConfigured) {
+    return NextResponse.json({ success: true, transactions: [] });
+  }
   try {
     const snapshot = await db.collection('token_transactions')
       .orderBy('createdAt', 'desc')

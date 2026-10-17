@@ -1,4 +1,4 @@
-import { db, FieldValue } from '@/lib/firebase/admin';
+import { db, FieldValue, isFirebaseConfigured } from '@/lib/firebase/admin';
 import {
   TenantConfig,
   ProgramDocument,
@@ -479,6 +479,9 @@ export function auditProgramCompliance(
  * Initializes tenant configuration and seeds default accredited programs if empty.
  */
 export async function initializeCourseBuilderDatabase(): Promise<{ success: boolean; message: string }> {
+  if (!isFirebaseConfigured) {
+    return { success: true, message: 'Running with in-memory Course Builder store fallback.' };
+  }
   try {
     const tenantDocRef = db.collection('tenants').doc(DEFAULT_TENANT_CONFIG.tenantId);
     const tenantSnap = await tenantDocRef.get();
@@ -535,6 +538,9 @@ export async function initializeCourseBuilderDatabase(): Promise<{ success: bool
  * Fetch all programs for tenant.
  */
 export async function getPrograms(): Promise<ProgramDocument[]> {
+  if (!isFirebaseConfigured) {
+    return cachedPrograms;
+  }
   try {
     const snap = await db.collection('programs').orderBy('code', 'asc').get();
     if (!snap.empty) {
@@ -578,6 +584,10 @@ export async function saveProgram(program: ProgramDocument): Promise<{ success: 
  * Fetch all units for tenant or program.
  */
 export async function getUnits(programId?: string): Promise<UnitDocument[]> {
+  if (!isFirebaseConfigured) {
+    if (programId) return cachedUnits.filter(u => u.programId === programId);
+    return cachedUnits;
+  }
   try {
     let query: any = db.collection('units');
     if (programId) query = query.where('programId', '==', programId);
