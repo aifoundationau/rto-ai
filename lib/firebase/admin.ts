@@ -57,9 +57,14 @@ function getCredentials() {
   return { cleanKey, cleanEmail, cleanProjectId };
 }
 
+const { cleanKey: _credKey } = getCredentials();
+export const isFirebaseConfigured = Boolean(
+  _credKey && _credKey.includes('BEGIN PRIVATE KEY') && !_credKey.includes('YOUR_PRIVATE_KEY')
+);
+
 function getAdminApp() {
   const { cleanKey, cleanEmail, cleanProjectId } = getCredentials();
-  const hasCredentials = cleanKey && cleanKey.includes('BEGIN PRIVATE KEY') && !cleanKey.includes('YOUR_PRIVATE_KEY');
+  const hasCredentials = isFirebaseConfigured;
   const appName = 'ai-foundation-admin';
 
   // Check if our dedicated named admin app already exists
@@ -308,6 +313,9 @@ export async function recordActivity(event: {
   userAgent?: string;
   ip?: string;
 }) {
+  if (!isFirebaseConfigured) {
+    return { success: true, logId: 'local-log-unconfigured' };
+  }
   try {
     const eventTime = event.timestamp ? new Date(event.timestamp) : new Date();
     const docData = cleanUndefined({
@@ -345,6 +353,9 @@ export async function recordActivity(event: {
  * Persists student application data to Firestore.
  */
 export async function saveApplicationToFirestore(appData: any) {
+  if (!isFirebaseConfigured) {
+    return { success: true, id: appData?.id || 'local-app' };
+  }
   try {
     if (!appData?.id) return { success: false, error: 'No application ID' };
 
@@ -385,6 +396,9 @@ export async function saveApplicationToFirestore(appData: any) {
  * Retrieves all applications from Firestore with fallback.
  */
 export async function getApplicationsFromFirestore() {
+  if (!isFirebaseConfigured) {
+    return [];
+  }
   try {
     const snapshot = await db.collection('applications').orderBy('updatedAt', 'desc').get();
     if (!snapshot.empty) {
@@ -411,6 +425,9 @@ export async function saveChatInteraction(interaction: {
   applicantEmail?: string;
   currentApplicationId?: string;
 }) {
+  if (!isFirebaseConfigured) {
+    return { success: true, id: 'local-chat-unconfigured' };
+  }
   try {
     const docRef = await db.collection('chat_interactions').add({
       databaseCode: DATABASE_CODE,
@@ -449,6 +466,9 @@ export async function saveTokenTransaction(tx: {
   reason?: string;
   metadata?: Record<string, any>;
 }) {
+  if (!isFirebaseConfigured) {
+    return { success: true, id: 'local-token-unconfigured' };
+  }
   try {
     const docRef = await db.collection('token_transactions').add({
       databaseCode: DATABASE_CODE,
@@ -480,6 +500,9 @@ export async function saveTokenTransaction(tx: {
  * Persists Event bookings to Firestore.
  */
 export async function saveEventBooking(booking: any) {
+  if (!isFirebaseConfigured) {
+    return { success: true, id: 'local-booking-unconfigured' };
+  }
   try {
     const docRef = await db.collection('event_bookings').add({
       databaseCode: DATABASE_CODE,
@@ -510,6 +533,9 @@ export async function saveEventBooking(booking: any) {
  * Get recent activity logs for live telemetry display.
  */
 export async function getRecentActivityLogs(limitCount = 40) {
+  if (!isFirebaseConfigured) {
+    return [];
+  }
   try {
     try {
       const snapshot = await db.collection('activity_logs')

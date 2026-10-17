@@ -67,6 +67,7 @@ export interface RagQueryOptions {
   categoryFilter?: string;
   targetLanguage?: string;
   apiKey?: string;
+  allTranslations?: boolean;
 }
 
 export interface AutoSortResult {

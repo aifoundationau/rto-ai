@@ -42,6 +42,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [application, setApplication] = useState<StudentApplication>(INITIAL_APPLICATION_STATE);
   const [apiKey, setApiKey] = useState<string>('');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isClassroomLoginOpen, setIsClassroomLoginOpen] = useState(false);
   const [classroomUser, setClassroomUser] = useState<ClassroomUser | null>(null);
@@ -405,7 +406,12 @@ export default function HomePage() {
       });
 
       if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
+        let errMessage = '';
+        try {
+          const errData = await res.json();
+          errMessage = errData.message || errData.error || '';
+        } catch (_) {}
+        throw new Error(errMessage || `Server responded with status ${res.status}`);
       }
 
       const data = await res.json();
@@ -434,12 +440,15 @@ export default function HomePage() {
           }).catch((err) => console.warn('Failed to save chat-submitted application:', err));
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
+      const isTimeout = error?.message?.includes('504') || error?.message?.includes('timed out');
       const errorMessage: ChatMessage = {
         id: `msg-${Date.now()}-error`,
         role: 'assistant',
-        content: '⚠️ I encountered an error connecting to the university server. Please try again or rephrase your question.',
+        content: isTimeout
+          ? '⚠️ Connection timed out while contacting the AI model. If you deployed to Vercel, ensure **GEMINI_API_KEY** is configured under **Project Settings → Environment Variables**, or click the **Set Gemini Key** button in the chat header.'
+          : '⚠️ I encountered an error connecting to the university server. Please check your network, configure your Gemini API Key in the chat header, or ask about our degree courses (e.g. *Bachelor of Computer Science*), unit syllabuses (e.g. *COMP1001*), or upcoming Open Days!',
         timestamp: new Date().toISOString()
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -561,6 +570,8 @@ export default function HomePage() {
               onSelectCourse={handleApplyForCourse}
               onSelectUnit={handleSelectUnitForChat}
               onResetChat={handleResetChat}
+              onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+              hasApiKey={Boolean(apiKey && apiKey.length > 10)}
             />
           </div>
         )}
@@ -682,6 +693,19 @@ export default function HomePage() {
           }
         }}
         onLogout={handleLogoutAdmin}
+      />
+
+      {/* Gemini API Key Configuration Modal */}
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        apiKey={apiKey}
+        onSaveApiKey={(key) => {
+          setApiKey(key);
+          try {
+            localStorage.setItem('edupulse_api_key', key);
+          } catch (e) {}
+        }}
       />
     </div>
   );

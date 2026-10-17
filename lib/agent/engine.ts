@@ -728,18 +728,25 @@ Always be polite, structured, and use markdown formatting. Match the user's inqu
     ]
   };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey
-    },
-    body: JSON.stringify(body)
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(9000)
+    });
+  } catch (fetchErr) {
+    console.warn('Gemini API request timed out or network error:', fetchErr);
+    return null;
+  }
 
   if (!res.ok) {
     const errorText = await res.text();
-    console.error('Gemini API returned error:', errorText);
+    console.warn('Gemini API returned error status:', res.status, errorText);
     return null;
   }
 
@@ -768,19 +775,31 @@ Always be polite, structured, and use markdown formatting. Match the user's inqu
 
     for (const fc of functionCalls) {
       const { name, args } = fc;
-      const { result, updatedApplication: newApp } = await executeAgentToolAsync(name, args || {}, updatedApp, apiKey);
-      toolsExecuted.push({ toolName: name, args: args || {}, output: result.output });
-      if (result.uiWidget) uiWidgets.push(result.uiWidget);
-      if (newApp) updatedApp = newApp;
+      try {
+        const { result, updatedApplication: newApp } = await executeAgentToolAsync(name, args || {}, updatedApp, apiKey);
+        toolsExecuted.push({ toolName: name, args: args || {}, output: result.output });
+        if (result.uiWidget) uiWidgets.push(result.uiWidget);
+        if (newApp) updatedApp = newApp;
 
-      functionResponseParts.push({
-        functionResponse: {
-          name,
-          response: {
-            output: result.output
+        functionResponseParts.push({
+          functionResponse: {
+            name,
+            response: {
+              output: result.output
+            }
           }
-        }
-      });
+        });
+      } catch (toolErr) {
+        console.warn(`Tool execution error for ${name}:`, toolErr);
+        functionResponseParts.push({
+          functionResponse: {
+            name,
+            response: {
+              output: { error: 'Tool completed with warnings.' }
+            }
+          }
+        });
+      }
     }
 
     // Try follow-up call to Gemini to synthesize grounded prose
@@ -804,7 +823,8 @@ Always be polite, structured, and use markdown formatting. Match the user's inqu
           contents: secondTurnContents,
           systemInstruction,
           tools: body.tools
-        })
+        }),
+        signal: AbortSignal.timeout(5000)
       });
 
       if (secondRes.ok) {
@@ -816,7 +836,7 @@ Always be polite, structured, and use markdown formatting. Match the user's inqu
         }
       }
     } catch (secondErr) {
-      console.warn('Second turn Gemini call failed:', secondErr);
+      console.warn('Second turn Gemini call skipped or timed out:', secondErr);
     }
 
     // If second call didn't yield text, synthesize from tool execution
