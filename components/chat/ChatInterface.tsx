@@ -24,7 +24,8 @@ import {
   HelpCircle,
   CheckCircle2,
   ChevronRight,
-  Code
+  Code,
+  Key
 } from 'lucide-react';
 
 interface ChatInterfaceProps {
@@ -36,6 +37,8 @@ interface ChatInterfaceProps {
   onSelectCourse: (course: CourseProgram) => void;
   onSelectUnit: (unitCode: string) => void;
   onResetChat: () => void;
+  onOpenApiKeyModal?: () => void;
+  hasApiKey?: boolean;
 }
 
 const FormattedMessage: React.FC<{ content: string; isAssistant: boolean }> = ({ content, isAssistant }) => {
@@ -138,7 +141,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onOpenApplicationPortal,
   onSelectCourse,
   onSelectUnit,
-  onResetChat
+  onResetChat,
+  onOpenApiKeyModal,
+  hasApiKey = false
 }) => {
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -271,6 +276,20 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {onOpenApiKeyModal && (
+            <button
+              onClick={onOpenApiKeyModal}
+              title="Configure Gemini API Key"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
+                hasApiKey
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30 hover:bg-emerald-500/30'
+                  : 'bg-white/10 text-slate-300 border-white/15 hover:bg-white/20 hover:text-white'
+              }`}
+            >
+              <Key className="w-3.5 h-3.5" />
+              <span>{hasApiKey ? 'Gemini Active' : 'Set Gemini Key'}</span>
+            </button>
+          )}
           <button
             onClick={onResetChat}
             title="Clear & Restart Conversation"

@@ -42,6 +42,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [application, setApplication] = useState<StudentApplication>(INITIAL_APPLICATION_STATE);
   const [apiKey, setApiKey] = useState<string>('');
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [isClassroomLoginOpen, setIsClassroomLoginOpen] = useState(false);
   const [classroomUser, setClassroomUser] = useState<ClassroomUser | null>(null);
@@ -405,7 +406,12 @@ export default function HomePage() {
       });
 
       if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
+        let errMessage = '';
+        try {
+          const errData = await res.json();
+          errMessage = errData.message || errData.error || '';
+        } catch (_) {}
+        throw new Error(errMessage || `Server responded with status ${res.status}`);
       }
 
       const data = await res.json();
@@ -434,16 +440,19 @@ export default function HomePage() {
           }).catch((err) => console.warn('Failed to save chat-submitted application:', err));
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
+      const isTimeout = error?.message?.includes('504') || error?.message?.includes('timed out');
       const fallbackMessage: ChatMessage = {
         id: `msg-${Date.now()}-assistant`,
         role: 'assistant',
-        content: `I am currently operating in resilient offline advisory mode while server connections synchronize.\n\n` +
-          `• 📚 **Degree Programs:** Browse our degrees and entry requirements in the **Degree Programs** tab.\n` +
-          `• 🔬 **Unit Syllabuses:** Inspect full subject descriptions and prerequisites (e.g. *COMP1001, AI5001*) in the **Unit Syllabuses** tab.\n` +
-          `• 📝 **Admissions Portal:** Complete and submit your student enrolment directly via the **Application Form** tab.\n\n` +
-          `Feel free to try sending your question again or check back shortly!`,
+        content: isTimeout
+          ? 'I am currently experiencing network latency contacting external AI services. Our complete course catalog and syllabus database are available in the tabs above, or you can try sending your message again shortly.'
+          : `I am currently operating in resilient offline advisory mode while server connections synchronize.\n\n` +
+            `• 📚 **Degree Programs:** Browse our degrees and entry requirements in the **Degree Programs** tab.\n` +
+            `• 🔬 **Unit Syllabuses:** Inspect full subject descriptions and prerequisites (e.g. *COMP1001, AI5001*) in the **Unit Syllabuses** tab.\n` +
+            `• 📝 **Admissions Portal:** Complete and submit your student enrolment directly via the **Application Form** tab.\n\n` +
+            `Feel free to try sending your question again or explore our catalog!`,
         timestamp: new Date().toISOString()
       };
       setMessages((prev) => [...prev, fallbackMessage]);
@@ -565,6 +574,8 @@ export default function HomePage() {
               onSelectCourse={handleApplyForCourse}
               onSelectUnit={handleSelectUnitForChat}
               onResetChat={handleResetChat}
+              onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
+              hasApiKey={Boolean(apiKey && apiKey.length > 10)}
             />
           </div>
         )}
@@ -686,6 +697,19 @@ export default function HomePage() {
           }
         }}
         onLogout={handleLogoutAdmin}
+      />
+
+      {/* Gemini API Key Configuration Modal */}
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        apiKey={apiKey}
+        onSaveApiKey={(key) => {
+          setApiKey(key);
+          try {
+            localStorage.setItem('edupulse_api_key', key);
+          } catch (e) {}
+        }}
       />
     </div>
   );
