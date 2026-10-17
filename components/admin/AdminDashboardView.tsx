@@ -36,7 +36,10 @@ import {
   MessageSquare,
   GraduationCap,
   TrendingUp,
-  BarChart3
+  BarChart3,
+  LogOut,
+  User,
+  Mail
 } from 'lucide-react';
 
 import { ImageManager } from './ImageManager';
@@ -53,7 +56,7 @@ import { ApplicationDetailModal } from './ApplicationDetailModal';
 import { MultilingualRagManager } from './MultilingualRagManager';
 import { BlogInsightsManager } from './BlogInsightsManager';
 import { CampusMetricsManager } from './CampusMetricsManager';
-import { SYSTEM_ROLES, ROLE_DEFINITIONS, normalizeRole, getRoleMeta, isSuperAdmin } from '@/lib/auth/roles';
+import { SYSTEM_ROLES, ROLE_DEFINITIONS, normalizeRole, getRoleMeta, isSuperAdmin, isProjectOwnerEmail } from '@/lib/auth/roles';
 import { authenticatedFetch } from '@/lib/firebase/client';
 import { ClassroomUser } from '@/components/auth/GoogleClassroomLoginModal';
 
@@ -79,38 +82,51 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   const isAdministration = roleNormalized === 'administration';
   const hasAccess = isSuper || isAdministration;
 
-  if (currentUser && !hasAccess) {
-    return (
-      <div className="max-w-xl mx-auto my-12 p-8 bg-white rounded-3xl border border-rose-200 shadow-xl text-center space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-          <ShieldAlert className="w-6 h-6" />
-        </div>
-        <h2 className="text-xl font-bold text-slate-900">Administrative Privileges Required</h2>
-        <p className="text-xs text-slate-600 max-w-md mx-auto">
-          Access to this operations panel is reserved exclusively for verified administration and superadmin accounts.
-        </p>
-        <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-600 inline-block text-left font-mono border border-slate-200">
-          <div>Signed in as: <span className="font-bold text-slate-900">{currentUser.email}</span></div>
-          <div>Role: <span className="font-bold uppercase text-indigo-600">{currentUser.role || 'supporter'}</span></div>
-        </div>
-        <div className="pt-2 flex justify-center gap-3">
-          <button
-            onClick={onLogout}
-            className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl transition cursor-pointer hover:bg-slate-800"
-          >
-            Sign Out / Switch Account
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const [activeTab, setActiveTab] = useState<'account_profile' | 'campus_metrics' | 'course_builder' | 'role_permissions' | 'rag_pipeline' | 'blog_insights' | 'api_key' | 'telemetry' | 'staff_messaging' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens' | 'calendar'>(
+    'account_profile'
+  );
+
+  const [isSyncingRole, setIsSyncingRole] = useState(false);
+  const [roleSyncFeedback, setRoleSyncFeedback] = useState<string>('');
+
+  const handleRefreshRole = async () => {
+    if (!currentUser) return;
+    setIsSyncingRole(true);
+    setRoleSyncFeedback('');
+    try {
+      const isOwner = isProjectOwnerEmail(currentUser.email);
+      const query = currentUser.email 
+        ? `email=${encodeURIComponent(currentUser.email)}`
+        : (currentUser.googleWorkspaceId ? `uid=${encodeURIComponent(currentUser.googleWorkspaceId)}` : '');
+      const res = await fetch(`/api/users?${query}`);
+      const data = await res.json();
+      if (res.ok && data.user) {
+        const role = isOwner ? 'superadmin' : (data.user.role || 'supporter');
+        const isSuperRole = isOwner || data.user.isSuperAdmin === true || role.toLowerCase() === 'superadmin';
+        const updated = {
+          ...currentUser,
+          role,
+          isSuperAdmin: isSuperRole,
+        };
+        try {
+          localStorage.setItem('edupulse_user', JSON.stringify(updated));
+          localStorage.setItem('edupulse_is_admin', isSuperRole ? 'true' : 'false');
+        } catch (e) {}
+        setRoleSyncFeedback(`Live role verified from database: ${role.toUpperCase()}`);
+      } else {
+        setRoleSyncFeedback('Could not fetch user record from database');
+      }
+    } catch (err: any) {
+      setRoleSyncFeedback(err.message || 'Failed to sync role');
+    } finally {
+      setIsSyncingRole(false);
+    }
+  };
+
   const [applications, setApplications] = useState<StudentApplication[]>([]);
   const [selectedApp, setSelectedApp] = useState<StudentApplication | null>(null);
   const [appSearchTerm, setAppSearchTerm] = useState('');
   const [appStatusFilter, setAppStatusFilter] = useState('ALL');
-  const [activeTab, setActiveTab] = useState<'campus_metrics' | 'course_builder' | 'role_permissions' | 'rag_pipeline' | 'blog_insights' | 'api_key' | 'telemetry' | 'staff_messaging' | 'applications' | 'sheets_sync' | 'events' | 'knowledge' | 'embed_code' | 'user_management' | 'images' | 'classroom' | 'tokens' | 'calendar'>(
-    isAdministration && !isSuper ? 'campus_metrics' : 'course_builder'
-  );
   const [apiKeys, setApiKeys] = useState({
     gemini: apiKey || '',
     firebase: '',
@@ -369,17 +385,40 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         {/* Title and Controls Row */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Admin & Operations Panel
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+              <span>Admin & Operations Panel</span>
             </h1>
             <p className="text-sm text-slate-300 mt-1">
               Executive control over LMS Course Builder, admissions telemetry, 24/7 Google Sheets synchronization, and student identifiers.
             </p>
           </div>
 
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-2 shadow-md cursor-pointer shrink-0 border border-rose-500/60 hover:shadow-rose-900/40"
+              title="Log Out of your account"
+            >
+              <LogOut className="w-4 h-4 text-white" />
+              <span>Log Out</span>
+            </button>
+          )}
+        </div>
 
+        {/* Navigation Tabs */}
+        <div className="flex flex-wrap items-center gap-1.5 bg-white/10 p-1.5 rounded-2xl">
+          <button
+            onClick={() => setActiveTab('account_profile')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'account_profile' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <User className="w-3.5 h-3.5 text-indigo-300" />
+            <span>Account & Profile</span>
+            <span className="px-1.5 py-0.2 bg-emerald-500 text-white text-[9px] font-extrabold rounded-full">Profile</span>
+          </button>
 
-          <div className="flex flex-wrap items-center gap-1.5 bg-white/10 p-1.5 rounded-2xl">
           <button
             onClick={() => setActiveTab('campus_metrics')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -549,7 +588,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
         </div>
       </div>
-    </div>
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -596,6 +634,218 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Tab: Account & Profile */}
+      {activeTab === 'account_profile' && (
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8 space-y-6 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 bg-gradient-to-tr from-indigo-500 to-purple-600 text-white rounded-2xl shadow-md">
+                <User className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-slate-900 text-xl tracking-tight">
+                  Account & Profile
+                </h3>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  Your university profile, credentials, system permissions, and session management
+                </p>
+              </div>
+            </div>
+
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
+              >
+                <LogOut className="w-4 h-4 text-rose-600" />
+                <span>Log Out of Account</span>
+              </button>
+            )}
+          </div>
+
+          {/* User Identity Card */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 p-6 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-4 text-center sm:text-left">
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="relative">
+                  <img
+                    src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=80'}
+                    alt={currentUser?.name || 'User Profile'}
+                    className="w-20 h-20 rounded-2xl object-cover ring-4 ring-white shadow-md"
+                  />
+                  <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white" title="Active Session" />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="font-black text-slate-900 text-lg truncate">
+                    {currentUser?.name || 'Verified User'}
+                  </h4>
+                  <p className="text-xs text-slate-500 font-mono truncate">
+                    {currentUser?.email || 'No email attached'}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5 justify-center sm:justify-start">
+                    <span className="px-2.5 py-1 text-[10px] font-black uppercase rounded-lg tracking-wider bg-indigo-600 text-white shadow-xs">
+                      {isSuper ? 'Superadmin' : (currentUser?.role || 'Supporter')}
+                    </span>
+                    {currentUser?.isSuperAdmin && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-lg bg-purple-100 text-purple-700 border border-purple-200">
+                        Owner Level
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-200/60 space-y-2 text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">Google Workspace ID</span>
+                  <span className="font-mono font-bold text-slate-700 truncate max-w-[140px]">
+                    {currentUser?.googleWorkspaceId || 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">Auth Method</span>
+                  <span className="font-semibold text-slate-800">Google OAuth 2.0</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">Session Status</span>
+                  <span className="font-bold text-emerald-600 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Authenticated
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleRefreshRole}
+                  disabled={isSyncingRole}
+                  className="w-full py-2.5 px-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-2xs cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${isSyncingRole ? 'animate-spin' : ''}`} />
+                  <span>{isSyncingRole ? 'Verifying with Database...' : 'Sync Live Role & Claims'}</span>
+                </button>
+                {roleSyncFeedback && (
+                  <p className="mt-2 text-[11px] font-semibold text-emerald-700 text-center bg-emerald-50 py-1 px-2 rounded-lg border border-emerald-200">
+                    {roleSyncFeedback}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Permissions & Capabilities */}
+            <div className="lg:col-span-2 space-y-5">
+              <div className="p-6 bg-white rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
+                <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                  <span>Active Permissions & Role Capabilities</span>
+                </div>
+                <p className="text-xs text-slate-600">
+                  Your current account authorization grant provides access to the following institutional features:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">AI Student Assistant</div>
+                      <div className="text-[11px] text-slate-500">Unrestricted Q&A, syllabus lookup, course guidance</div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">Degree & Syllabus Catalog</div>
+                      <div className="text-[11px] text-slate-500">Full access to view TEQSA & AQF accredited curricula</div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">Student Admissions Portal</div>
+                      <div className="text-[11px] text-slate-500">Submit and track online degree applications</div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 flex items-start gap-2.5">
+                    {hasAccess ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <Lock className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">
+                        {hasAccess ? 'Course Builder & LMS Control' : 'LMS Authoring (Restricted)'}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        {hasAccess ? 'Create, modify and publish units & programs' : 'Requires Administration or Superadmin role'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 flex items-start gap-2.5">
+                    {hasAccess ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <Lock className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">
+                        {hasAccess ? 'ID & User Directory Management' : 'User Management (Restricted)'}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        {hasAccess ? 'Assign student numbers and manage staff roles' : 'Protected student and staff directory'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 flex items-start gap-2.5">
+                    {isSuper ? (
+                      <CheckCircle2 className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <Lock className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <div className="text-xs font-bold text-slate-800">
+                        {isSuper ? 'Executive Superadmin Operations' : 'Superadmin Tools (Restricted)'}
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        {isSuper ? 'Full telemetry, role permissions, API key management' : 'Reserved for institutional owners'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Session Termination Card */}
+              <div className="p-5 bg-rose-50/50 rounded-2xl border border-rose-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="font-bold text-xs text-rose-950 flex items-center gap-1.5">
+                    <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Session Termination & Sign Out</span>
+                  </div>
+                  <p className="text-[11px] text-rose-800/80 mt-0.5">
+                    Sign out securely from the Admin & Operations Panel. This revokes session storage and locks administrative tools.
+                  </p>
+                </div>
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition-colors shadow-xs cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    Log Out Now
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tab: Front Page Campus Metrics Manager */}
       {activeTab === 'campus_metrics' && (

@@ -7,10 +7,8 @@ import {
   FileText,
   Calendar,
   Sparkles,
-  LogOut,
   ChevronDown,
-  ShieldCheck,
-  User
+  ShieldCheck
 } from 'lucide-react';
 import { isProjectOwnerEmail } from '@/lib/auth/roles';
 
@@ -188,51 +186,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-1.5 space-y-0.5 text-xs">
-                    {canAccessAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsUserMenuOpen(false);
-                          onSelectTab('admin');
-                        }}
-                        className={`w-full px-3 py-2.5 rounded-xl text-left font-bold flex items-center gap-2.5 transition-colors cursor-pointer ${activeTab === 'admin'
-                            ? 'bg-purple-600 text-white shadow-xs'
-                            : 'text-purple-700 hover:bg-purple-50'
-                          }`}
-                      >
-                        <ShieldCheck className={`w-4 h-4 ${activeTab === 'admin' ? 'text-white' : 'text-purple-600'}`} />
-                        <span>Admin & Operations Panel</span>
-                      </button>
-                    )}
-
+                  <div className="p-2 space-y-1 text-xs">
                     <button
                       type="button"
                       onClick={() => {
                         setIsUserMenuOpen(false);
-                        onSelectTab('signin');
+                        onSelectTab('admin');
                       }}
-                      className={`w-full px-3 py-2 rounded-xl text-left font-semibold flex items-center gap-2.5 transition-colors cursor-pointer ${activeTab === 'signin'
-                          ? 'bg-indigo-50 text-indigo-700 font-bold'
-                          : 'text-slate-700 hover:bg-slate-50'
+                      className={`w-full px-3.5 py-3 rounded-xl text-left font-bold flex items-center gap-3 transition-colors cursor-pointer ${activeTab === 'admin'
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'bg-indigo-50 text-indigo-900 hover:bg-indigo-100 border border-indigo-100'
                         }`}
                     >
-                      <User className="w-4 h-4 text-indigo-600" />
-                      <span>Account & Profile</span>
-                    </button>
-                  </div>
-
-                  <div className="p-1.5 pt-1 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsUserMenuOpen(false);
-                        if (onLogout) onLogout();
-                      }}
-                      className="w-full px-3 py-2 rounded-xl text-left font-bold text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <LogOut className="w-4 h-4 text-rose-600" />
-                      <span>Log Out</span>
+                      <ShieldCheck className={`w-5 h-5 shrink-0 ${activeTab === 'admin' ? 'text-white' : 'text-indigo-600'}`} />
+                      <div>
+                        <div className="font-bold text-xs">Admin & Operations Panel</div>
+                        <div className={`text-[10px] font-normal mt-0.5 ${activeTab === 'admin' ? 'text-indigo-100' : 'text-indigo-700/80'}`}>
+                          Account & Profile, Security, & Log Out
+                        </div>
+                      </div>
                     </button>
                   </div>
                 </div>

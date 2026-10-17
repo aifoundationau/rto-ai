@@ -202,10 +202,8 @@ export default function HomePage() {
   };
 
   const handleOpenSettings = () => {
-    if (isSuperAdminUser) {
+    if (classroomUser) {
       setActiveTab('admin');
-    } else if (classroomUser) {
-      setActiveTab('signin');
     } else {
       handleGoogleSignInDirect();
     }
@@ -303,12 +301,10 @@ export default function HomePage() {
         },
       }));
 
-      if (isSuper) {
-        setActiveTab('admin');
-      } else if (activeTab === 'application') {
-        // Keep the user on the application form!
+      if (activeTab === 'application') {
+        // Keep the user on the application form if they were filling it out
       } else {
-        setActiveTab('chat');
+        setActiveTab('admin');
       }
     } catch (err: any) {
       console.error('Google Sign In error:', err);
@@ -610,7 +606,7 @@ export default function HomePage() {
         )}
 
         {activeTab === 'admin' && (
-          isSuperAdminUser ? (
+          classroomUser ? (
             <AdminDashboardView
               apiKey={apiKey}
               onSaveApiKey={handleSaveApiKey}
@@ -633,11 +629,7 @@ export default function HomePage() {
                   localStorage.setItem('edupulse_user', JSON.stringify(authed));
                   localStorage.setItem('edupulse_is_admin', isSuper ? 'true' : 'false');
                 } catch (e) {}
-                if (isSuper) {
-                  setActiveTab('admin');
-                } else {
-                  setActiveTab('chat');
-                }
+                setActiveTab('admin');
               }}
               onLogout={handleLogoutAdmin}
               onNavigateTab={setActiveTab}
@@ -646,25 +638,35 @@ export default function HomePage() {
         )}
 
         {activeTab === 'signin' && (
-          <SignInView
-            currentUser={classroomUser}
-            onLoginSuccess={(user) => {
-              setClassroomUser(user);
-              const isSuper = user.isSuperAdmin === true || user.role?.toLowerCase() === 'superadmin';
-              setIsAdminLoggedIn(isSuper);
-              try {
-                localStorage.setItem('edupulse_user', JSON.stringify(user));
-                localStorage.setItem('edupulse_is_admin', isSuper ? 'true' : 'false');
-              } catch (e) {}
-              if (isSuper) {
+          classroomUser ? (
+            <AdminDashboardView
+              apiKey={apiKey}
+              onSaveApiKey={handleSaveApiKey}
+              onLogout={handleLogoutAdmin}
+              currentUser={classroomUser}
+            />
+          ) : (
+            <SignInView
+              currentUser={classroomUser}
+              onLoginSuccess={(user) => {
+                const isSuper = isProjectOwnerEmail(user.email) || user.isSuperAdmin === true || user.role?.toLowerCase() === 'superadmin';
+                const authed = {
+                  ...user,
+                  role: isSuper ? 'superadmin' : (user.role || 'supporter'),
+                  isSuperAdmin: isSuper,
+                };
+                setClassroomUser(authed);
+                setIsAdminLoggedIn(isSuper);
+                try {
+                  localStorage.setItem('edupulse_user', JSON.stringify(authed));
+                  localStorage.setItem('edupulse_is_admin', isSuper ? 'true' : 'false');
+                } catch (e) {}
                 setActiveTab('admin');
-              } else {
-                setActiveTab('chat');
-              }
-            }}
-            onLogout={handleLogoutAdmin}
-            onNavigateTab={setActiveTab}
-          />
+              }}
+              onLogout={handleLogoutAdmin}
+              onNavigateTab={setActiveTab}
+            />
+          )
         )}
       </main>
 
