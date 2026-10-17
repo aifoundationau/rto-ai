@@ -95,6 +95,36 @@ export const SAMPLE_STAFF = [
   }
 ];
 
+export const SAMPLE_SUPPORTERS = [
+  {
+    uid: 'sup_jordan_01',
+    displayName: 'Jordan Taylor',
+    email: 'jordan.taylor@community.edupulse.edu.au',
+    role: 'supporter',
+    dept: 'Community & Alumni Network',
+    classification: 'Supporter',
+    status: 'supporter',
+  },
+  {
+    uid: 'sup_chloe_02',
+    displayName: 'Chloe Bennett',
+    email: 'chloe.bennett@partner.edupulse.edu.au',
+    role: 'supporter',
+    dept: 'Industry Partnership Hub',
+    classification: 'Supporter',
+    status: 'supporter',
+  },
+  {
+    uid: 'sup_matthew_03',
+    displayName: 'Matthew Zhang',
+    email: 'matthew.zhang@alumni.edupulse.edu.au',
+    role: 'supporter',
+    dept: 'Advisory Council',
+    classification: 'Supporter',
+    status: 'supporter',
+  }
+];
+
 async function seedDatabase() {
   console.log('🚀 Starting Firebase Database Seed...');
 

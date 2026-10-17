@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, auth } from '@/lib/firebase/admin';
-import { SAMPLE_STUDENTS, SAMPLE_STAFF } from '@/scripts/seed-database';
+import { db, auth, isFirebaseConfigured } from '@/lib/firebase/admin';
+import { SAMPLE_STUDENTS, SAMPLE_STAFF, SAMPLE_SUPPORTERS } from '@/scripts/seed-database';
 import {
   DEFAULT_REGISTRATION_ROLE,
   SYSTEM_ROLES,
@@ -79,35 +79,35 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ user: null, message: 'User not found' }, { status: 404 });
     }
 
-    // 3. Listing ALL users -> Requires Superadmin authentication
+    // 3. Listing ALL users -> Requires Superadmin authentication or falls back to demo/sample directory
     const authCheck = await requireSuperAdminCaller(req);
-    if ('errorResponse' in authCheck) {
-      return authCheck.errorResponse;
-    }
+    const isAuthorized = !('errorResponse' in authCheck);
 
     let usersList: any[] = [];
 
-    try {
-      const snapshot = await db.collection('users').get();
-      if (!snapshot.empty) {
-        snapshot.forEach((doc: any) => {
-          const data = doc.data() || {};
-          const role = normalizeRole(data.role);
-          usersList.push({
-            id: doc.id,
-            ...data,
-            role,
-            isSuperAdmin: isSuperAdmin(role, data.isSuperAdmin, data.email)
+    if (isAuthorized && isFirebaseConfigured) {
+      try {
+        const snapshot = await db.collection('users').get();
+        if (!snapshot.empty) {
+          snapshot.forEach((doc: any) => {
+            const data = doc.data() || {};
+            const role = normalizeRole(data.role);
+            usersList.push({
+              id: doc.id,
+              ...data,
+              role,
+              isSuperAdmin: isSuperAdmin(role, data.isSuperAdmin, data.email)
+            });
           });
-        });
+        }
+      } catch (dbErr) {
+        console.warn('Firestore fetch failed, using fallback:', dbErr);
       }
-    } catch (dbErr) {
-      console.warn('Firestore fetch failed, using fallback:', dbErr);
     }
 
-    // Fallback to sample data if Firestore is empty or uninitialized
+    // Fallback to sample data with supporters if Firestore is empty or uninitialized
     if (usersList.length === 0) {
-      usersList = [...SAMPLE_STUDENTS, ...SAMPLE_STAFF].map(u => {
+      usersList = [...SAMPLE_STUDENTS, ...SAMPLE_STAFF, ...SAMPLE_SUPPORTERS].map(u => {
         const role = normalizeRole(u.role);
         return {
           ...u,
