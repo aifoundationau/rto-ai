@@ -76,13 +76,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 via-primary-600 to-purple-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform shrink-0">
             <Sparkles className="w-5 h-5" />
           </div>
-          <div className="notranslate flex flex-col justify-center" translate="no">
-            <div className="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 leading-tight">
-              University Admissions & Student Agent
-            </div>
-            <p className="text-[10px] sm:text-[11px] font-extrabold text-indigo-600 uppercase tracking-wider leading-tight mt-0.5">
+          <div className="notranslate flex items-center" translate="no">
+            <span className="font-extrabold text-base sm:text-lg tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
               EduPulse AI
-            </p>
+            </span>
           </div>
         </div>
 
