@@ -21,6 +21,9 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
+  Radio,
+  ShieldAlert,
   Award,
   Video,
   FileText,
@@ -30,6 +33,7 @@ import {
 import { CourseProgram, COURSES_DATA } from '@/data/courses';
 import { UnitDetail, UNITS_DATA } from '@/data/units';
 import { NavTab } from '@/components/Navbar';
+import { SevereEmergencyModal } from '@/components/emergency/SevereEmergencyModal';
 
 interface HomeViewProps {
   onNavigateTab: (tab: NavTab) => void;
@@ -176,7 +180,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
     studentsSubtitle: 'Active learners across all faculties',
     placementSubtitle: 'Graduate employment within 90 days',
     facultySubtitle: 'Academic educators & operational staff',
+    emergencyAlert: '',
+    emergencyTitle: '',
+    emergencyActive: false,
+    emergencySeverity: 'severe' as 'critical' | 'severe' | 'warning',
+    emergencyUpdatedAt: '',
   });
+
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -217,6 +228,27 @@ export const HomeView: React.FC<HomeViewProps> = ({
       window.removeEventListener('storage', handleMetricsUpdated);
     };
   }, []);
+
+  // Auto-trigger Severe Emergency Popup when active update is saved
+  useEffect(() => {
+    if (campusMetrics.emergencyActive && campusMetrics.emergencyAlert?.trim()) {
+      const storageKey = `edupulse_emergency_ack_${campusMetrics.emergencyUpdatedAt || 'active'}`;
+      const dismissed = typeof window !== 'undefined' ? sessionStorage.getItem(storageKey) : null;
+      if (!dismissed) {
+        setIsEmergencyModalOpen(true);
+      }
+    } else {
+      setIsEmergencyModalOpen(false);
+    }
+  }, [campusMetrics.emergencyActive, campusMetrics.emergencyAlert, campusMetrics.emergencyUpdatedAt]);
+
+  const handleAcknowledgeEmergency = () => {
+    setIsEmergencyModalOpen(false);
+    if (typeof window !== 'undefined' && campusMetrics.emergencyUpdatedAt) {
+      const storageKey = `edupulse_emergency_ack_${campusMetrics.emergencyUpdatedAt}`;
+      sessionStorage.setItem(storageKey, 'true');
+    }
+  };
 
   const formatStudents = (val?: string) => {
     const raw = (val || '5,000+').trim();
@@ -287,6 +319,45 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   return (
     <div className="space-y-12 pb-16">
+
+      {/* 0. SEVERE EMERGENCY BROADCAST TOP BANNER (IF ACTIVE) */}
+      {campusMetrics.emergencyActive && campusMetrics.emergencyAlert?.trim() && (
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-red-650 via-rose-600 to-red-700 border-2 border-red-500 shadow-2xl text-white p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-300">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-black/30 border border-white/20 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 text-amber-300 animate-bounce" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wider uppercase bg-white/20 border border-white/30 text-white">
+                  {(campusMetrics.emergencySeverity || 'severe').toUpperCase()} EMERGENCY BROADCAST
+                </span>
+                {campusMetrics.emergencyUpdatedAt && (
+                  <span className="text-[11px] text-red-100 font-medium">
+                    • Issued {new Date(campusMetrics.emergencyUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-white mt-1 leading-tight">
+                {campusMetrics.emergencyTitle || 'Severe Environmental & Weather Emergency Notice'}
+              </h3>
+              <p className="text-xs sm:text-sm text-red-50 line-clamp-2 max-w-3xl mt-0.5 font-medium leading-relaxed">
+                {campusMetrics.emergencyAlert}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsEmergencyModalOpen(true)}
+              className="px-4 py-2.5 bg-white hover:bg-slate-100 active:bg-slate-200 text-red-700 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer"
+            >
+              <Radio className="w-4 h-4 animate-pulse text-red-600" />
+              <span>View Emergency Advisory</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 1. HERO BANNER SECTION */}
       <section className="relative w-full rounded-3xl overflow-hidden shadow-2xl bg-slate-900 border border-slate-800 flex items-center min-h-[460px] sm:min-h-[500px]">
@@ -980,6 +1051,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Severe Emergency Advisory Modal (Triggered on Emergency Update Broadcast) */}
+      <SevereEmergencyModal
+        isOpen={isEmergencyModalOpen}
+        onClose={handleAcknowledgeEmergency}
+        title={campusMetrics.emergencyTitle}
+        message={campusMetrics.emergencyAlert || ''}
+        severity={campusMetrics.emergencySeverity}
+        updatedAt={campusMetrics.emergencyUpdatedAt}
+      />
 
     </div>
   );

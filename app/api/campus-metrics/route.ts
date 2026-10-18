@@ -12,6 +12,12 @@ export interface CampusMetricsData {
   studentsSubtitle?: string;
   placementSubtitle?: string;
   facultySubtitle?: string;
+  // Severe Emergency Update (Weather / Environmental Hazard)
+  emergencyAlert?: string;
+  emergencyTitle?: string;
+  emergencyActive?: boolean;
+  emergencySeverity?: 'critical' | 'severe' | 'warning';
+  emergencyUpdatedAt?: string;
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -24,6 +30,11 @@ const DEFAULT_CAMPUS_METRICS: CampusMetricsData = {
   studentsSubtitle: 'Active learners across all faculties',
   placementSubtitle: 'Graduate employment within 90 days',
   facultySubtitle: 'Academic educators & operational staff',
+  emergencyAlert: '',
+  emergencyTitle: '',
+  emergencyActive: false,
+  emergencySeverity: 'severe',
+  emergencyUpdatedAt: '',
 };
 
 // In-memory runtime cache for high-speed local updates
@@ -82,6 +93,10 @@ export async function POST(req: NextRequest) {
       studentsSubtitle,
       placementSubtitle,
       facultySubtitle,
+      emergencyAlert,
+      emergencyTitle,
+      emergencyActive,
+      emergencySeverity,
     } = body;
 
     // RBAC check: only administration and superadmin can modify campus metrics
@@ -99,6 +114,9 @@ export async function POST(req: NextRequest) {
       updatedBy = authResult.caller.email || authResult.caller.role;
     }
 
+    const hasEmergencyContent = typeof emergencyAlert === 'string' && emergencyAlert.trim().length > 0;
+    const isEmergencyActive = Boolean(emergencyActive && hasEmergencyContent);
+
     const updatedMetrics: CampusMetricsData = {
       heroBadgeText: heroBadgeText !== undefined ? heroBadgeText.trim() : (runtimeCache.heroBadgeText || 'Your Future is Now • Powered by Gemini'),
       totalStudents: totalStudents?.trim() || runtimeCache.totalStudents || '5,000+',
@@ -107,6 +125,11 @@ export async function POST(req: NextRequest) {
       studentsSubtitle: studentsSubtitle?.trim() || 'Active learners across all faculties',
       placementSubtitle: placementSubtitle?.trim() || 'Graduate employment within 90 days',
       facultySubtitle: facultySubtitle?.trim() || 'Academic educators & operational staff',
+      emergencyAlert: typeof emergencyAlert === 'string' ? emergencyAlert.trim() : (runtimeCache.emergencyAlert || ''),
+      emergencyTitle: typeof emergencyTitle === 'string' ? emergencyTitle.trim() : (runtimeCache.emergencyTitle || ''),
+      emergencyActive: isEmergencyActive,
+      emergencySeverity: emergencySeverity || runtimeCache.emergencySeverity || 'severe',
+      emergencyUpdatedAt: isEmergencyActive ? (runtimeCache.emergencyActive && runtimeCache.emergencyAlert === emergencyAlert?.trim() && runtimeCache.emergencyUpdatedAt ? runtimeCache.emergencyUpdatedAt : new Date().toISOString()) : '',
       updatedAt: new Date().toISOString(),
       updatedBy,
     };

@@ -12,7 +12,17 @@ import {
   ShieldCheck,
   Sparkles,
   BarChart3,
-  Briefcase
+  Briefcase,
+  AlertTriangle,
+  Flame,
+  CloudRain,
+  CloudLightning,
+  ShieldAlert,
+  Radio,
+  Trash2,
+  BellRing,
+  Clock,
+  Wind
 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/firebase/client';
 
@@ -24,6 +34,12 @@ export interface CampusMetrics {
   studentsSubtitle?: string;
   placementSubtitle?: string;
   facultySubtitle?: string;
+  // Severe Emergency Update (Weather / Environmental Hazard)
+  emergencyAlert?: string;
+  emergencyTitle?: string;
+  emergencyActive?: boolean;
+  emergencySeverity?: 'critical' | 'severe' | 'warning';
+  emergencyUpdatedAt?: string;
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -36,16 +52,53 @@ export const DEFAULT_METRICS: CampusMetrics = {
   studentsSubtitle: 'Active learners across all faculties',
   placementSubtitle: 'Graduate employment within 90 days',
   facultySubtitle: 'Academic educators & operational staff',
+  emergencyAlert: '',
+  emergencyTitle: '',
+  emergencyActive: false,
+  emergencySeverity: 'severe',
+  emergencyUpdatedAt: '',
 };
 
 export const CampusMetricsManager: React.FC = () => {
   const [metrics, setMetrics] = useState<CampusMetrics>(DEFAULT_METRICS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isEmergencyConfirmed, setIsEmergencyConfirmed] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | null; message: string }>({
     type: null,
     message: ''
   });
+
+  const EMERGENCY_PRESETS = [
+    {
+      label: 'Severe Storm & Flooding',
+      icon: CloudLightning,
+      severity: 'severe' as const,
+      title: 'Severe Weather Warning: Gale Winds & Flash Flooding',
+      text: 'Bureau of Meteorology (BOM) has issued an urgent Severe Weather Warning for damaging winds and flash flooding across campus precincts. All physical on-campus classes are transitioning to online delivery immediately. Essential staff only. Stay indoors and avoid travelling.',
+    },
+    {
+      label: 'Bushfire Smoke & Air Hazard',
+      icon: Flame,
+      severity: 'warning' as const,
+      title: 'Air Quality & Environmental Smoke Advisory',
+      text: 'Severe bushfire smoke has triggered a hazardous air quality alert across metropolitan campuses. Outdoor facilities, sports ovals, and open-air concourses are closed today. Filtered air conditioning study zones remain open in the Central Library.',
+    },
+    {
+      label: 'Cyclone & High Gale Watch',
+      icon: Wind,
+      severity: 'critical' as const,
+      title: 'Tropical Cyclone Warning: Campus Facility Closure',
+      text: 'Category 2/3 tropical cyclone conditions forecasted within 6 hours. Complete campus closure is in effect. All exams and lectures are postponed. Immediate shelter protocols activated.',
+    },
+    {
+      label: 'Regional Power Grid Outage',
+      icon: AlertTriangle,
+      severity: 'severe' as const,
+      title: 'Power Substation Interruption: Precincts A & B',
+      text: 'Unplanned high-voltage substation outage has suspended power to Academic Precincts A and B. IT emergency generators are online. Affected buildings are closed for safety until technicians complete restoration.',
+    },
+  ];
 
   const fetchMetrics = async () => {
     setIsLoading(true);
@@ -54,6 +107,9 @@ export const CampusMetricsManager: React.FC = () => {
       const data = await res.json();
       if (data && data.metrics) {
         setMetrics(data.metrics);
+        if (data.metrics.emergencyActive) {
+          setIsEmergencyConfirmed(true);
+        }
       }
     } catch (err) {
       console.warn('[CampusMetricsManager] Failed to load metrics:', err);
@@ -72,20 +128,33 @@ export const CampusMetricsManager: React.FC = () => {
     setFeedback({ type: null, message: '' });
 
     try {
+      const hasEmergencyText = Boolean(metrics.emergencyAlert && metrics.emergencyAlert.trim().length > 0);
+      const isEmergencyActive = Boolean(hasEmergencyText && isEmergencyConfirmed);
+
+      const payload: CampusMetrics = {
+        ...metrics,
+        emergencyActive: isEmergencyActive,
+      };
+
       const res = await authenticatedFetch('/api/campus-metrics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(metrics)
+        body: JSON.stringify(payload)
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
         setFeedback({
           type: 'success',
-          message: 'Front page headline metrics and hero badge updated successfully!'
+          message: isEmergencyActive
+            ? 'Front page metrics and Severe Emergency Broadcast saved & published live!'
+            : 'Front page headline metrics and hero badge updated successfully!'
         });
         if (data.metrics) {
           setMetrics(data.metrics);
+          if (data.metrics.emergencyActive) {
+            setIsEmergencyConfirmed(true);
+          }
           if (typeof window !== 'undefined') {
             localStorage.setItem('edupulse_metrics_cache', JSON.stringify(data.metrics));
             window.dispatchEvent(new Event('edupulse_metrics_updated'));
@@ -99,6 +168,55 @@ export const CampusMetricsManager: React.FC = () => {
       setFeedback({
         type: 'error',
         message: err.message || 'Failed to update campus metrics'
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleClearEmergency = async () => {
+    if (!confirm('Are you sure you want to deactivate and clear the Severe Emergency Broadcast? This will immediately remove the popup from the front page.')) {
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback({ type: null, message: '' });
+
+    try {
+      const payload: CampusMetrics = {
+        ...metrics,
+        emergencyAlert: '',
+        emergencyTitle: '',
+        emergencyActive: false,
+        emergencyUpdatedAt: '',
+      };
+
+      const res = await authenticatedFetch('/api/campus-metrics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setMetrics(data.metrics || payload);
+        setIsEmergencyConfirmed(false);
+        setFeedback({
+          type: 'success',
+          message: 'Severe emergency broadcast cleared & deactivated. Front page popup is now disabled.'
+        });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('edupulse_metrics_cache', JSON.stringify(data.metrics || payload));
+          window.dispatchEvent(new Event('edupulse_metrics_updated'));
+        }
+      } else {
+        throw new Error(data.error || 'Failed to clear emergency broadcast');
+      }
+    } catch (err: any) {
+      console.error('[CampusMetricsManager] Clear emergency error:', err);
+      setFeedback({
+        type: 'error',
+        message: err.message || 'Failed to clear emergency broadcast'
       });
     } finally {
       setIsSaving(false);
@@ -493,6 +611,263 @@ export const CampusMetricsManager: React.FC = () => {
               <span>Syncing with Cloud Firestore & Site Settings</span>
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. SEVERE EMERGENCY UPDATE & PUBLIC BROADCAST SECTION */}
+      <div className="bg-gradient-to-br from-slate-900 via-rose-950/80 to-slate-900 rounded-3xl border-2 border-rose-500/40 p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden space-y-6">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Section Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-rose-500/20 pb-5">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase bg-rose-500/20 border border-rose-500/40 text-rose-300">
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                <span>Critical Campus Dispatch</span>
+              </span>
+              {metrics.emergencyActive && metrics.emergencyAlert ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase bg-red-600 text-white animate-pulse shadow-md">
+                  <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                  <span>Broadcast Active on Front Page</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wider uppercase bg-slate-800 text-slate-400 border border-slate-700">
+                  <span>Default Blank • Inactive</span>
+                </span>
+              )}
+            </div>
+
+            <h3 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
+              <ShieldAlert className="w-6 h-6 text-rose-400 shrink-0" />
+              <span>Severe Emergency Update (Weather & Environmental Hazards)</span>
+            </h3>
+
+            <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
+              This field is <strong className="text-white">default blank</strong>. If an emergency advisory is entered, verified with the safety confirmation checkbox, and saved, an urgent broadcast popup will immediately appear across the public front page for all prospective students, faculty, and visitors.
+            </p>
+          </div>
+
+          {metrics.emergencyActive && metrics.emergencyAlert && (
+            <button
+              type="button"
+              onClick={handleClearEmergency}
+              disabled={isSaving}
+              className="px-4 py-2.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 text-xs font-bold rounded-xl transition flex items-center gap-2 cursor-pointer self-start md:self-center shrink-0"
+            >
+              <Trash2 className="w-4 h-4 text-rose-400" />
+              <span>Clear & Deactivate Emergency</span>
+            </button>
+          )}
+        </div>
+
+        {/* 1-Click Quick Presets */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Radio className="w-3.5 h-3.5 text-rose-400" />
+            <span>1-Click Incident Quick Presets (Weather & Environmental Events):</span>
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+            {EMERGENCY_PRESETS.map((preset) => {
+              const IconComp = preset.icon;
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => {
+                    setMetrics((prev) => ({
+                      ...prev,
+                      emergencyTitle: preset.title,
+                      emergencySeverity: preset.severity,
+                      emergencyAlert: preset.text,
+                    }));
+                  }}
+                  className="p-3 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-700/80 hover:border-rose-400/60 rounded-xl text-left transition flex items-center gap-2.5 group cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-rose-500/20 group-hover:bg-rose-500/30 border border-rose-500/30 flex items-center justify-center shrink-0">
+                    <IconComp className="w-4 h-4 text-rose-300" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-100 group-hover:text-rose-200 truncate">
+                      {preset.label}
+                    </div>
+                    <div className="text-[10px] text-slate-400 capitalize">
+                      {preset.severity} severity
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Emergency Edit Form Fields */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-8 space-y-4">
+            {/* Severity Level & Title */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Alert Severity Level
+                </label>
+                <select
+                  value={metrics.emergencySeverity || 'severe'}
+                  onChange={(e) =>
+                    setMetrics({
+                      ...metrics,
+                      emergencySeverity: e.target.value as 'critical' | 'severe' | 'warning',
+                    })
+                  }
+                  className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                >
+                  <option value="warning">⚠️ Warning (Amber Advisory)</option>
+                  <option value="severe">🚨 Severe (High Hazard)</option>
+                  <option value="critical">🔴 Critical (Immediate Lockdown/Evacuation)</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-slate-300 mb-1">
+                  Advisory Headline Title
+                </label>
+                <input
+                  type="text"
+                  value={metrics.emergencyTitle || ''}
+                  onChange={(e) => setMetrics({ ...metrics, emergencyTitle: e.target.value })}
+                  placeholder="e.g. Severe Storm & Flash Flooding Warning"
+                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+            </div>
+
+            {/* Advisory Message Textarea */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-300">
+                  Emergency Broadcast Message & Action Plan (Default Blank)
+                </label>
+                <span className="text-[11px] text-slate-400">
+                  {metrics.emergencyAlert?.length || 0} characters
+                </span>
+              </div>
+              <textarea
+                rows={4}
+                value={metrics.emergencyAlert || ''}
+                onChange={(e) => setMetrics({ ...metrics, emergencyAlert: e.target.value })}
+                placeholder="Leave blank during normal operations. When severe weather or environmental emergencies occur, describe the situation, campus building closures, online class transitions, and safety directives here..."
+                className="w-full p-3.5 bg-slate-900 border border-slate-700 rounded-2xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500 leading-relaxed font-sans"
+              />
+            </div>
+
+            {/* Safety Confirmation Checkbox */}
+            <div
+              onClick={() => setIsEmergencyConfirmed(!isEmergencyConfirmed)}
+              className={`p-4 rounded-2xl border transition cursor-pointer flex items-start gap-3 select-none ${
+                isEmergencyConfirmed
+                  ? 'bg-rose-500/20 border-rose-400 text-white'
+                  : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700'
+              }`}
+            >
+              <input
+                type="checkbox"
+                id="emergency-confirm-checkbox"
+                checked={isEmergencyConfirmed}
+                onChange={(e) => setIsEmergencyConfirmed(e.target.checked)}
+                className="w-4 h-4 mt-0.5 rounded text-rose-600 focus:ring-rose-500 border-slate-600 shrink-0 cursor-pointer"
+              />
+              <div className="text-xs space-y-0.5">
+                <div className="font-bold flex items-center gap-1.5">
+                  <ShieldCheck className={`w-4 h-4 ${isEmergencyConfirmed ? 'text-rose-400' : 'text-slate-400'}`} />
+                  <span>I confirm and verify this Severe Emergency Update for public broadcast.</span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Checking this box confirms that when you click Save, an emergency popup will trigger on the front page for every visitor. Leaving unchecked keeps the broadcast inactive.
+                </p>
+              </div>
+            </div>
+
+            {/* Action Row */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleClearEmergency}
+                disabled={isSaving || (!metrics.emergencyAlert && !metrics.emergencyTitle)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 text-xs font-semibold transition flex items-center gap-2 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Reset to Default Blank</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className={`px-6 py-2.5 text-xs font-extrabold rounded-xl shadow-lg transition flex items-center gap-2 cursor-pointer ${
+                  metrics.emergencyAlert && isEmergencyConfirmed
+                    ? 'bg-red-600 hover:bg-red-500 text-white ring-2 ring-red-400 animate-pulse'
+                    : 'bg-emerald-500 hover:bg-emerald-600 text-slate-950'
+                }`}
+              >
+                <Save className="w-4 h-4" />
+                <span>
+                  {isSaving
+                    ? 'Broadcasting...'
+                    : metrics.emergencyAlert && isEmergencyConfirmed
+                    ? 'Broadcast Emergency Live to Front Page'
+                    : 'Save & Publish Live'}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Right Preview Column: Front-Page Popup Preview */}
+          <div className="lg:col-span-4 bg-slate-950 rounded-2xl border border-slate-800 p-5 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Eye className="w-3.5 h-3.5 text-rose-400" />
+                <span>Live Popup Modal Preview</span>
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                metrics.emergencyAlert && isEmergencyConfirmed
+                  ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                  : 'bg-slate-800 text-slate-400'
+              }`}>
+                {metrics.emergencyAlert && isEmergencyConfirmed ? 'Will Display' : 'Hidden (Blank)'}
+              </span>
+            </div>
+
+            {metrics.emergencyAlert ? (
+              <div className="bg-slate-900 border-2 border-rose-500/60 rounded-2xl p-3.5 space-y-2.5 shadow-xl text-left">
+                <div className="flex items-center justify-between bg-rose-600/30 px-2.5 py-1 rounded-lg text-rose-200 text-[10px] font-bold uppercase tracking-wider border border-rose-500/30">
+                  <span className="flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-amber-300" />
+                    <span>Emergency Advisory</span>
+                  </span>
+                  <span>{(metrics.emergencySeverity || 'severe').toUpperCase()}</span>
+                </div>
+                <h4 className="text-xs font-black text-white leading-tight">
+                  {metrics.emergencyTitle || 'Severe Emergency Notice'}
+                </h4>
+                <p className="text-[11px] text-slate-200 line-clamp-4 leading-relaxed font-normal">
+                  {metrics.emergencyAlert}
+                </p>
+                <div className="pt-1 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Front Page Popup Simulation</span>
+                  <span className="px-2 py-0.5 rounded bg-rose-600 text-white font-bold text-[9px]">
+                    I Acknowledge
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="h-44 flex flex-col items-center justify-center text-center p-4 rounded-xl border border-dashed border-slate-800 text-slate-500 text-xs space-y-1.5">
+                <ShieldCheck className="w-8 h-8 text-emerald-500/40" />
+                <span className="font-bold text-slate-400">Default Blank (Normal Operations)</span>
+                <p className="text-[11px] text-slate-500">
+                  No popup active on the front page. Enter text above, confirm, and save to trigger.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
