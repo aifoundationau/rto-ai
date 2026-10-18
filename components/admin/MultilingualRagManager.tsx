@@ -110,37 +110,107 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
   const [isIngesting, setIsIngesting] = useState(false);
   const [ingestFeedback, setIngestFeedback] = useState<{ success: boolean; message: string; autoSorted?: any } | null>(null);
 
-  // Supported language tabs for translation viewing & editing
+  // Supported language tabs for translation viewing & editing (Global + All ASEAN Languages)
   const languageTabOptions = [
     { code: 'en', label: 'English', flag: '🇬🇧' },
     { code: 'ja', label: 'Japanese', flag: '🇯🇵' },
     { code: 'zh', label: 'Chinese', flag: '🇨🇳' },
-    { code: 'vi', label: 'Vietnamese', flag: '🇻🇳' },
-    { code: 'th', label: 'Thai', flag: '🇹🇭' },
-    { code: 'id', label: 'Indonesian', flag: '🇮🇩' },
+    { code: 'vi', label: 'Vietnamese', flag: '🇻🇳', isAsean: true },
+    { code: 'th', label: 'Thai', flag: '🇹🇭', isAsean: true },
+    { code: 'id', label: 'Indonesian', flag: '🇮🇩', isAsean: true },
+    { code: 'ms', label: 'Malay', flag: '🇲🇾', isAsean: true },
+    { code: 'tl', label: 'Filipino', flag: '🇵🇭', isAsean: true },
+    { code: 'km', label: 'Khmer', flag: '🇰🇭', isAsean: true },
+    { code: 'my', label: 'Burmese', flag: '🇲🇲', isAsean: true },
+    { code: 'lo', label: 'Lao', flag: '🇱🇦', isAsean: true },
+    { code: 'tet', label: 'Tetum', flag: '🇹🇱', isAsean: true },
   ];
 
-  // Quick test query samples
+  // Quick test query samples across global and all ASEAN languages
   const sampleQueries = [
     {
-      label: '🇯🇵 Japanese (AI Admission)',
-      text: 'オーストラリアの大学で人工知能（AI）学士号を取得したいのですが、入学条件と必要な英語スコア（IELTS）を教えてください。'
+      label: '🇯🇵 Japanese',
+      subtitle: 'AI Admission',
+      text: 'オーストラリアの大学で人工知能（AI）学士号を取得したいのですが、入学条件と必要な英語スコア（IELTS）を教えてください。',
+      isAsean: false
     },
     {
-      label: '🇨🇳 Chinese (AQF & RPL)',
-      text: '澳大利亚学历资格框架AQF对学士学位的要求是什么？先前学习认定RPL可以减免多少学分？'
+      label: '🇨🇳 Chinese',
+      subtitle: 'AQF & RPL',
+      text: '澳大利亚学历资格框架AQF对学士学位的要求是什么？先前学习认定RPL可以减免多少学分？',
+      isAsean: false
     },
     {
-      label: '🇻🇳 Vietnamese (AI Pathways)',
-      text: 'Điều kiện tuyển sinh và yêu cầu tiếng Anh cho chương trình Cử nhân Trí tuệ Nhân tạo tại Úc là gì?'
+      label: '🇻🇳 Vietnamese',
+      subtitle: 'AI Pathways',
+      text: 'Điều kiện tuyển sinh và yêu cầu tiếng Anh cho chương trình Cử nhân Trí tuệ Nhân tạo tại Úc là gì?',
+      isAsean: true
     },
     {
-      label: '🇹🇭 Thai (Admissions & Visa)',
-      text: 'เกณฑ์การรับเข้าศึกษาต่อระดับปริญญาตรีด้าน AI ในออสเตรเลียและคะแนน IELTS ขั้นต่ำคือเท่าใด?'
+      label: '🇹🇭 Thai',
+      subtitle: 'Admissions & Visa',
+      text: 'เกณฑ์การรับเข้าศึกษาต่อระดับปริญญาตรีด้าน AI ในออสเตรเลียและคะแนน IELTS ขั้นต่ำคือเท่าใด?',
+      isAsean: true
     },
     {
-      label: '🇬🇧 English (TEQSA Standards)',
-      text: 'What are the TEQSA threshold standards regarding teaching faculty qualifications and academic governance?'
+      label: '🇬🇧 English',
+      subtitle: 'TEQSA Standards',
+      text: 'What are the TEQSA threshold standards regarding teaching faculty qualifications and academic governance?',
+      isAsean: false
+    },
+    {
+      label: '🇮🇩 Indonesian',
+      subtitle: 'Syarat Masuk & Beasiswa',
+      text: 'Bagaimana syarat pendaftaran program Sarjana Kecerdasan Buatan (AI) di Australia dan berapa skor minimum IELTS atau TOEFL yang diperlukan?',
+      isAsean: true
+    },
+    {
+      label: '🇲🇾 Malay',
+      subtitle: 'Kemasukan & Kredit RPL',
+      text: 'Apakah syarat kelayakan kemasukan bagi Ijazah Sarjana Muda Kecerdasan Buatan (AI) di Australia dan bagaimana penilaian pemindahan kredit RPL dijalankan?',
+      isAsean: true
+    },
+    {
+      label: '🇵🇭 Filipino',
+      subtitle: 'Pangangailangan sa Pagpasok',
+      text: 'Ano ang mga kinakailangang marka sa IELTS at proseso ng pagpasok sa Bachelor of Artificial Intelligence sa Australia para sa mga mag-aaral mula sa Pilipinas?',
+      isAsean: true
+    },
+    {
+      label: '🇸🇬 Singapore',
+      subtitle: 'Polytechnic Articulation',
+      text: 'What are the credit exemptions and direct advanced standing pathways for Singapore Polytechnic diploma holders entering Australian university degrees?',
+      isAsean: true
+    },
+    {
+      label: '🇰🇭 Khmer',
+      subtitle: 'លក្ខខណ្ឌចុះឈ្មោះ & IELTS',
+      text: 'តើអ្វីជាលក្ខខណ្ឌចូលរៀនសម្រាប់កម្មវិធីបរិញ្ញាបត្របញ្ញាសិប្បនិម្មិត (AI) នៅអូស្ត្រាលី និងកម្រិតពិន្ទុ IELTS ដែលតម្រូវ?',
+      isAsean: true
+    },
+    {
+      label: '🇲🇲 Burmese',
+      subtitle: 'ဝင်ခွင့်သတ်မှတ်ချက်များ',
+      text: 'ဩစတြေးလျတက္ကသိုလ်များတွင် AI ဘွဲ့ကြိုသင်တန်းတက်ရောက်ရန် ဝင်ခွင့်သတ်မှတ်ချက်များနှင့် လိုအပ်သော IELTS ရမှတ်ကို သိရှိလိုပါသည်။',
+      isAsean: true
+    },
+    {
+      label: '🇱🇦 Lao',
+      subtitle: 'ເງື່ອນໄຂການຮຽນ & ທຶນ',
+      text: 'ເງື່ອນໄຂການສະໝັກຮຽນລະດັບປະລິນຍາຕີດ້ານ AI ໃນປະເທດອົດສະຕຣາລີ ແລະ ຄະແນນ IELTS ຂັ້ນຕ່ຳແມ່ນເທົ່າໃດ?',
+      isAsean: true
+    },
+    {
+      label: '🇧🇳 Brunei',
+      subtitle: 'Akreditasi & Kemasukan',
+      text: 'Apakah piawaian akreditasi TEQSA dan kelayakan kemasukan bagi pemohon dari Brunei untuk program ijazah kecerdasan buatan di Australia?',
+      isAsean: true
+    },
+    {
+      label: '🇹🇱 Tetum',
+      subtitle: 'Kriteriu Simu Estudante',
+      text: 'Saida mak rekezitus hodi tama kursu Lisensiatura Intelijénsia Artifisiál (AI) iha Austrália no valór IELTS mínimu hira?',
+      isAsean: true
     }
   ];
 
@@ -210,7 +280,7 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
       if (data.success) {
         setQueryResult(data.data);
         const translations = data.data.translations || {};
-        // Ensure primary answer is mapped
+        // Ensure primary answer and all ASEAN languages are mapped
         const initialMap: Record<string, string> = {
           en: translations.en || data.data.answer || '',
           ja: translations.ja || '',
@@ -218,6 +288,12 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
           vi: translations.vi || '',
           th: translations.th || '',
           id: translations.id || '',
+          ms: translations.ms || '',
+          tl: translations.tl || '',
+          km: translations.km || '',
+          my: translations.my || '',
+          lo: translations.lo || '',
+          tet: translations.tet || '',
           [data.data.queryLanguageCode]: data.data.answer,
         };
         setTranslationsMap(initialMap);
@@ -545,19 +621,31 @@ Higher education providers may grant credit transfer of up to 50% of the course 
             </div>
 
             {/* Quick Sample Queries */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                1-Click Multilingual Test Prompts:
-              </label>
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  1-Click Multilingual Test Prompts:
+                </label>
+                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-full">
+                  Global &amp; All ASEAN Languages
+                </span>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {sampleQueries.map((sample, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => setQueryInput(sample.text)}
-                    className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 rounded-xl border border-slate-200 transition font-medium text-left cursor-pointer"
+                    className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 rounded-xl border border-slate-200 transition font-medium text-left cursor-pointer flex items-center gap-1.5 shadow-sm hover:border-indigo-300"
+                    title={`Click to load ${sample.label} prompt`}
                   >
-                    {sample.label}
+                    <span className="font-semibold">{sample.label}</span>
+                    <span className="text-[11px] text-slate-500 font-normal">({sample.subtitle})</span>
+                    {sample.isAsean && (
+                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded border border-emerald-300/60 ml-0.5">
+                        ASEAN
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -573,7 +661,7 @@ Higher education providers may grant credit transfer of up to 50% of the course 
                   rows={3}
                   value={queryInput}
                   onChange={(e) => setQueryInput(e.target.value)}
-                  placeholder="Ask a question in Japanese, Chinese, Vietnamese, Thai, English, etc..."
+                  placeholder="Ask a question in Japanese, Chinese, Vietnamese, Thai, Indonesian, Malay, Filipino, Khmer, Burmese, Lao, English, etc..."
                   className="w-full p-3.5 pr-28 rounded-2xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm outline-none resize-none"
                 />
                 <button
@@ -646,6 +734,11 @@ Higher education providers may grant credit transfer of up to 50% of the course 
                         >
                           <span>{opt.flag}</span>
                           <span>{opt.label}</span>
+                          {opt.isAsean && (
+                            <span className={`text-[8px] font-black uppercase px-1 py-0.2 rounded ${isActive ? 'bg-indigo-500 text-white' : 'bg-emerald-100 text-emerald-800'}`}>
+                              ASEAN
+                            </span>
+                          )}
                           {isEdited && (
                             <span className="w-2 h-2 rounded-full bg-amber-400" title="Custom Edited by Admin" />
                           )}

@@ -108,5 +108,57 @@ Core requirements:
 1. สำเร็จการศึกษาระดับมัธยมศึกษาปีที่ 6 (ม.6) ด้วยเกรดเฉลี่ยสะสม (GPA) ไม่ต่ำกว่า 3.00 หรือสำเร็จหลักสูตร Foundation Studies
 2. ผลสอบวัดระดับภาษาอังกฤษ (อายุไม่เกิน 2 ปี): IELTS Academic 6.5 (ไม่มีพาร์ทใดต่ำกว่า 6.0) หรือ TOEFL iBT 79 หรือ PTE Academic 58
 3. ทุนการศึกษา: มีทุนสนับสนุนความเป็นเลิศทางวิชาการ (Academic Excellence Scholarship) สูงสุด 20-30% ของค่าเล่าเรียนสำหรับผู้มีผลการเรียนดีเยี่ยม`,
+  },
+  {
+    id: 'kb_indonesian_admissions_id',
+    title: 'Panduan Pendaftaran Mahasiswa Internasional & Program Sarjana AI di Australia (Bahasa Indonesia)',
+    category: 'Admissions & Visas',
+    language: 'id',
+    source: 'Kantor Admisi Mahasiswa Internasional Asia Tenggara',
+    keywords: ['Sarjana AI', 'syarat masuk', 'IELTS', 'beasiswa', 'visa pelajar', 'TEQSA', 'Indonesia'],
+    content: `Program Sarjana Kecerdasan Buatan (Bachelor of Artificial Intelligence) di Australia terakreditasi resmi oleh TEQSA (AQF Level 7).
+Persyaratan Masuk untuk Lulusan Indonesia:
+1. Akademik: Ijazah SMA/SMK dengan nilai rata-rata Ujian Sekolah minimal 80%, atau penyelesaian program Foundation Studies/Diploma di institusi terakreditasi.
+2. Kemampuan Bahasa Inggris: Sertifikat resmi IELTS Akademik skor minimal 6.5 (tidak ada band di bawah 6.0), TOEFL iBT minimal 79, atau PTE Academic minimal 58.
+3. Beasiswa & Pengakuan Pembelajaran Lampau (RPL): Tersedia beasiswa prestasi akademik (International Merit Scholarship) hingga 25% potongan biaya kuliah. Mahasiswa transfer universitas dapat mengajukan transfer kredit hingga maksimal 8 unit mata kuliah dasar.`,
+  },
+  {
+    id: 'kb_malaysian_rpl_pathway_ms',
+    title: 'Garis Panduan Pemindahan Kredit RPL dan Syarat Kemasukan Siswazah Australia (Bahasa Melayu)',
+    category: 'Course Architecture',
+    language: 'ms',
+    source: 'Lembaga Akademik & Kerjasama Antarabangsa Malaysia-Australia',
+    keywords: ['pemindahan kredit', 'RPL', 'kemasukan', 'Ijazah Sarjana Muda AI', 'STPM', 'Matrikulasi', 'Malaysia'],
+    content: `Struktur kelayakan Ijazah Sarjana Muda Kecerdasan Buatan (AQF Tahap 7) mengikut piawaian TEQSA:
+Syarat Kemasukan Pelajar Malaysia:
+1. Kelayakan Akademik: Sijil Tinggi Persekolahan Malaysia (STPM) dengan minimum 2 Prinsipal gred C, Sijil Matrikulasi KPM dengan PNGK 2.50+, atau Diploma dalam bidang Sains Komputer/IT.
+2. Keperluan Bahasa Inggeris: IELTS Akademik 6.5 (tiada komponen di bawah 6.0) atau MUET Band 4.5 ke atas.
+3. Pemindahan Kredit (RPL): Pemegang Diploma dari politeknik atau kolej universiti Malaysia yang diiktiraf layak mendapat pengecualian kredit sehingga 1 tahun pengajian (8 unit kursus / 48 mata kredit).`,
+  },
+  {
+    id: 'kb_filipino_admissions_tl',
+    title: 'Gabay sa Pagpasok ng mga Mag-aaral at Kursong AI sa Australia (Wikang Filipino)',
+    category: 'Admissions & Visas',
+    language: 'tl',
+    source: 'Tanggapan ng Pandaigdigang Adminsyon sa Timog-Silangang Asya',
+    keywords: ['Bachelor of AI', 'pagpasok', 'IELTS', 'Pilipinas', 'kredito', 'AQF', 'TEQSA'],
+    content: `Ang Bachelor of Artificial Intelligence (AQF Level 7) ay isang accredited na 3-taong kurso sa Australia na kinikilala ng TEQSA.
+Mga Pangangailangan sa Pagpasok para sa mga Mag-aaral mula sa Pilipinas:
+1. Akademiko: Pagkumpleto ng K-12 Senior High School Diploma na may pangkalahatang marka na hindi bababa sa 85%, o pagtapos ng hindi bababa sa isang taon ng pag-aaral sa kolehiyo/pamantasan sa Pilipinas.
+2. Kahusayan sa Wikang Ingles: Academic IELTS na may pangkalahatang marka na 6.5 (walang sub-score na mas mababa sa 6.0), o katumbas sa TOEFL iBT (79) o PTE Academic (58).
+3. Pagkilala sa Nakaraang Pag-aaral (RPL): Ang mga nagtapos ng kaugnay na Associate o Diploma courses ay maaaring mag-aplay para sa credit transfer upang mabawasan ang mga unit na kailangang kunin.`,
+  },
+  {
+    id: 'kb_khmer_admissions_km',
+    title: 'សេចក្ដីណែនាំអំពីការចុះឈ្មោះចូលរៀនបរិញ្ញាបត្របញ្ញាសិប្បនិម្មិត (AI) នៅអូស្ត្រាលី (ភាសាខ្មែរ)',
+    category: 'Admissions & Visas',
+    language: 'km',
+    source: 'ការិយាល័យនិស្សិតអន្តរជាតិប្រចាំតំបន់អាស៊ីអាគ្នេយ៍',
+    keywords: ['បរិញ្ញាបត្រ AI', 'ការចុះឈ្មោះ', 'IELTS', 'អាហារូបករណ៍', 'កម្ពុជា', 'TEQSA'],
+    content: `កម្មវិធីបរិញ្ញាបត្របញ្ញាសិប្បនិម្មិត (Bachelor of Artificial Intelligence) ទទួលបានការទទួលស្គាល់កម្រិត AQF Level 7 ពីស្ថាប័ន TEQSA អូស្ត្រាលី។
+លក្ខខណ្ឌតម្រូវសម្រាប់ការចុះឈ្មោះ៖
+១. លក្ខខណ្ឌសិក្សា៖ សញ្ញាបត្រមធ្យមសិក្សាទុតិយភូមិ (បាក់ឌុប) និទ្ទេសល្អ ឬការបញ្ចប់វគ្គសិក្សាមូលដ្ឋាន (Foundation Studies) នៅវិទ្យាស្ថានដែលមានការទទួលស្គាល់។
+២. កម្រិតភាសាអង់គ្លេស៖ ពិន្ទុ IELTS Academic យ៉ាងតិច ៦.៥ (មិនមានផ្នែកណាមួយក្រោម ៦.០) ឬ TOEFL iBT ៧៩ ឬ PTE ៥៨។
+៣. អាហារូបករណ៍៖ មានអាហារូបករណ៍លើកទឹកចិត្តរហូតដល់ ២០-៣០% នៃថ្លៃសិក្សា សម្រាប់និស្សិតឆ្នើម។`,
   }
 ];

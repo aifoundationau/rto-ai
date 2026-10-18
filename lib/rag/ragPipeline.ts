@@ -150,6 +150,12 @@ ${r.chunk.text}
     vi: '',
     th: '',
     id: '',
+    ms: '',
+    tl: '',
+    km: '',
+    my: '',
+    lo: '',
+    tet: '',
   };
 
   if (apiKey && apiKey.length > 10) {
@@ -164,7 +170,7 @@ You specialize in TEQSA, ASQA, CRICOS accreditation, curricula, university degre
 CRITICAL INSTRUCTIONS:
 1. Cross-Lingual Synthesis: Understand the retrieved reference documents regardless of their source language.
 2. Primary Output Language: Synthesize a full, authoritative answer in "${queryLangName}" (${queryLangCode}).
-3. Multi-Language Translations: Provide complete translations in "en", "ja", "zh", "vi", "th", "id".
+3. Multi-Language Translations: Provide complete translations across key international and ASEAN languages: "en", "ja", "zh", "vi", "th", "id", "ms", "tl", "km", "my", "lo", "tet".
 4. Grounding: Answer strictly using facts and guidelines from the provided Sources.
 5. Format: Return STRICT JSON matching this schema:
 {
@@ -175,7 +181,13 @@ CRITICAL INSTRUCTIONS:
     "zh": "Full Simplified Chinese translation markdown",
     "vi": "Full Vietnamese translation markdown",
     "th": "Full Thai translation markdown",
-    "id": "Full Indonesian translation markdown"
+    "id": "Full Indonesian translation markdown",
+    "ms": "Full Malay translation markdown",
+    "tl": "Full Filipino translation markdown",
+    "km": "Full Khmer translation markdown",
+    "my": "Full Burmese translation markdown",
+    "lo": "Full Lao translation markdown",
+    "tet": "Full Tetum translation markdown"
   }
 }`
         : `You are EduPulse AI, an authoritative Higher Education and Vocational Training (RTO) intelligence assistant.

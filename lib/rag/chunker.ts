@@ -29,14 +29,18 @@ export function detectLanguage(text: string): LanguageDetectionResult {
   const chineseRegex = /[\u4E00-\u9FFF]/g; // CJK Unified Ideographs
   const koreanRegex = /[\uAC00-\uD7AF\u1100-\u11FF]/g; // Hangul
   const thaiRegex = /[\u0E00-\u0E7F]/g; // Thai
+  const laoRegex = /[\u0E80-\u0EFF]/g; // Lao
   const khmerRegex = /[\u1780-\u17FF\u19E0-\u19FF]/g; // Khmer
+  const myanmarRegex = /[\u1000-\u109F\uAA60-\uAA7F]/g; // Burmese / Myanmar
   const vietnameseRegex = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/gi;
 
   const jpMatches = clean.match(japaneseRegex)?.length || 0;
   const zhMatches = clean.match(chineseRegex)?.length || 0;
   const koMatches = clean.match(koreanRegex)?.length || 0;
   const thMatches = clean.match(thaiRegex)?.length || 0;
+  const loMatches = clean.match(laoRegex)?.length || 0;
   const kmMatches = clean.match(khmerRegex)?.length || 0;
+  const myMatches = clean.match(myanmarRegex)?.length || 0;
   const viMatches = clean.match(vietnameseRegex)?.length || 0;
 
   // Japanese check: contains Hiragana or Katakana
@@ -47,6 +51,16 @@ export function detectLanguage(text: string): LanguageDetectionResult {
   // Korean check: contains Hangul
   if (koMatches >= 2 || koMatches / totalChars > 0.05) {
     return { code: 'ko', name: 'Korean (한국어)', confidence: 0.95 };
+  }
+
+  // Burmese check
+  if (myMatches >= 2 || myMatches / totalChars > 0.05) {
+    return { code: 'my', name: 'Burmese (မြန်မာဘာသာ)', confidence: 0.95 };
+  }
+
+  // Lao check
+  if (loMatches >= 2 || loMatches / totalChars > 0.05) {
+    return { code: 'lo', name: 'Lao (ພາສາລາວ)', confidence: 0.95 };
   }
 
   // Khmer check
@@ -69,18 +83,39 @@ export function detectLanguage(text: string): LanguageDetectionResult {
     return { code: 'vi', name: 'Vietnamese (Tiếng Việt)', confidence: 0.9 };
   }
 
-  // Indonesian / Malay keyword check
+  // Tetum (Timor-Leste) check
+  const tetKeywords = /\b(iha|ba|ho|ne|ida|atu|mak|hodi|kursu|lisensiatura|universidade|estudante|estudu|rekezitus|rekizitu|bolsu)\b/gi;
+  const tetMatches = clean.match(tetKeywords)?.length || 0;
+  if (tetMatches >= 3) {
+    return { code: 'tet', name: 'Tetum (Lian Tetun)', confidence: 0.88 };
+  }
+
+  // Malay check
+  const msKeywords = /\b(kelayakan|kemasukan|pemindahan|kredit|ijazah|sarjana|kursus|pengajian|universiti|syarat|dijalankan|pelajar)\b/gi;
+  const msMatches = clean.match(msKeywords)?.length || 0;
+  if (msMatches >= 3) {
+    return { code: 'ms', name: 'Malay (Bahasa Melayu)', confidence: 0.88 };
+  }
+
+  // Indonesian check
+  const idKeywords = /\b(persyaratan|pendaftaran|beasiswa|sarjana|kecerdasan|buatan|mahasiswa|universitas|pembelajaran|diperlukan|adalah)\b/gi;
+  const idMatches = clean.match(idKeywords)?.length || 0;
+  if (idMatches >= 3) {
+    return { code: 'id', name: 'Indonesian (Bahasa Indonesia)', confidence: 0.88 };
+  }
+
+  // General Indonesian/Malay check
   const idMsKeywords = /\b(dan|yang|untuk|dengan|adalah|ini|itu|di|pada|ke|dari|kursus|ijazah|universitas|pembelajaran)\b/gi;
-  const idMatches = clean.match(idMsKeywords)?.length || 0;
-  if (idMatches >= 4) {
+  const idMsMatches = clean.match(idMsKeywords)?.length || 0;
+  if (idMsMatches >= 4) {
     return { code: 'id', name: 'Indonesian (Bahasa Indonesia)', confidence: 0.85 };
   }
 
   // Tagalog keyword check
-  const tlKeywords = /\b(ang|ng|mga|sa|ay|na|para|at|kung|ito|sila|bachelor|kurso)\b/gi;
+  const tlKeywords = /\b(ang|ng|mga|sa|ay|na|para|at|kung|ito|sila|bachelor|kurso|kinakailangan|marka|pagpasok|pamantasan|mag-aaral)\b/gi;
   const tlMatches = clean.match(tlKeywords)?.length || 0;
-  if (tlMatches >= 4) {
-    return { code: 'tl', name: 'Tagalog (Filipino)', confidence: 0.85 };
+  if (tlMatches >= 3) {
+    return { code: 'tl', name: 'Tagalog (Filipino)', confidence: 0.88 };
   }
 
   // Default is always English
@@ -93,7 +128,7 @@ export function detectLanguage(text: string): LanguageDetectionResult {
 export function extractKeywords(text: string, count = 8): string[] {
   const words = text
     .toLowerCase()
-    .replace(/[^a-zA-Z0-9\s\u00C0-\u024F\u1E00-\u1EFF\u3040-\u30FF\u4E00-\u9FFF\u0E00-\u0E7F\u1780-\u17FF]/g, ' ')
+    .replace(/[^a-zA-Z0-9\s\u00C0-\u024F\u1E00-\u1EFF\u3040-\u30FF\u4E00-\u9FFF\u0E00-\u0E7F\u0E80-\u0EFF\u1000-\u109F\u1780-\u17FF]/g, ' ')
     .split(/\s+/)
     .filter(w => w.length > 3);
 

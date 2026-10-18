@@ -12,8 +12,10 @@ export type SupportedLanguageCode =
   | 'km'  // Khmer
   | 'id'  // Indonesian
   | 'ms'  // Malay
-  | 'tl'  // Tagalog
+  | 'tl'  // Tagalog / Filipino
   | 'my'  // Burmese
+  | 'lo'  // Lao
+  | 'tet' // Tetum
   | 'other';
 
 export interface MultilingualChunk {

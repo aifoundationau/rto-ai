@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { query, topK, minScore, categoryFilter, targetLanguage, apiKey } = body;
+    const { query, topK, minScore, categoryFilter, targetLanguage, apiKey, allTranslations } = body;
 
     if (!query || typeof query !== 'string' || query.trim().length === 0) {
       return NextResponse.json(
@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       categoryFilter,
       targetLanguage,
       apiKey,
+      allTranslations: allTranslations !== undefined ? Boolean(allTranslations) : true,
     });
 
     return NextResponse.json({

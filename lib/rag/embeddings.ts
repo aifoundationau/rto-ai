@@ -84,7 +84,17 @@ export function generateDeterministicEmbedding(text: string, dimension: number =
     // Thai
     หลักสูตร: 11, ปริญญา: 23, ประกาศนียบัตร: 49, นักเรียน: 73, ค่าเล่าเรียน: 89, หน่วยกิต: 151,
     // Khmer
-    វគ្គសិក្សា: 11, សញ្ញាបត្រ: 23, និស្សិត: 73, ការចុះឈ្មោះ: 113
+    វគ្គសិក្សា: 11, សញ្ញាបត្រ: 23, និស្សិត: 73, ការចុះឈ្មោះ: 113,
+    // Indonesian & Malay
+    kursus: 11, ijazah: 23, sarjana: 23, sertifikat: 49, mahasiswa: 73, pelajar: 73, pendaftaran: 113, kemasukan: 101, kredit: 151, beasiswa: 89, kelayakan: 101,
+    // Filipino / Tagalog
+    kurso: 11, pamantasan: 23, magaaral: 73, pagpasok: 101, matrikula: 89,
+    // Burmese
+    ဘွဲ့: 23, သင်တန်း: 11, ကျောင်းသား: 73, ဝင်ခွင့်: 101, ပညာသင်ဆု: 89,
+    // Lao
+    ປະລິນຍາ: 23, ຫຼັກສູດ: 11, ນັກຮຽນ: 73, ການສະໝັກ: 101,
+    // Tetum
+    kursu: 11, lisensiatura: 23, estudante: 73, rekezitus: 101, bolsu: 89,
   };
 
   for (const [term, idx] of Object.entries(semanticConcepts)) {
