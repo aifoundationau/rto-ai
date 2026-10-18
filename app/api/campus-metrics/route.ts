@@ -5,6 +5,7 @@ import { requireAdministrationOrSuperAdminCaller } from '@/lib/auth/serverAuth';
 export const dynamic = 'force-dynamic';
 
 export interface CampusMetricsData {
+  heroBadgeText?: string;
   totalStudents: string;
   placementRate: string;
   facultyStaff: string;
@@ -16,6 +17,7 @@ export interface CampusMetricsData {
 }
 
 const DEFAULT_CAMPUS_METRICS: CampusMetricsData = {
+  heroBadgeText: 'Your Future is Now • Powered by Gemini',
   totalStudents: '5,000+',
   placementRate: '96%',
   facultyStaff: '350+',
@@ -73,6 +75,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
+      heroBadgeText,
       totalStudents,
       placementRate,
       facultyStaff,
@@ -97,6 +100,7 @@ export async function POST(req: NextRequest) {
     }
 
     const updatedMetrics: CampusMetricsData = {
+      heroBadgeText: heroBadgeText !== undefined ? heroBadgeText.trim() : (runtimeCache.heroBadgeText || 'Your Future is Now • Powered by Gemini'),
       totalStudents: totalStudents?.trim() || runtimeCache.totalStudents || '5,000+',
       placementRate: placementRate?.trim() || runtimeCache.placementRate || '96%',
       facultyStaff: facultyStaff?.trim() || runtimeCache.facultyStaff || '350+',

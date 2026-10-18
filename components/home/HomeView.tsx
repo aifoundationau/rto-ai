@@ -169,6 +169,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   // Dynamic Front-Page Campus Metrics (Adjustable via Admin Panel)
   const [campusMetrics, setCampusMetrics] = useState({
+    heroBadgeText: 'Your Future is Now • Powered by Gemini',
     totalStudents: '5,000+',
     placementRate: '96%',
     facultyStaff: '350+',
@@ -179,19 +180,41 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   useEffect(() => {
     let isMounted = true;
-    fetch('/api/campus-metrics')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (isMounted && data && data.metrics) {
-          setCampusMetrics((prev) => ({
-            ...prev,
-            ...data.metrics,
-          }));
+
+    const loadMetrics = () => {
+      try {
+        const stored = typeof window !== 'undefined' ? localStorage.getItem('edupulse_metrics_cache') : null;
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && isMounted) setCampusMetrics((prev) => ({ ...prev, ...parsed }));
         }
-      })
-      .catch((err) => console.warn('[HomeView] Campus metrics fetch error:', err));
+      } catch {}
+
+      fetch('/api/campus-metrics')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (isMounted && data && data.metrics) {
+            setCampusMetrics((prev) => ({
+              ...prev,
+              ...data.metrics,
+            }));
+          }
+        })
+        .catch((err) => console.warn('[HomeView] Campus metrics fetch error:', err));
+    };
+
+    loadMetrics();
+
+    const handleMetricsUpdated = () => {
+      loadMetrics();
+    };
+    window.addEventListener('edupulse_metrics_updated', handleMetricsUpdated);
+    window.addEventListener('storage', handleMetricsUpdated);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('edupulse_metrics_updated', handleMetricsUpdated);
+      window.removeEventListener('storage', handleMetricsUpdated);
     };
   }, []);
 
@@ -316,7 +339,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <div className="relative z-10 p-6 sm:p-10 md:p-14 max-w-3xl text-white space-y-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-600/40 border border-indigo-400/40 text-indigo-200 text-xs font-bold backdrop-blur-md">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>2026 Admissions Open • Powered by Gemini 3.1 AI</span>
+            <span>{campusMetrics.heroBadgeText || 'Your Future is Now • Powered by Gemini'}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight leading-none text-white">
@@ -463,7 +486,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </div>
           <div className="text-2xl font-black text-slate-900 tracking-tight">24/7 Agent</div>
           <div className="text-xs font-bold text-slate-700 mt-0.5">Autonomous Advisor</div>
-          <div className="text-[11px] text-slate-400 mt-1">Gemini 3.1 & GCP sync</div>
+          <div className="text-[11px] text-slate-400 mt-1">Gemini & GCP sync</div>
         </div>
       </section>
 
