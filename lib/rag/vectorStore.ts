@@ -57,7 +57,7 @@ function searchSeedDocuments(
           totalChunks: 1,
           text: doc.content,
           language: (doc.language || 'en') as any,
-          languageName: doc.language === 'ja' ? 'Japanese' : doc.language === 'zh' ? 'Chinese' : doc.language === 'vi' ? 'Vietnamese' : doc.language === 'th' ? 'Thai' : 'English',
+          languageName: doc.language === 'ja' ? 'Japanese' : doc.language === 'zh' ? 'Chinese' : doc.language === 'vi' ? 'Vietnamese' : doc.language === 'th' ? 'Thai' : 'EN English / Global',
           category: doc.category || 'General',
           title: doc.title,
           source: doc.source || 'Institutional Archive',
@@ -197,7 +197,7 @@ export async function searchNearestVectors(
                 totalChunks: data.totalChunks || 1,
                 text: data.text || '',
                 language: data.language || 'en',
-                languageName: data.languageName || 'English',
+                languageName: data.languageName || 'EN English / Global',
                 category: data.category || 'General',
                 title: data.title || '',
                 source: data.source || '',
@@ -245,7 +245,7 @@ export async function searchNearestVectors(
                 totalChunks: data.totalChunks || 1,
                 text: data.text || '',
                 language: data.language || 'en',
-                languageName: data.languageName || 'English',
+                languageName: data.languageName || 'EN English / Global',
                 category: data.category || 'General',
                 title: data.title || '',
                 source: data.source || '',
@@ -277,6 +277,13 @@ export async function searchNearestVectors(
  * Deletes all chunks associated with a document ID.
  */
 export async function deleteDocumentChunks(docId: string): Promise<number> {
+  // Clear from runtime in-memory cache
+  for (let i = RUNTIME_STORED_CHUNKS.length - 1; i >= 0; i--) {
+    if (RUNTIME_STORED_CHUNKS[i].docId === docId || RUNTIME_STORED_CHUNKS[i].id === docId) {
+      RUNTIME_STORED_CHUNKS.splice(i, 1);
+    }
+  }
+
   if (!isFirebaseConfigured) return 0;
   const collectionRef = db.collection(KNOWLEDGE_COLLECTION);
   const snapshot = await collectionRef.where('docId', '==', docId).get();
@@ -335,7 +342,7 @@ export async function getVectorStoreStats(): Promise<{
  */
 function getLanguageDisplayName(code: string): string {
   const map: Record<string, string> = {
-    en: 'English',
+    en: 'EN English / Global',
     id: 'Indonesian (Bahasa Indonesia)',
     vi: 'Vietnamese (Tiếng Việt)',
     th: 'Thai (ภาษาไทย)',

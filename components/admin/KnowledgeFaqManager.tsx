@@ -34,7 +34,7 @@ interface KnowledgeFaqManagerProps {
 }
 
 const PRESET_LANGUAGES = [
-  { code: 'en', label: 'English (en)', flag: '🇦🇺' },
+  { code: 'en', label: 'EN English / Global', flag: '🌐' },
   { code: 'ja', label: '日本語 (Japanese)', flag: '🇯🇵' },
   { code: 'ko', label: '한국어 (Korean)', flag: '🇰🇷' },
   { code: 'zh', label: '中文 (Chinese)', flag: '🇨🇳' },

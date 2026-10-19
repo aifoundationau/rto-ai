@@ -18,7 +18,7 @@ export interface LanguageDetectionResult {
  */
 export function detectLanguage(text: string): LanguageDetectionResult {
   if (!text || text.trim().length === 0) {
-    return { code: 'en', name: 'English', confidence: 1.0 };
+    return { code: 'en', name: 'EN English / Global', confidence: 1.0 };
   }
 
   const clean = text.trim();
@@ -111,15 +111,15 @@ export function detectLanguage(text: string): LanguageDetectionResult {
     return { code: 'id', name: 'Indonesian (Bahasa Indonesia)', confidence: 0.85 };
   }
 
-  // Tagalog keyword check
-  const tlKeywords = /\b(ang|ng|mga|sa|ay|na|para|at|kung|ito|sila|bachelor|kurso|kinakailangan|marka|pagpasok|pamantasan|mag-aaral)\b/gi;
+  // Tagalog keyword check (avoid common English words like 'at' or 'bachelor')
+  const tlKeywords = /\b(ang\s+mga|ano\s+ang|mga|ay|para\s+sa|kung|ito|sila|kurso|kinakailangan|marka|pagpasok|pamantasan|mag-aaral)\b/gi;
   const tlMatches = clean.match(tlKeywords)?.length || 0;
   if (tlMatches >= 3) {
     return { code: 'tl', name: 'Tagalog (Filipino)', confidence: 0.88 };
   }
 
   // Default is always English
-  return { code: 'en', name: 'English', confidence: 0.99 };
+  return { code: 'en', name: 'EN English / Global', confidence: 0.99 };
 }
 
 /**

@@ -8,7 +8,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { detectLanguage, chunkDocument, extractKeywords } from './chunker';
 import { getEmbedding, getBatchEmbeddings, GENERATION_MODEL } from './embeddings';
-import { storeChunks, searchNearestVectors, getVectorStoreStats } from './vectorStore';
+import { storeChunks, searchNearestVectors, getVectorStoreStats, deleteDocumentChunks } from './vectorStore';
 import { IngestDocumentInput, IngestResult, RagQueryOptions, RagQueryResponse, SupportedLanguageCode, AutoSortResult } from './types';
 
 
@@ -21,6 +21,15 @@ export async function ingestDocument(
 ): Promise<IngestResult> {
   const docId = input.id || `doc_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const content = input.content;
+
+  // Clean up existing chunks if updating an already existing document
+  if (input.id) {
+    try {
+      await deleteDocumentChunks(input.id);
+    } catch (err) {
+      console.warn('[ingestDocument] Could not purge old chunks for docId:', input.id, err);
+    }
+  }
 
   if (!content || content.trim().length === 0) {
     return {
@@ -389,6 +398,23 @@ Return ONLY valid JSON matching this schema:
   };
 }
 
+export const LANGUAGE_NAME_MAP: Record<string, string> = {
+  en: 'EN English / Global',
+  id: 'Indonesian (Bahasa Indonesia)',
+  vi: 'Vietnamese (Tiếng Việt)',
+  th: 'Thai (ภาษาไทย)',
+  tl: 'Filipino / Tagalog (Wikang Filipino)',
+  ms: 'Malay (Bahasa Melayu)',
+  my: 'Burmese (မြန်မာဘာသာ - Myanmar)',
+  km: 'Khmer (ភាសាខ្មែរ - Cambodia)',
+  kh: 'Khmer (ភាសាខ្មែរ - Cambodia)',
+  lo: 'Lao (ພາສາລາວ - Laos)',
+  tet: 'Tetum (Lian Tetun - Timor-Leste)',
+  zh: 'Chinese (中文)',
+  ja: 'Japanese (日本語)',
+  ko: 'Korean (한국어)',
+};
+
 /**
  * Translates arbitrary text into a target language using Gemini.
  */
@@ -399,23 +425,6 @@ export async function translateText(
 ): Promise<string> {
   const apiKey = customApiKey || process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.length < 10) return text;
-
-  const LANGUAGE_NAME_MAP: Record<string, string> = {
-    en: 'English',
-    id: 'Indonesian (Bahasa Indonesia)',
-    vi: 'Vietnamese (Tiếng Việt)',
-    th: 'Thai (ภาษาไทย)',
-    tl: 'Filipino / Tagalog (Wikang Filipino)',
-    ms: 'Malay (Bahasa Melayu)',
-    my: 'Burmese (မြန်မာဘာသာ - Myanmar)',
-    km: 'Khmer (ភាសាខ្មែរ - Cambodia)',
-    kh: 'Khmer (ភាសាខ្មែរ - Cambodia)',
-    lo: 'Lao (ພາສາລາວ - Laos)',
-    tet: 'Tetum (Lian Tetun - Timor-Leste)',
-    zh: 'Chinese (中文)',
-    ja: 'Japanese (日本語)',
-    ko: 'Korean (한국어)',
-  };
 
   const resolvedLanguage = LANGUAGE_NAME_MAP[targetLanguage.toLowerCase()] || targetLanguage;
 
@@ -444,6 +453,82 @@ Translated text:`;
     console.warn('[translateText] Gemini error:', err);
     return text;
   }
+}
+
+/**
+ * Improves and polishes the language, readability, and professional clarity of an academic document.
+ */
+export async function improveDocumentLanguage(
+  title: string,
+  content: string,
+  language?: string,
+  customApiKey?: string
+): Promise<{
+  improvedTitle: string;
+  improvedContent: string;
+  summary: string;
+}> {
+  const apiKey = customApiKey || process.env.GEMINI_API_KEY;
+  const langKey = (language || 'en').toLowerCase();
+  const langName = LANGUAGE_NAME_MAP[langKey] || language || 'EN English / Global';
+
+  if (!apiKey || apiKey.length < 10) {
+    return {
+      improvedTitle: title,
+      improvedContent: content,
+      summary: 'API key not configured; current content retained.',
+    };
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const prompt = `You are a distinguished academic editor and higher education accreditation documentation specialist.
+Your task is to refine, polish, and improve the language of the following educational document.
+Requirements:
+1. Improve readability, grammar, structural clarity, and professional academic precision.
+2. The output MUST be in ${langName} (do NOT translate to a different language).
+3. Preserve all factual information, curriculum details, accreditation standards, and regulatory acronyms (e.g. TEQSA, AQF, ASQA, RPL, CRICOS, IELTS, GPA).
+4. Return ONLY a valid JSON object matching this schema:
+{
+  "improvedTitle": "Polished document title",
+  "improvedContent": "Polished markdown document content",
+  "summary": "1-sentence summary of the language improvements applied"
+}
+
+Document Title:
+"${title}"
+
+Document Content:
+"""
+${content}
+"""`;
+
+    const res = await ai.models.generateContent({
+      model: GENERATION_MODEL,
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        temperature: 0.2,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    if (res.text) {
+      const parsed = JSON.parse(res.text.trim());
+      return {
+        improvedTitle: parsed.improvedTitle || title,
+        improvedContent: parsed.improvedContent || content,
+        summary: parsed.summary || 'Language successfully improved and polished.',
+      };
+    }
+  } catch (err: any) {
+    console.warn('[improveDocumentLanguage] Gemini error:', err);
+  }
+
+  return {
+    improvedTitle: title,
+    improvedContent: content,
+    summary: 'Original content retained.',
+  };
 }
 
 

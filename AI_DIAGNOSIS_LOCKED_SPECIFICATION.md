@@ -44,15 +44,15 @@ This design is permanently locked and must never be altered, removed, or simplif
    - In-memory runtime caching must always be available as a fallback so local development and unconfigured Firestore states never crash or produce blank diagnostic screens.
 
 7. **Mandatory Multilingual Inspect, "Edit AI Response" & Direct RAG Sync**:
-   - The Inspect modal MUST provide multilingual translation capabilities covering **all ASEAN languages** and regional dialogue partners:
+   - The Inspect modal MUST provide multilingual translation capabilities covering **all ASEAN languages** and regional dialogue partners (with EN English / Global as default and top of all lists):
+     - 🌐 **EN English / Global** (`en`)
+     - 🇰🇭 **Khmer** (`kh` / `km` - ភាសាខ្មែរ - Cambodia)
      - 🇮🇩 **Indonesian** (`id` - Bahasa Indonesia)
      - 🇻🇳 **Vietnamese** (`vi` - Tiếng Việt)
      - 🇹🇭 **Thai** (`th` - ภาษาไทย)
      - 🇵🇭 **Filipino / Tagalog** (`tl` - Wikang Filipino)
      - 🇲🇾 / 🇧🇳 **Malay** (`ms` - Bahasa Melayu)
-     - 🇸🇬 / 🇦🇺 **English** (`en` - Singapore / Global)
      - 🇲🇲 **Burmese** (`my` - မြန်မာဘာသာ - Myanmar)
-     - 🇰🇭 **Khmer** (`km` - ភាសាខ្មែរ - Cambodia)
      - 🇱🇦 **Lao** (`lo` - ພາສາລາວ - Laos)
      - 🇹🇱 **Tetum** (`tet` - Lian Tetun - Timor-Leste)
      - 🇨🇳 **Chinese** (`zh` - 中文)

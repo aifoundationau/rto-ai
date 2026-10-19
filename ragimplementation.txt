@@ -1,0 +1,370 @@
+================================================================================
+EDUPULSE AI / RTO-AI MULTILINGUAL RAG IMPLEMENTATION MASTER PLAN
+================================================================================
+Document: ragimplementation.txt
+Target System: End-to-End Multilingual Vector RAG for Australian Higher Education
+Frameworks: Google Gemini (gemini-3.8-flash, text-embedding-004, gemini-embedding-001)
+Database: Google Cloud Firestore Native Vector Search (768 dimensions, COSINE)
+Accreditation Scope: TEQSA (AQF Levels 7-9), ASQA (VET/RTO), CRICOS, ESOS Act
+Primary Languages: English (en), Khmer (kh/km), Indonesian (id), Vietnamese (vi),
+                   Thai (th), Filipino/Tagalog (tl), Malay (ms), Burmese (my),
+                   Lao (lo), Tetum (tet), Chinese (zh), Japanese (ja), Korean (ko)
+================================================================================
+
+--------------------------------------------------------------------------------
+1. EXECUTIVE SUMMARY & ARCHITECTURAL VISION
+--------------------------------------------------------------------------------
+This plan establishes the end-to-end connection between:
+  1. The Interaction Diagnostic Deep-Dive (Staff Review & Translation Panel)
+  2. The Multilingual RAG Vector Index (Cloud Firestore 768-dim Vector Store)
+  3. The Cross-Lingual Semantic Retrieval Engine (Gemini Embeddings + Chunker)
+  4. The Live Student Assistant (Gemini 3.8 Flash Agent with RAG Tool Calling)
+
+When staff review an AI interaction, correct the inquiry language, edit the answer,
+and translate it into Khmer (kh), English (en), or any ASEAN language, clicking
+"Save & Ingest to Multilingual RAG" must immediately make that verified institutional
+response searchable and citable by future prospective students in ANY language.
+
+Cross-lingual capability means:
+- A student asking in Khmer (ភាសាខ្មែរ) or Vietnamese about Bachelor of AI admission
+  prerequisites will semantically match against verified institutional syllabus chunks
+  (whether originally authored in English, Khmer, or Vietnamese).
+- The response is synthesized in the student's native language, grounded in verified
+  TEQSA/AQF facts, with statutory acronyms (CRICOS, RPL, IELTS, GPA) preserved intact.
+
+
+--------------------------------------------------------------------------------
+2. CURRENT ARCHITECTURE AUDIT & CRITICAL GAPS IDENTIFIED
+--------------------------------------------------------------------------------
+A forensic audit of the existing codebase identified the following specific gaps:
+
+[GAP 1] CHUNKER SCRIPT TRIGGER POLLUTION (lib/rag/chunker.ts)
+  - Issue: Line 115 of `lib/rag/chunker.ts` contains `\b(bachelor|at)\b` in `tlKeywords`.
+    When English course documents containing "Bachelor of Science at University..."
+    are auto-chunked without an explicit language code, they risk being misclassified
+    as Tagalog (`tl`).
+  - Required Action: Remove `bachelor` and `at` from `tlKeywords` in `chunker.ts`,
+    and prioritize English stopword/indicator checks before Latin-based ASEAN scripts,
+    matching the heuristic resolution implemented in `AiDiagnosisView.tsx`.
+
+[GAP 2] EMBEDDING TASK TYPES (lib/rag/embeddings.ts)
+  - Issue: Google Gemini embeddings (`text-embedding-004` and `gemini-embedding-001`)
+    yield significantly higher retrieval precision when the asymmetric search task type
+    is declared:
+      - `taskType: TaskType.RETRIEVAL_DOCUMENT` during document chunk ingestion.
+      - `taskType: TaskType.RETRIEVAL_QUERY` during student query time.
+  - Required Action: Pass `taskType` in `getEmbedding()` and `getBatchEmbeddings()`.
+
+[GAP 3] HYDE & CROSS-LINGUAL QUERY EXPANSION (lib/rag/ragPipeline.ts)
+  - Issue: Technical Australian accreditation terms (e.g. "RPL credit transfer",
+    "CRICOS CoE", "AQF Level 7", "ATAR 75.0") in English documents may have lower
+    embedding proximity to purely colloquial Khmer or Thai queries.
+  - Required Action: Implement Dual-Query / HyDE (Hypothetical Document Embeddings)
+    retrieval: when an ASEAN language query is received, generate an embedded query
+    for both the native text AND an English translation, merging candidate chunks
+    using Reciprocal Rank Fusion (RRF).
+
+[GAP 4] VERIFIED KNOWLEDGE BANK PRIORITY BOOSTING (lib/rag/vectorStore.ts)
+  - Issue: Chunks created by staff review in `AiDiagnosisView.tsx` carry
+    `category: 'Verified Q&A Knowledge Bank'`. Currently, they receive the same
+    scoring weight as general unstructured documents.
+  - Required Action: Apply an intentional +0.15 relevance boost to chunks from
+    'Verified Q&A Knowledge Bank', ensuring staff-verified answers always outrank
+    unverified documents in live chat.
+
+[GAP 5] FIRESTORE NATIVE VECTOR INDEX DEPLOYMENT
+  - Issue: `firestore.indexes.json` contains the 768-dim index definition on `embedding`.
+    If the index is still building or undeployed in a given GCP project, the system
+    currently relies on in-memory cosine ranking.
+  - Required Action: Execute `firebase deploy --only firestore:indexes` and verify
+    index status in the Firebase Console.
+
+[GAP 6] CHAT AGENT SYSTEM PROMPT MANDATE (lib/agent/engine.ts & tools.ts)
+  - Issue: The Gemini 3.8 Flash agent has the `query_multilingual_rag` tool, but
+    system instructions must explicitly command the agent to execute this tool
+    whenever queries in non-English languages are detected.
+  - Required Action: Inject mandatory RAG grounding directives into the agent prompt.
+
+
+--------------------------------------------------------------------------------
+3. STEP-BY-STEP IMPLEMENTATION ROADMAP
+--------------------------------------------------------------------------------
+
+================================================================================
+PHASE 1: CHUNKER & LANGUAGE ACCURACY HARDENING
+================================================================================
+Goal: Guarantee 100% accurate language labeling and chunk segmentation across
+all ASEAN and partner languages.
+
+Step 1.1: Refactor `lib/rag/chunker.ts` Language Detection
+  - Update `detectLanguage()`:
+    1. Prioritize distinctive non-Latin scripts:
+       - Myanmar/Burmese: `[\u1000-\u109F\uAA60-\uAA7F]` -> `my`
+       - Khmer: `[\u1780-\u17FF\u19E0-\u19FF]` -> `km` (alias `kh`)
+       - Lao: `[\u0E80-\u0EFF]` -> `lo`
+       - Thai: `[\u0E00-\u0E7F]` -> `th`
+       - Japanese: `[\u3040-\u309F\u30A0-\u30FF]` -> `ja`
+       - Korean: `[\uAC00-\uD7AF\u1100-\u11FF]` -> `ko`
+       - Chinese: `[\u4E00-\u9FFF]` (without kana) -> `zh`
+       - Vietnamese diacritics: `[àáạảãâ...đ]` -> `vi`
+    2. Latin-script evaluation:
+       - Check English strong stopwords FIRST (`the`, `is`, `are`, `what`, `course`,
+         `admission`, `degree`, `bachelor`, `university`, `at`). If English stopwords
+         are prominent, classify as `en` immediately.
+       - Clean Tagalog (`tl`) triggers: remove `bachelor` and `at`. Keep unique
+         indigenous markers: `mga`, `ng`, `ay`, `kung`, `ito`, `mag-aaral`, `pamantasan`.
+       - Clean Tetum (`tet`) triggers: remove single-word collisions (`ba`, `ne`).
+         Keep distinct terms: `iha`, `atu`, `mak`, `kursu`, `lisensiatura`, `rekezitus`.
+
+Step 1.2: Standardize Khmer Language Codes
+  - Ensure both `kh` and `km` are recognized universally across:
+    - `lib/rag/types.ts` (`SupportedLanguageCode`)
+    - `lib/rag/ragPipeline.ts` (`LANGUAGE_NAME_MAP`)
+    - `lib/rag/chunker.ts`
+    - `components/admin/AiDiagnosisView.tsx`
+
+Step 1.3: Verification Target
+  - Ingest an English document containing "Bachelor of Science at..." -> classified as `en`.
+  - Ingest a Khmer document with ភាសាខ្មែរ -> classified as `kh`.
+
+
+================================================================================
+PHASE 2: EMBEDDING ENGINE & ASYMMETRIC SEARCH OPTIMIZATION
+================================================================================
+Goal: Elevate semantic similarity resolution using Google's premier embedding models.
+
+Step 2.1: Model Hierarchy in `lib/rag/embeddings.ts`
+  - Update primary model sequence:
+    1. Primary: `text-embedding-004` (768 dimensions via `outputDimensionality: 768`)
+    2. Secondary: `gemini-embedding-001` (768 dimensions)
+    3. Resilient Fallback: `google-multilingual-deterministic-768` (offline n-gram hash)
+
+Step 2.2: Add TaskType Directives
+  - When embedding document chunks during ingestion:
+    `config: { outputDimensionality: 768, taskType: 'RETRIEVAL_DOCUMENT' }`
+  - When embedding user queries during search:
+    `config: { outputDimensionality: 768, taskType: 'RETRIEVAL_QUERY' }`
+  - Benefit: Asymmetric retrieval models separate document semantic space from
+    query semantic space, improving precision by 18-24% on technical terms.
+
+Step 2.3: Verification Target
+  - Execute `getEmbedding("តម្រូវការចូលរៀន", undefined)` (Khmer query) -> returns
+    unit-normalized 768-float array with `model: text-embedding-004`.
+
+
+================================================================================
+PHASE 3: FIRESTORE VECTOR STORE & RELEVANCE SCORING
+================================================================================
+Goal: Ensure Cloud Firestore Vector Search operates at low latency with authoritative
+weighting for verified institutional records.
+
+Step 3.1: Verified Q&A Priority Boosting
+  - In `lib/rag/vectorStore.ts` (`searchNearestVectors`):
+    - When iterating retrieved candidate chunks:
+      ```typescript
+      if (chunk.category === 'Verified Q&A Knowledge Bank') {
+        score = Math.min(0.99, score + 0.15); // +15% boost for staff-verified Q&As
+      }
+      ```
+    - Rationale: A question answered and verified by staff in `AiDiagnosisView` must
+      override generic or scraped text when answering identical student queries.
+
+Step 3.2: Re-Rank & Threshold Filtering
+  - Implement two-tier filtering:
+    - Tier 1 (Synthesis context): Chunks with `score >= 0.50` are passed to Gemini.
+    - Tier 2 (Cited sources): Only chunks with `score >= 0.65` are displayed in the
+      citations/sources list.
+  - Discard candidates below `0.35` to avoid noisy or irrelevant grounding.
+
+Step 3.3: Firestore Composite Index Verification
+  - Deploy indexes via CLI:
+    `npx firebase deploy --only firestore:indexes`
+  - Confirm index build status in GCP Console for `knowledge_embeddings`:
+    - `tenantTag` (ASCENDING) + `embedding` (VECTOR: 768, COSINE)
+    - `embedding` (VECTOR: 768, COSINE)
+
+
+================================================================================
+PHASE 4: CROSS-LINGUAL QUERY RETRIEVAL & HYDE EXPANSION
+================================================================================
+Goal: Bridge language boundaries so an inquiry in any ASEAN language retrieves
+authoritative English documents, and vice versa.
+
+Step 4.1: Implement Dual-Query Search in `lib/rag/ragPipeline.ts`
+  - In `queryMultilingualRag(query, options)`:
+    1. Detect `queryLanguage`.
+    2. If `queryLanguage !== 'en'`:
+       - Translate `query` to English: `queryEn = await translateText(query, 'en')`.
+       - Generate vector for `query` (Native) AND vector for `queryEn` (English).
+       - Query vector store with both vectors.
+       - Merge results using Reciprocal Rank Fusion:
+         `RRF_Score = 1 / (60 + rank_native) + 1 / (60 + rank_english)`
+    3. If `queryLanguage === 'en'`:
+       - Perform standard single-vector query.
+
+Step 4.2: Multilingual Answer Synthesis Prompt
+  - Update synthesis prompt in `queryMultilingualRag`:
+    - Command Gemini 3.8 Flash to:
+      1. Review the retrieved verified chunks.
+      2. Synthesize a comprehensive response directly in the user's inquiry language
+         (e.g., Khmer, Vietnamese, Indonesian, Thai).
+      3. Strictly preserve official regulatory and academic acronyms:
+         TEQSA, ASQA, AQF, CRICOS, RPL, ATAR, IELTS, GPA, CoE, OSHC.
+      4. Avoid inventing policies or numbers not present in the grounding chunks.
+
+Step 4.3: Verification Target
+  - Query: "តើថ្លៃសិក្សាសម្រាប់បរិញ្ញាបត្រ AI ប៉ុន្មាន?" (Khmer: How much is tuition for Bachelor of AI?)
+  - Retrieval: Retrieves English chunk `kb_bachelor_ai_curriculum_en`.
+  - Output: Formatted in Khmer, citing official tuition fees, IELTS 6.5 requirement, and TEQSA accreditation.
+
+
+================================================================================
+PHASE 5: STAFF INGESTION & DIAGNOSTIC DEEP-DIVE SYNC
+================================================================================
+Goal: Tighten the loop between staff review in `AiDiagnosisView.tsx` and the live
+RAG knowledge bank.
+
+Step 5.1: Bilingual Chunk Ingestion
+  - In `AiDiagnosisView.tsx` (`handleSaveAndIngestRag`):
+    - When staff translates and saves an answer (e.g. in Khmer `kh`):
+      1. Ingest Chunk A (Target Language: `kh`):
+         - Title: `Verified Q&A (${activeInquiryLang.name}): ${qSnippet}`
+         - Content: `### User Inquiry\n${inspectRecord.userQuestion}\n\n### Verified Institutional Answer\n${editedAnswerText}`
+         - Language: `editLanguage` (`kh`)
+      2. If target language is non-English, also auto-ingest Chunk B (English `en`):
+         - Ensures English queries can also benefit from this verified turnaround.
+    - Set metadata:
+      `metadata: { sourceInteractionId: inspectRecord.id, reviewerEmail: 'staff@ai-foundation.org' }`
+
+Step 5.2: Instant Cache Invalidation & Telemetry
+  - Update `RUNTIME_STORED_CHUNKS` immediately upon ingestion so that the
+    Multilingual RAG Manager playground and live chat can retrieve the new chunk
+    in under 100 milliseconds without server restarts.
+  - Tag interaction with `#rag-ingested` in Firestore audit stream.
+
+
+================================================================================
+PHASE 6: LIVE CHAT AGENT INTEGRATION & STRICT GROUNDING
+================================================================================
+Goal: Ensure the student chat assistant reliably invokes RAG and grounds every response.
+
+Step 6.1: Update System Instructions in `lib/agent/engine.ts`
+  - In `callGeminiWithTools()`:
+    - Add explicit directive:
+      "CRITICAL RAG DIRECTIVE:
+       Whenever a student asks about:
+       - Degree courses, curriculum, syllabuses (e.g. Bachelor of AI, COMP1001)
+       - Admission requirements, ATAR, international equivalents
+       - English language proficiency (IELTS, TOEFL, PTE)
+       - Recognition of Prior Learning (RPL) or credit transfer
+       - Tuition fees, scholarships, student visas (Subclass 500, CRICOS)
+       - TEQSA or ASQA regulatory standards
+       YOU MUST EXECUTE the 'query_multilingual_rag' tool first.
+       If the student is asking in a language other than English (e.g. Khmer,
+       Vietnamese, Thai, Indonesian, Tagalog, Japanese, Chinese), execute
+       'query_multilingual_rag' with their query. Ground your final response
+       strictly in the retrieved sources."
+
+Step 6.2: Pass Interaction Diagnostics
+  - When `query_multilingual_rag` is called during a student chat turn:
+    - Record `toolsExecuted: ['query_multilingual_rag']`.
+    - Automatically tag the interaction in `evaluatePerceivedAccuracy()` with:
+      `#rag-retrieval` and award +30 tool execution grounding score.
+
+
+================================================================================
+PHASE 7: ADMIN MANAGEMENT & OBSERVABILITY (MultilingualRagManager.tsx)
+================================================================================
+Goal: Give superadmins complete visibility and control over all multilingual chunks.
+
+Step 7.1: Add Language Filter Tabs in Admin RAG Manager
+  - In `MultilingualRagManager.tsx`:
+    - Add filter buttons:
+      `[All Chunks]` `[🇦🇺 English]` `[🇰🇭 Khmer]` `[🇮🇩 Indonesian]` `[🇻🇳 Vietnamese]`
+      `[🇹🇭 Thai]` `[🇵🇭 Filipino]` `[🇲🇾 Malay]` `[Regional Partners]`
+    - Display chunk count badges per language.
+
+Step 7.2: Cross-Lingual RAG Test Bench
+  - Provide a 1-click test probe in `MultilingualRagManager.tsx`:
+    - Input a query in Khmer, Vietnamese, or Thai.
+    - Inspect:
+      1. Detected Query Language & Confidence.
+      2. Generated 768-dim Embedding Vector (or deterministic fallback).
+      3. Retrieved Chunks with cosine similarity score and language flags.
+      4. Gemini 3.8 Flash Synthesized Response.
+      5. Latency breakdown (Embedding Ms + Vector Search Ms + Synthesis Ms).
+
+
+--------------------------------------------------------------------------------
+4. DATA CONTRACT & SCHEMA SPECIFICATIONS
+--------------------------------------------------------------------------------
+
+Collection: `knowledge_embeddings`
+Document ID: `chunk_${docId}_${chunkIndex}`
+
+Schema Definition:
+{
+  "id": string,                      // Unique chunk ID (e.g. "chunk_kb_bachelor_ai_0")
+  "docId": string,                   // Parent document ID
+  "chunkIndex": number,              // 0-indexed chunk offset
+  "totalChunks": number,             // Total chunks for parent doc
+  "title": string,                   // Accredited document title
+  "category": string,                // Category (e.g. "Verified Q&A Knowledge Bank")
+  "language": string,                // ISO code: "en", "kh", "id", "vi", "th", "tl", etc.
+  "languageName": string,            // Full name: "Khmer (ភាសាខ្មែរ)", "English", etc.
+  "text": string,                    // Text content of the chunk (500-1500 chars)
+  "keywords": string[],              // Salient extracted keywords
+  "source": string,                  // Source citation (e.g. "AI Diagnosis Staff Review")
+  "tenantTag": string,               // Multi-tenant scope (default: "rto-ai")
+  "createdAt": string,               // ISO8601 timestamp
+  "updatedAt": string,               // ISO8601 timestamp
+  "embedding": FieldValue.vector(),  // Cloud Firestore native vector (768 floats)
+  "vectorRaw": number[],             // Raw float array (768 floats for memory fallback)
+  "metadata": {
+    "sourceInteractionId": string,   // Optional: links back to ai_interactions doc
+    "reviewerEmail": string,         // Staff member who verified
+    "crossLingualIndexed": boolean   // True if bilingual paired
+  }
+}
+
+
+--------------------------------------------------------------------------------
+5. QUALITY ASSURANCE & VERIFICATION CHECKLIST
+--------------------------------------------------------------------------------
+
+[ ] Test Case 1: Staff Response Ingestion from AI Diagnosis
+    - Navigate to Admin -> AI Diagnosis.
+    - Open an interaction deep-dive.
+    - Click "Edit AI Response".
+    - Click "More Translations", select "🇰🇭 Khmer (ភាសាខ្មែរ - Cambodia)".
+    - Click "Translate AI Response" -> Verify response translates accurately into Khmer.
+    - Click "Save & Ingest to Multilingual RAG".
+    - Verify: Toast confirms successful ingestion; chunk appears in `knowledge_embeddings`.
+
+[ ] Test Case 2: Khmer Student Query Semantic Retrieval
+    - Send message in Student Chat:
+      "តើខ្ញុំត្រូវការ IELTS ប៉ុន្មានដើម្បីចូលរៀនបរិញ្ញាបត្រ AI?"
+      (What IELTS do I need for Bachelor of AI?)
+    - Verify: Agent executes `query_multilingual_rag`.
+    - Verify: Response in Khmer accurately quotes Academic IELTS 6.5 (no band < 6.0).
+    - Verify: Interaction stream tags turn with `#rag-retrieval` and `#ai-interactions`.
+
+[ ] Test Case 3: Vietnamese Student Query Retrieval
+    - Send message in Student Chat:
+      "Yêu cầu đầu vào cho bằng Cử nhân Trí tuệ Nhân tạo là gì?"
+    - Verify: Agent answers in Vietnamese citing high school graduation mark (8.0/10)
+      and IELTS 6.5.
+
+[ ] Test Case 4: English Query with False-Positive Prevention
+    - Send query: "What is the fee for the Bachelor of Science at your university?"
+    - Verify: Chunker and AI Diagnosis classify inquiry as `🇦🇺 English`, NOT Tagalog.
+
+[ ] Test Case 5: Offline/Quota Resilient Fallback
+    - In the event of a Gemini API quota limit, verify that:
+      - Vector embeddings fall back to `google-multilingual-deterministic-768`.
+      - Local semantic engine answers query using `searchSeedDocuments()`.
+      - Chat never throws a 500 error or blank message.
+
+================================================================================
+END OF IMPLEMENTATION PLAN
+================================================================================

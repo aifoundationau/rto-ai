@@ -24,7 +24,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, content, language, category, source, keywords, tenantTag, apiKey } = body;
+    const { id, title, content, language, category, source, keywords, tenantTag, apiKey } = body;
 
     if (!content || typeof content !== 'string' || content.trim().length === 0) {
       return NextResponse.json(
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
 
     const result = await ingestDocument(
       {
+        id,
         title: title || '',
         content: content.trim(),
         language,

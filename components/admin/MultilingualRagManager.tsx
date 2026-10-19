@@ -32,7 +32,9 @@ import {
   EyeOff,
   Languages,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { IngestedDocumentEntry } from '@/lib/rag/types';
 import { isProjectOwnerEmail, normalizeRole } from '@/lib/auth/roles';
@@ -114,32 +116,33 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
   const [isIngesting, setIsIngesting] = useState(false);
   const [ingestFeedback, setIngestFeedback] = useState<{ success: boolean; message: string; autoSorted?: any } | null>(null);
 
-  // Supported language tabs for translation viewing & editing (Global + All ASEAN Languages)
+  // Supported language tabs for translation viewing & editing (EN English / Global is always default and top of all lists)
   const languageTabOptions = [
-    { code: 'en', label: 'English', flag: '🇬🇧' },
-    { code: 'ja', label: 'Japanese', flag: '🇯🇵' },
-    { code: 'zh', label: 'Chinese', flag: '🇨🇳' },
+    { code: 'en', label: 'EN English / Global', flag: '🌐' },
+    { code: 'kh', label: 'Khmer', flag: '🇰🇭', isAsean: true },
+    { code: 'id', label: 'Indonesian', flag: '🇮🇩', isAsean: true },
     { code: 'vi', label: 'Vietnamese', flag: '🇻🇳', isAsean: true },
     { code: 'th', label: 'Thai', flag: '🇹🇭', isAsean: true },
-    { code: 'id', label: 'Indonesian', flag: '🇮🇩', isAsean: true },
-    { code: 'ms', label: 'Malay', flag: '🇲🇾', isAsean: true },
     { code: 'tl', label: 'Filipino', flag: '🇵🇭', isAsean: true },
-    { code: 'km', label: 'Khmer', flag: '🇰🇭', isAsean: true },
+    { code: 'ms', label: 'Malay', flag: '🇲🇾', isAsean: true },
     { code: 'my', label: 'Burmese', flag: '🇲🇲', isAsean: true },
     { code: 'lo', label: 'Lao', flag: '🇱🇦', isAsean: true },
     { code: 'tet', label: 'Tetum', flag: '🇹🇱', isAsean: true },
+    { code: 'zh', label: 'Chinese', flag: '🇨🇳' },
+    { code: 'ja', label: 'Japanese', flag: '🇯🇵' },
+    { code: 'ko', label: 'Korean', flag: '🇰🇷' },
   ];
 
-  // ASEAN & Regional Language Definitions
+  // ASEAN & Regional Language Definitions (EN English / Global is always default and top of all lists)
   const aseanLanguages = [
+    { code: 'en', label: 'EN English / Global', short: 'EN', flag: '🌐', country: 'Global' },
+    { code: 'kh', label: 'Khmer (ភាសាខ្មែរ - Cambodia)', short: 'KH', flag: '🇰🇭', country: 'Cambodia' },
     { code: 'id', label: 'Indonesian (Bahasa Indonesia)', short: 'ID', flag: '🇮🇩', country: 'Indonesia' },
     { code: 'vi', label: 'Vietnamese (Tiếng Việt)', short: 'VI', flag: '🇻🇳', country: 'Vietnam' },
     { code: 'th', label: 'Thai (ภาษาไทย)', short: 'TH', flag: '🇹🇭', country: 'Thailand' },
-    { code: 'tl', label: 'Filipino / Tagalog', short: 'TL', flag: '🇵🇭', country: 'Philippines' },
+    { code: 'tl', label: 'Filipino / Tagalog (Wikang Filipino)', short: 'TL', flag: '🇵🇭', country: 'Philippines' },
     { code: 'ms', label: 'Malay (Bahasa Melayu)', short: 'MS', flag: '🇲🇾', country: 'Malaysia / Brunei' },
-    { code: 'en', label: 'English (Singapore / Global)', short: 'EN', flag: '🇸🇬', country: 'Singapore' },
     { code: 'my', label: 'Burmese (မြန်မာဘာသာ)', short: 'MY', flag: '🇲🇲', country: 'Myanmar' },
-    { code: 'km', label: 'Khmer (ភាសាខ្មែរ)', short: 'KM', flag: '🇰🇭', country: 'Cambodia' },
     { code: 'lo', label: 'Lao (ພາສາລາວ)', short: 'LO', flag: '🇱🇦', country: 'Laos' },
     { code: 'tet', label: 'Tetum (Lian Tetun)', short: 'TET', flag: '🇹🇱', country: 'Timor-Leste' },
   ];
@@ -150,15 +153,25 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
     { code: 'ko', label: 'Korean (한국어)', short: 'KO', flag: '🇰🇷', country: 'South Korea' },
   ];
 
-  const allSupportedLanguages = [...aseanLanguages, ...regionalLanguages];
+  const allSupportedLanguages = [
+    ...aseanLanguages,
+    { code: 'km', label: 'Khmer (ភាសាខ្មែរ - Cambodia)', short: 'KM', flag: '🇰🇭', country: 'Cambodia' },
+    ...regionalLanguages,
+  ];
 
   const getLanguageFlag = (code: string) => {
-    const match = allSupportedLanguages.find(l => l.code === (code || '').toLowerCase());
+    const c = (code || '').toLowerCase();
+    if (c === 'en') return '🌐';
+    if (c === 'km' || c === 'kh') return '🇰🇭';
+    const match = allSupportedLanguages.find(l => l.code === c);
     return match?.flag || '🌐';
   };
 
   const getLanguageLabel = (code: string) => {
-    const match = allSupportedLanguages.find(l => l.code === (code || '').toLowerCase());
+    const c = (code || '').toLowerCase();
+    if (c === 'en') return 'EN English / Global';
+    if (c === 'km' || c === 'kh') return 'Khmer (Cambodia)';
+    const match = allSupportedLanguages.find(l => l.code === c);
     return match?.label || (code || '').toUpperCase();
   };
 
@@ -169,23 +182,50 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
   const [entrySearchQuery, setEntrySearchQuery] = useState<string>('');
   const [entryCategoryFilter, setEntryCategoryFilter] = useState<string>('ALL');
 
-  // Translation & In-Place Verification State for Selected Entry
-  const [targetTranslationLang, setTargetTranslationLang] = useState<string>('id');
-  const [isTranslatingEntry, setIsTranslatingEntry] = useState<boolean>(false);
-  const [translatedDoc, setTranslatedDoc] = useState<{
-    originalDocId: string;
-    targetLang: string;
-    title: string;
-    content: string;
-  } | null>(null);
-  const [editedDocTitle, setEditedDocTitle] = useState<string>('');
-  const [editedDocContent, setEditedDocContent] = useState<string>('');
-  const [isStoringTranslation, setIsStoringTranslation] = useState<boolean>(false);
-  const [translationStoreFeedback, setTranslationStoreFeedback] = useState<{
+  // Original Document Language Edit & Improvement Box State
+  const [originalDocTitle, setOriginalDocTitle] = useState<string>('');
+  const [originalDocContent, setOriginalDocContent] = useState<string>('');
+  const [originalDocLanguage, setOriginalDocLanguage] = useState<string>('en');
+  const [originalDocCategory, setOriginalDocCategory] = useState<string>('Accreditation Standards');
+  const [isImprovingLanguage, setIsImprovingLanguage] = useState<boolean>(false);
+  const [improveLanguageFeedback, setImproveLanguageFeedback] = useState<{
     success: boolean;
     message: string;
   } | null>(null);
-  const [showOriginalContent, setShowOriginalContent] = useState<boolean>(false);
+  const [isSavingOriginalDoc, setIsSavingOriginalDoc] = useState<boolean>(false);
+  const [saveOriginalDocFeedback, setSaveOriginalDocFeedback] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+
+  // Dynamic Multiple Translation Slots State
+  interface TranslationSlot {
+    id: string;
+    targetLang: string;
+    title: string;
+    content: string;
+    isTranslating: boolean;
+    isStored: boolean;
+    storeFeedback?: { success: boolean; message: string } | null;
+  }
+
+  const createDefaultSlot = (lang = 'en'): TranslationSlot => ({
+    id: `slot_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    targetLang: lang,
+    title: '',
+    content: '',
+    isTranslating: false,
+    isStored: false,
+    storeFeedback: null,
+  });
+
+  const [translationSlots, setTranslationSlots] = useState<TranslationSlot[]>([]);
+  const [selectedTargetLangForAdd, setSelectedTargetLangForAdd] = useState<string>('kh');
+  const [isSavingAllSlots, setIsSavingAllSlots] = useState<boolean>(false);
+  const [saveAllSlotsFeedback, setSaveAllSlotsFeedback] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
 
   // Fetch stats on load
   const loadStats = async () => {
@@ -230,80 +270,83 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
     loadIngestedEntries();
   }, []);
 
-  // Translate selected document entry into target language
-  const handleTranslateEntry = async (targetLang: string) => {
-    const entry = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
-    if (!entry) return;
+  // Synchronize original doc edit fields when selected entry or list updates
+  useEffect(() => {
+    const current = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
+    if (current) {
+      setOriginalDocTitle(current.title || '');
+      setOriginalDocContent(current.content || '');
+      setOriginalDocLanguage(current.language || 'en');
+      setOriginalDocCategory(current.category || 'Accreditation Standards');
+      setSaveOriginalDocFeedback(null);
+      setImproveLanguageFeedback(null);
+      setSaveAllSlotsFeedback(null);
+      setTranslationSlots([]);
+      setSelectedTargetLangForAdd((current.language || 'en').toLowerCase() === 'en' ? 'kh' : 'en');
+    }
+  }, [selectedEntryId, ingestedEntries]);
 
-    setIsTranslatingEntry(true);
-    setTranslationStoreFeedback(null);
-    setTargetTranslationLang(targetLang);
+  // Handler: Improve Language using AI Polish
+  const handleImproveLanguage = async () => {
+    if (!originalDocContent.trim()) return;
+    setIsImprovingLanguage(true);
+    setImproveLanguageFeedback(null);
 
     try {
-      const [resTitle, resContent] = await Promise.all([
-        fetch('/api/rag/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: entry.title,
-            targetLanguage: targetLang,
-            apiKey: apiKey || undefined,
-          }),
+      const res = await fetch('/api/rag/improve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: originalDocTitle.trim(),
+          content: originalDocContent.trim(),
+          language: originalDocLanguage,
+          apiKey: apiKey || undefined,
         }),
-        fetch('/api/rag/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: entry.content,
-            targetLanguage: targetLang,
-            apiKey: apiKey || undefined,
-          }),
-        }),
-      ]);
-
-      const dataTitle = await resTitle.json();
-      const dataContent = await resContent.json();
-
-      const translatedTitle = dataTitle.translatedText || entry.title;
-      const translatedContent = dataContent.translatedText || entry.content;
-
-      setTranslatedDoc({
-        originalDocId: entry.id,
-        targetLang,
-        title: translatedTitle,
-        content: translatedContent,
       });
-      setEditedDocTitle(translatedTitle);
-      setEditedDocContent(translatedContent);
+
+      const data = await res.json();
+      if (data.success) {
+        if (data.improvedTitle) setOriginalDocTitle(data.improvedTitle);
+        if (data.improvedContent) setOriginalDocContent(data.improvedContent);
+        setImproveLanguageFeedback({
+          success: true,
+          message: data.summary || '✓ Document language successfully refined, polished, and improved!',
+        });
+      } else {
+        setImproveLanguageFeedback({
+          success: false,
+          message: data.error || 'Failed to improve document language',
+        });
+      }
     } catch (err: any) {
-      console.error('Entry translation error:', err);
-      setTranslationStoreFeedback({
+      setImproveLanguageFeedback({
         success: false,
-        message: err.message || 'Failed to translate document entry',
+        message: err.message || 'Error communicating with language improvement AI',
       });
     } finally {
-      setIsTranslatingEntry(false);
+      setIsImprovingLanguage(false);
     }
   };
 
-  // Store & vectorize verified translation into RAG
-  const handleStoreTranslationIntoRag = async () => {
-    const entry = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
-    if (!entry || !editedDocContent.trim() || !editedDocTitle.trim()) return;
+  // Handler: Save changes to original document into RAG
+  const handleSaveOriginalDoc = async () => {
+    const current = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
+    if (!current || !originalDocContent.trim() || !originalDocTitle.trim()) return;
 
-    setIsStoringTranslation(true);
-    setTranslationStoreFeedback(null);
+    setIsSavingOriginalDoc(true);
+    setSaveOriginalDocFeedback(null);
 
     try {
       const res = await fetch('/api/rag/ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: editedDocTitle.trim(),
-          content: editedDocContent.trim(),
-          language: targetTranslationLang,
-          category: entry.category,
-          source: `Verified Translation (${entry.language.toUpperCase()} → ${targetTranslationLang.toUpperCase()}): ${entry.source || entry.title}`,
+          id: current.id,
+          title: originalDocTitle.trim(),
+          content: originalDocContent.trim(),
+          language: originalDocLanguage,
+          category: originalDocCategory,
+          source: current.source || 'Admin Document Portal',
           tenantTag: 'rto-ai',
           apiKey: apiKey || undefined,
         }),
@@ -311,25 +354,334 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
 
       const data = await res.json();
       if (data.success) {
-        setTranslationStoreFeedback({
+        setSaveOriginalDocFeedback({
           success: true,
-          message: `✓ Successfully stored and indexed "${editedDocTitle.trim()}" in ${getLanguageLabel(targetTranslationLang)} (${data.data?.chunksCreated || 1} vector chunks) into Multilingual RAG!`,
+          message: `✓ Saved & re-indexed "${originalDocTitle.trim()}" in RAG (${data.data?.chunksCreated || 1} chunks)!`,
         });
         loadStats();
         loadIngestedEntries();
       } else {
-        setTranslationStoreFeedback({
+        setSaveOriginalDocFeedback({
           success: false,
-          message: data.error || 'Failed to store translation in RAG vector store',
+          message: data.error || 'Failed to save document updates to RAG',
         });
       }
     } catch (err: any) {
-      setTranslationStoreFeedback({
+      setSaveOriginalDocFeedback({
         success: false,
-        message: err.message || 'Network error storing translation in RAG',
+        message: err.message || 'Network error saving document to RAG',
       });
     } finally {
-      setIsStoringTranslation(false);
+      setIsSavingOriginalDoc(false);
+    }
+  };
+
+  // Handler: Revert original doc fields to loaded values
+  const handleRevertOriginalDoc = () => {
+    const current = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
+    if (current) {
+      setOriginalDocTitle(current.title || '');
+      setOriginalDocContent(current.content || '');
+      setOriginalDocLanguage(current.language || 'en');
+      setOriginalDocCategory(current.category || 'Accreditation Standards');
+      setSaveOriginalDocFeedback(null);
+      setImproveLanguageFeedback(null);
+    }
+  };
+
+  // Handler: Add a new dynamic translation dropdown slot
+  const handleAddTranslationSlot = (preferredLang?: string, autoTranslate = true) => {
+    const usedLangs = new Set(translationSlots.map(s => s.targetLang.toLowerCase()));
+    let nextLang = preferredLang;
+    if (!nextLang) {
+      const defaultFirst = originalDocLanguage.toLowerCase() === 'en' ? 'kh' : 'en';
+      if (!usedLangs.has(defaultFirst)) {
+        nextLang = defaultFirst;
+      } else {
+        const candidate = aseanLanguages.find(l => !usedLangs.has(l.code.toLowerCase()));
+        nextLang = candidate?.code || 'en';
+      }
+    }
+
+    const currentEntry = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
+    const currentTitle = (originalDocTitle || currentEntry?.title || '').trim();
+    const currentContent = (originalDocContent || currentEntry?.content || '').trim();
+
+    // Check if slot with this language already exists
+    const existing = translationSlots.find(s => s.targetLang.toLowerCase() === nextLang?.toLowerCase());
+    if (existing) {
+      if (autoTranslate) {
+        handleTranslateSlot(existing.id, nextLang);
+      }
+      return;
+    }
+
+    const newSlotId = `slot_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newSlot: TranslationSlot = {
+      id: newSlotId,
+      targetLang: nextLang,
+      title: '',
+      content: '',
+      isTranslating: autoTranslate && currentContent.length > 0,
+      isStored: false,
+      storeFeedback: null,
+    };
+    setTranslationSlots(prev => [...prev, newSlot]);
+
+    if (autoTranslate) {
+      handleTranslateSlot(newSlotId, nextLang);
+    }
+
+    // Automatically suggest next unused ASEAN or regional partner language for the next dropdown
+    const usedAfter = new Set([...translationSlots.map(s => s.targetLang.toLowerCase()), nextLang.toLowerCase()]);
+    const nextCandidate = aseanLanguages.find(l => !usedAfter.has(l.code.toLowerCase())) ||
+      regionalLanguages.find(l => !usedAfter.has(l.code.toLowerCase()));
+    if (nextCandidate) {
+      setSelectedTargetLangForAdd(nextCandidate.code);
+    }
+  };
+
+  // Handler: Remove a translation dropdown slot (allows removing down to 0)
+  const handleRemoveTranslationSlot = (slotId: string) => {
+    setTranslationSlots(prev => prev.filter(s => s.id !== slotId));
+  };
+
+  // Handler: Translate specific slot using original title & content from the top box
+  const handleTranslateSlot = async (slotId: string, customTargetLang?: string) => {
+    let langToUse = customTargetLang;
+    if (!langToUse) {
+      const slot = translationSlots.find(s => s.id === slotId);
+      langToUse = slot?.targetLang;
+    }
+    if (!langToUse) return;
+
+    // Read top box text from "Selected Document: Edit & Improve Language"
+    const currentEntry = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
+    const currentTitle = (originalDocTitle || currentEntry?.title || '').trim();
+    const currentContent = (originalDocContent || currentEntry?.content || '').trim();
+
+    if (!currentContent) {
+      setTranslationSlots(prev => prev.map(s => s.id === slotId ? {
+        ...s,
+        isTranslating: false,
+        storeFeedback: {
+          success: false,
+          message: 'Document content in the top box is empty. Please enter or select content to translate.',
+        },
+      } : s));
+      return;
+    }
+
+    setTranslationSlots(prev => prev.map(s => s.id === slotId ? {
+      ...s,
+      targetLang: langToUse!,
+      isTranslating: true,
+      storeFeedback: null,
+    } : s));
+
+    try {
+      const translateTitlePromise = currentTitle
+        ? fetch('/api/rag/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: currentTitle,
+              targetLanguage: langToUse,
+              apiKey: apiKey || undefined,
+            }),
+          }).then(async res => {
+            const data = await res.json();
+            return data.success && data.translatedText ? data.translatedText : currentTitle;
+          }).catch(() => currentTitle)
+        : Promise.resolve('');
+
+      const translateContentPromise = fetch('/api/rag/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: currentContent,
+          targetLanguage: langToUse,
+          apiKey: apiKey || undefined,
+        }),
+      }).then(async res => {
+        const data = await res.json();
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to translate document content');
+        }
+        return data.translatedText || currentContent;
+      });
+
+      const [translatedTitle, translatedContent] = await Promise.all([
+        translateTitlePromise,
+        translateContentPromise,
+      ]);
+
+      setTranslationSlots(prev => prev.map(s => s.id === slotId ? {
+        ...s,
+        targetLang: langToUse!,
+        title: translatedTitle,
+        content: translatedContent,
+        isTranslating: false,
+        isStored: false,
+        storeFeedback: {
+          success: true,
+          message: `✓ Successfully translated into ${getLanguageLabel(langToUse!)}`,
+        },
+      } : s));
+    } catch (err: any) {
+      console.error('Translation slot error:', err);
+      setTranslationSlots(prev => prev.map(s => s.id === slotId ? {
+        ...s,
+        isTranslating: false,
+        storeFeedback: {
+          success: false,
+          message: err.message || 'Translation request failed',
+        },
+      } : s));
+    }
+  };
+
+  // Slot editing handlers
+  const handleUpdateSlotTitle = (slotId: string, newTitle: string) => {
+    setTranslationSlots(prev => prev.map(s => s.id === slotId ? { ...s, title: newTitle, isStored: false } : s));
+  };
+
+  const handleUpdateSlotContent = (slotId: string, newContent: string) => {
+    setTranslationSlots(prev => prev.map(s => s.id === slotId ? { ...s, content: newContent, isStored: false } : s));
+  };
+
+  const handleUpdateSlotLang = (slotId: string, newLang: string) => {
+    setTranslationSlots(prev => prev.map(s => s.id === slotId ? { ...s, targetLang: newLang, isStored: false } : s));
+  };
+
+  // Handler: Store single slot into RAG
+  const handleStoreSingleSlot = async (slotId: string) => {
+    const current = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
+    const slot = translationSlots.find(s => s.id === slotId);
+    if (!current || !slot || !slot.content.trim() || !slot.title.trim()) return;
+
+    setTranslationSlots(prev => prev.map(s => s.id === slotId ? { ...s, isTranslating: true } : s));
+
+    try {
+      const res = await fetch('/api/rag/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: slot.title.trim(),
+          content: slot.content.trim(),
+          language: slot.targetLang,
+          category: originalDocCategory || current.category,
+          source: `Verified Translation (${originalDocLanguage.toUpperCase()} → ${slot.targetLang.toUpperCase()}): ${originalDocTitle || current.title}`,
+          tenantTag: 'rto-ai',
+          apiKey: apiKey || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setTranslationSlots(prev => prev.map(s => s.id === slotId ? {
+          ...s,
+          isTranslating: false,
+          isStored: true,
+          storeFeedback: {
+            success: true,
+            message: `✓ Saved & indexed in RAG (${getLanguageLabel(slot.targetLang)}) with ${data.data?.chunksCreated || 1} chunks!`,
+          },
+        } : s));
+        loadStats();
+        loadIngestedEntries();
+      } else {
+        setTranslationSlots(prev => prev.map(s => s.id === slotId ? {
+          ...s,
+          isTranslating: false,
+          storeFeedback: {
+            success: false,
+            message: data.error || 'Failed to save translation to RAG',
+          },
+        } : s));
+      }
+    } catch (err: any) {
+      setTranslationSlots(prev => prev.map(s => s.id === slotId ? {
+        ...s,
+        isTranslating: false,
+        storeFeedback: {
+          success: false,
+          message: err.message || 'Network error saving translation',
+        },
+      } : s));
+    }
+  };
+
+  // Handler: Save everything to RAG
+  const handleSaveAllTranslations = async () => {
+    const current = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
+    if (!current) return;
+
+    const slotsToSave = translationSlots.filter(s => s.content.trim().length > 0 && s.title.trim().length > 0);
+    if (slotsToSave.length === 0) {
+      setSaveAllSlotsFeedback({
+        success: false,
+        message: 'No translated content found to save. Please translate or enter content for at least one translation dropdown first.',
+      });
+      return;
+    }
+
+    setIsSavingAllSlots(true);
+    setSaveAllSlotsFeedback(null);
+
+    let successCount = 0;
+    let totalChunks = 0;
+    const errors: string[] = [];
+
+    for (const slot of slotsToSave) {
+      try {
+        const res = await fetch('/api/rag/ingest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: slot.title.trim(),
+            content: slot.content.trim(),
+            language: slot.targetLang,
+            category: originalDocCategory || current.category,
+            source: `Verified Translation (${originalDocLanguage.toUpperCase()} → ${slot.targetLang.toUpperCase()}): ${originalDocTitle || current.title}`,
+            tenantTag: 'rto-ai',
+            apiKey: apiKey || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          successCount++;
+          totalChunks += data.data?.chunksCreated || 1;
+          setTranslationSlots(prev => prev.map(s => s.id === slot.id ? {
+            ...s,
+            isStored: true,
+            storeFeedback: {
+              success: true,
+              message: `✓ Saved to RAG (${data.data?.chunksCreated || 1} chunks)`,
+            },
+          } : s));
+        } else {
+          errors.push(`${getLanguageLabel(slot.targetLang)}: ${data.error || 'Failed'}`);
+        }
+      } catch (err: any) {
+        errors.push(`${getLanguageLabel(slot.targetLang)}: ${err.message}`);
+      }
+    }
+
+    setIsSavingAllSlots(false);
+
+    if (successCount > 0) {
+      setSaveAllSlotsFeedback({
+        success: true,
+        message: `✓ Successfully saved and indexed all ${successCount} translation(s) (${totalChunks} vector chunks) into the Multilingual RAG!`,
+      });
+      loadStats();
+      loadIngestedEntries();
+    } else {
+      setSaveAllSlotsFeedback({
+        success: false,
+        message: `Failed to save translations: ${errors.join(', ')}`,
+      });
     }
   };
 
@@ -727,9 +1079,9 @@ Higher education providers may grant credit transfer of up to 50% of the course 
             <div className="space-y-3.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
-                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <Database className="w-4 h-4 text-indigo-600" />
-                    <span>Entries from Ingest Document &amp; Auto-Vectorize</span>
+                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap">
+                    <Database className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span className="whitespace-nowrap">Entries from Ingest Document &amp; Auto-Vectorize</span>
                   </label>
                   <p className="text-[11px] text-slate-500">
                     Select any entry to translate into ASEAN languages, check &amp; edit, and store in RAG.
@@ -815,8 +1167,6 @@ Higher education providers may grant credit transfer of up to 50% of the course 
                         key={entry.id}
                         onClick={() => {
                           setSelectedEntryId(entry.id);
-                          setTranslatedDoc(null);
-                          setTranslationStoreFeedback(null);
                         }}
                         className={`p-3 rounded-xl border transition-all cursor-pointer text-left space-y-1.5 ${
                           isSelected
@@ -864,71 +1214,40 @@ Higher education providers may grant credit transfer of up to 50% of the course 
               </div>
             </div>
 
-            {/* SECTION 2: SELECTED ENTRY WORKSPACE & ASEAN TRANSLATION CONTROLS */}
+            {/* SECTION 2: EDIT ORIGINAL DOCUMENT & IMPROVE LANGUAGE + TRANSLATE INTO ASEAN LANGUAGES */}
             {(() => {
               const currentEntry = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
               if (!currentEntry) return null;
 
               return (
-                <div className="pt-3 border-t border-slate-100 space-y-3.5">
-                  {/* Selected Document Info Banner */}
-                  <div className="p-3.5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl space-y-2 shadow-sm">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="pt-3 border-t border-slate-100 space-y-6">
+                  {/* 2A: DOCUMENT LANGUAGE EDIT & IMPROVEMENT BOX */}
+                  <div className="bg-slate-50/80 border-2 border-indigo-200/90 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
+                    {/* Box Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-indigo-100">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs px-2 py-0.5 rounded-md bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 font-bold flex items-center gap-1">
-                          <span>{getLanguageFlag(currentEntry.language)}</span>
-                          <span>Original Language: {currentEntry.languageName || currentEntry.language.toUpperCase()}</span>
-                        </span>
-                        <span className="text-xs text-slate-300 font-medium">{currentEntry.category}</span>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setShowOriginalContent(!showOriginalContent)}
-                        className="text-[11px] text-indigo-300 hover:text-white underline font-semibold flex items-center gap-1 cursor-pointer"
-                      >
-                        {showOriginalContent ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        <span>{showOriginalContent ? 'Hide Original Text' : 'View Original Text'}</span>
-                      </button>
-                    </div>
-
-                    <div className="font-bold text-sm text-white">{currentEntry.title}</div>
-
-                    {showOriginalContent && (
-                      <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-xs text-slate-200 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed animate-in fade-in">
-                        {currentEntry.content}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Translation Action Bar: Dropdown Menu & 1-Click ASEAN Buttons */}
-                  <div className="space-y-3 p-4 sm:p-5 bg-indigo-50/70 border border-indigo-200/80 rounded-2xl">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <Languages className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <div className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-xs">
+                          <Edit3 className="w-4 h-4" />
+                        </div>
                         <div>
-                          <label className="text-xs font-bold text-slate-800 block">
-                            Translate Original into Another Language:
-                          </label>
-                          <span className="text-[11px] text-slate-500">
-                            Select target language from the dropdown menu or use quick buttons
-                          </span>
+                          <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                            <span>Selected Document: Edit &amp; Improve Language</span>
+                          </h4>
+                          <p className="text-[11px] text-slate-500">
+                            Edit original title and text, improve language with AI, and save updates into RAG.
+                          </p>
                         </div>
                       </div>
 
-                      {/* Dropdown Menu for Translation */}
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                      {/* Original Document Language Selector */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-semibold text-slate-600">Language:</span>
                         <select
-                          value={targetTranslationLang}
-                          onChange={(e) => {
-                            const newLang = e.target.value;
-                            setTargetTranslationLang(newLang);
-                            handleTranslateEntry(newLang);
-                          }}
-                          disabled={isTranslatingEntry}
-                          className="flex-1 sm:flex-initial px-3 py-2 bg-white border border-indigo-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs cursor-pointer"
+                          value={originalDocLanguage}
+                          onChange={(e) => setOriginalDocLanguage(e.target.value)}
+                          className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs cursor-pointer"
                         >
-                          <optgroup label="── ASEAN Languages ──">
+                          <optgroup label="── ASEAN Languages (EN English / Global first) ──">
                             {aseanLanguages.map(l => (
                               <option key={l.code} value={l.code}>{l.flag} {l.label}</option>
                             ))}
@@ -939,157 +1258,385 @@ Higher education providers may grant credit transfer of up to 50% of the course 
                             ))}
                           </optgroup>
                         </select>
-
-                        <button
-                          type="button"
-                          onClick={() => handleTranslateEntry(targetTranslationLang)}
-                          disabled={isTranslatingEntry}
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow cursor-pointer active:scale-95 shrink-0"
-                        >
-                          <Sparkles className={`w-3.5 h-3.5 ${isTranslatingEntry ? 'animate-spin' : ''}`} />
-                          <span>{isTranslatingEntry ? 'Translating...' : 'Translate'}</span>
-                        </button>
                       </div>
                     </div>
 
-                    {/* Quick ASEAN Language Buttons */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-indigo-200/60">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-900 mr-1 flex items-center gap-1">
-                        <Globe className="w-3 h-3 text-indigo-600" />
-                        <span>Quick ASEAN:</span>
-                      </span>
-                      {aseanLanguages.map(l => (
-                        <button
-                          key={l.code}
-                          type="button"
-                          onClick={() => {
-                            setTargetTranslationLang(l.code);
-                            handleTranslateEntry(l.code);
-                          }}
-                          disabled={isTranslatingEntry}
-                          title={`Translate into ${l.label} (${l.country})`}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition flex items-center gap-1 cursor-pointer active:scale-95 ${
-                            targetTranslationLang === l.code && translatedDoc
-                              ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
-                              : 'bg-white hover:bg-indigo-100 text-indigo-900 border-indigo-200'
-                          } disabled:opacity-50`}
-                        >
-                          <span>{l.flag}</span>
-                          <span>{l.short}</span>
-                        </button>
-                      ))}
+                    {/* Editable Title */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                        <span>Document Title (Editable):</span>
+                        <span className="text-[10px] text-slate-400 font-mono">ID: {currentEntry.id}</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={originalDocTitle}
+                        onChange={(e) => setOriginalDocTitle(e.target.value)}
+                        className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-2xs"
+                        placeholder="Document title..."
+                      />
                     </div>
+
+                    {/* Editable Content */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                        <span>Document Content (Editable &amp; Improvable):</span>
+                        <div className="text-[11px] text-slate-400 font-normal">
+                          <span>{originalDocContent.trim().split(/\s+/).filter(Boolean).length} words</span>
+                          <span className="mx-1.5">•</span>
+                          <span>{originalDocContent.length} chars</span>
+                        </div>
+                      </div>
+                      <textarea
+                        rows={6}
+                        value={originalDocContent}
+                        onChange={(e) => setOriginalDocContent(e.target.value)}
+                        className="w-full p-3.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none leading-relaxed font-sans shadow-2xs"
+                        placeholder="Document content..."
+                      />
+                    </div>
+
+                    {/* Language Improvement & Save Actions Bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-indigo-100">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleImproveLanguage}
+                          disabled={isImprovingLanguage || !originalDocContent.trim()}
+                          className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-300 text-indigo-900 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
+                          title="Refine grammar, clarity, and professional academic polish using AI"
+                        >
+                          <Sparkles className={`w-3.5 h-3.5 text-indigo-600 ${isImprovingLanguage ? 'animate-spin' : ''}`} />
+                          <span>{isImprovingLanguage ? 'Improving Language with AI...' : 'Improve Language'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleRevertOriginalDoc}
+                          className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                          title="Reset fields to original loaded values"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Revert</span>
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleSaveOriginalDoc}
+                        disabled={isSavingOriginalDoc || !originalDocContent.trim() || !originalDocTitle.trim()}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
+                      >
+                        <Save className={`w-3.5 h-3.5 ${isSavingOriginalDoc ? 'animate-spin' : ''}`} />
+                        <span>{isSavingOriginalDoc ? 'Saving to RAG...' : 'Save'}</span>
+                      </button>
+                    </div>
+
+                    {/* Feedback Banners for Original Doc */}
+                    {improveLanguageFeedback && (
+                      <div className={`p-2.5 rounded-xl text-xs font-medium flex items-center gap-2 ${
+                        improveLanguageFeedback.success
+                          ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                          : 'bg-rose-50 border border-rose-200 text-rose-800'
+                      }`}>
+                        {improveLanguageFeedback.success ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        )}
+                        <span>{improveLanguageFeedback.message}</span>
+                      </div>
+                    )}
+
+                    {saveOriginalDocFeedback && (
+                      <div className={`p-2.5 rounded-xl text-xs font-medium flex items-center gap-2 ${
+                        saveOriginalDocFeedback.success
+                          ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                          : 'bg-rose-50 border border-rose-200 text-rose-800'
+                      }`}>
+                        {saveOriginalDocFeedback.success ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        )}
+                        <span>{saveOriginalDocFeedback.message}</span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* SECTION 3: CHECK, EDIT & STORE TRANSLATION IN RAG */}
-                  {translatedDoc ? (
-                    <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-indigo-300 space-y-3.5 shadow-sm animate-in fade-in">
-                      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-indigo-100">
-                        <div className="flex items-center gap-2">
-                          <Edit3 className="w-4 h-4 text-indigo-600" />
-                          <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                            <span>Check &amp; Edit Translation:</span>
-                            <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold flex items-center gap-1">
-                              <span>{getLanguageFlag(translatedDoc.targetLang)}</span>
-                              <span>{getLanguageLabel(translatedDoc.targetLang)}</span>
-                            </span>
+                  {/* 2B: TRANSLATE ORIGINAL INTO ANOTHER LANGUAGE (OPTIONAL DYNAMIC DROPDOWNS) */}
+                  <div className="space-y-4 p-4 sm:p-5 bg-indigo-50/70 border-2 border-indigo-200/80 rounded-2xl">
+                    {/* SECTION HEADER & SUMMARY */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-indigo-200/60">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-xs">
+                          <Languages className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 block">
+                            Translate Original into Another Language
+                          </h4>
+                          <span className="text-[11px] text-slate-500">
+                            Select a target language from the dropdown below to translate the original document, edit translations, and save to RAG.
                           </span>
                         </div>
-
-                        <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                          <span>Words: {editedDocContent.trim().split(/\s+/).filter(Boolean).length}</span>
-                          <span>•</span>
-                          <span>Chars: {editedDocContent.length}</span>
-                        </div>
                       </div>
 
-                      {/* Translated Title Edit */}
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700">Translated Document Title:</label>
-                        <input
-                          type="text"
-                          value={editedDocTitle}
-                          onChange={(e) => setEditedDocTitle(e.target.value)}
-                          className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                        />
-                      </div>
-
-                      {/* Translated Content Edit */}
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700">Translated Document Content (Editable):</label>
-                        <textarea
-                          rows={7}
-                          value={editedDocContent}
-                          onChange={(e) => setEditedDocContent(e.target.value)}
-                          className="w-full p-3.5 border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none leading-relaxed font-sans"
-                        />
-                      </div>
-
-                      {/* Action Bar: Store Translation into RAG */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-indigo-100">
+                      {translationSlots.length > 0 && (
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleTranslateEntry(targetTranslationLang)}
-                            disabled={isTranslatingEntry}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>Re-Translate</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(editedDocContent);
-                              setCopiedLang('draft');
-                              setTimeout(() => setCopiedLang(null), 2000);
-                            }}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
-                          >
-                            {copiedLang === 'draft' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                            <span>{copiedLang === 'draft' ? 'Copied' : 'Copy'}</span>
-                          </button>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={handleStoreTranslationIntoRag}
-                          disabled={isStoringTranslation || !editedDocContent.trim() || !editedDocTitle.trim()}
-                          className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95"
-                        >
-                          <BookOpen className="w-3.5 h-3.5" />
-                          <span>{isStoringTranslation ? 'Vectorizing & Storing into RAG...' : 'Store New Language Translation into RAG'}</span>
-                        </button>
-                      </div>
-
-                      {/* Translation Storage Feedback Banner */}
-                      {translationStoreFeedback && (
-                        <div className={`p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${
-                          translationStoreFeedback.success
-                            ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                            : 'bg-rose-50 border border-rose-200 text-rose-800'
-                        }`}>
-                          {translationStoreFeedback.success ? (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          ) : (
-                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                          )}
-                          <span>{translationStoreFeedback.message}</span>
+                          <span className="text-[11px] font-bold text-indigo-800 bg-white border border-indigo-200 px-2.5 py-1 rounded-full shadow-2xs">
+                            {translationSlots.length} {translationSlots.length === 1 ? 'Language Dropdown Open' : 'Language Dropdowns Open'}
+                          </span>
                         </div>
                       )}
                     </div>
-                  ) : (
-                    <div className="p-4 rounded-2xl bg-indigo-50/40 border border-dashed border-indigo-200 text-center space-y-1.5">
-                      <Sparkles className="w-5 h-5 text-indigo-500 mx-auto" />
-                      <p className="text-xs font-semibold text-indigo-950">
-                        Ready to translate &ldquo;{currentEntry.title}&rdquo;
-                      </p>
-                      <p className="text-[11px] text-slate-500">
-                        Choose an ASEAN or regional language from the dropdown menu above or click any quick button to translate, check and edit, and store into the RAG.
-                      </p>
-                    </div>
-                  )}
+
+                    {/* ─── WHEN 0 TRANSLATIONS OPEN: INITIAL TRANSLATE ORIGINAL INTO ANOTHER LANGUAGE ─── */}
+                    {translationSlots.length === 0 ? (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-white rounded-2xl border border-indigo-200 shadow-2xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
+                          <label className="text-xs font-bold text-slate-900 flex items-center gap-2 shrink-0">
+                            <div className="p-1 rounded-md bg-indigo-100 text-indigo-700">
+                              <Languages className="w-3.5 h-3.5" />
+                            </div>
+                            <span>Translate Original into Another Language:</span>
+                          </label>
+
+                          {/* Dedicated Language Dropdown Menu & Translate Button */}
+                          <div className="flex items-center gap-2 flex-1 max-w-xl">
+                            <select
+                              value={selectedTargetLangForAdd}
+                              onChange={(e) => setSelectedTargetLangForAdd(e.target.value)}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-white border-2 border-indigo-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs cursor-pointer transition-colors"
+                            >
+                              <optgroup label="── ASEAN Languages (EN English / Global first) ──">
+                                {aseanLanguages.map(l => (
+                                  <option key={l.code} value={l.code}>{l.flag} {l.label}</option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="── Regional Dialogue Partners ──">
+                                {regionalLanguages.map(l => (
+                                  <option key={l.code} value={l.code}>{l.flag} {l.label}</option>
+                                ))}
+                              </optgroup>
+                            </select>
+
+                            <button
+                              type="button"
+                              onClick={() => handleAddTranslationSlot(selectedTargetLangForAdd, true)}
+                              disabled={!originalDocContent.trim()}
+                              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 shrink-0"
+                              title="Translate original document into this language"
+                            >
+                              <Sparkles className="w-4 h-4" />
+                              <span>Translate</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* ─── WHEN TRANSLATION BOXES ARE OPEN ─── */
+                      <div className="space-y-4 pt-1">
+                        {translationSlots.map((slot) => {
+                          const hasContent = slot.content.trim().length > 0;
+                          return (
+                            <div
+                              key={slot.id}
+                              className="p-4 sm:p-5 rounded-xl bg-white border-2 border-indigo-200 shadow-sm space-y-3.5 transition-all"
+                            >
+                              {/* Slot Top Bar: Language Badge + Status + Close/Remove */}
+                              <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="px-3 py-1 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                                    <span>{getLanguageFlag(slot.targetLang)}</span>
+                                    <span>{getLanguageLabel(slot.targetLang)}</span>
+                                  </span>
+                                  {slot.isTranslating && (
+                                    <span className="text-[11px] font-semibold text-indigo-600 flex items-center gap-1 animate-pulse">
+                                      <Sparkles className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+                                      <span>Translating with AI...</span>
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {slot.isStored && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                                      <Check className="w-3 h-3" />
+                                      <span>Saved in RAG</span>
+                                    </span>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveTranslationSlot(slot.id)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                    title="Close / remove this translation box"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Slot Content: Editable Title & Text */}
+                              <div className="space-y-3">
+                                <div className="space-y-1">
+                                  <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                                    <span>Translated Title ({getLanguageLabel(slot.targetLang)}):</span>
+                                    <span className="text-[10px] text-slate-400 font-normal">Editable</span>
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={slot.title}
+                                    onChange={(e) => handleUpdateSlotTitle(slot.id, e.target.value)}
+                                    placeholder={`Enter or click 'Translate' for translated title in ${getLanguageLabel(slot.targetLang)}...`}
+                                    className="w-full px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                                    <span>Translated Content ({getLanguageLabel(slot.targetLang)} - Editable):</span>
+                                    <div className="text-[10px] text-slate-400 font-normal">
+                                      <span>{slot.content.trim().split(/\s+/).filter(Boolean).length} words</span>
+                                      <span className="mx-1">•</span>
+                                      <span>{slot.content.length} chars</span>
+                                    </div>
+                                  </div>
+                                  <textarea
+                                    rows={4}
+                                    value={slot.content}
+                                    onChange={(e) => handleUpdateSlotContent(slot.id, e.target.value)}
+                                    placeholder={`Click 'Translate' above to automatically translate original document into ${getLanguageLabel(slot.targetLang)}, or type translated text directly here...`}
+                                    className="w-full p-3 border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none leading-relaxed font-sans"
+                                  />
+                                </div>
+
+                                {/* Slot Actions: Copy & Individual Save */}
+                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(slot.content);
+                                      setCopiedLang(slot.id);
+                                      setTimeout(() => setCopiedLang(null), 2000);
+                                    }}
+                                    disabled={!slot.content.trim()}
+                                    className="px-2.5 py-1 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded-lg text-[11px] font-semibold transition flex items-center gap-1 cursor-pointer"
+                                  >
+                                    {copiedLang === slot.id ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                                    <span>{copiedLang === slot.id ? 'Copied' : 'Copy'}</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStoreSingleSlot(slot.id)}
+                                    disabled={slot.isTranslating || !slot.content.trim() || !slot.title.trim()}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                                  >
+                                    <Save className="w-3 h-3" />
+                                    <span>Save This Translation to RAG</span>
+                                  </button>
+                                </div>
+
+                                {slot.storeFeedback && (
+                                  <div className={`p-2 rounded-lg text-[11px] font-medium flex items-center gap-1.5 ${
+                                    slot.storeFeedback.success
+                                      ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                                      : 'bg-rose-50 border border-rose-200 text-rose-800'
+                                  }`}>
+                                    {slot.storeFeedback.success ? (
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                    ) : (
+                                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                                    )}
+                                    <span>{slot.storeFeedback.message}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* ─── BELOW TRANSLATE ORIGINAL INTO ANOTHER LANGUAGE BOX: + BUTTON FOR TRANSLATE ORIGINAL INTO ANOTHER LANGUAGE ─── */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 bg-white rounded-2xl border-2 border-dashed border-indigo-300 hover:border-indigo-400 shadow-2xs transition-all">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
+                            <label className="text-xs font-bold text-slate-900 flex items-center gap-2 shrink-0">
+                              <div className="p-1 rounded-md bg-indigo-100 text-indigo-700">
+                                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                              </div>
+                              <span>Translate Original into Another Language:</span>
+                            </label>
+
+                            {/* Dropdown to choose another language & + Button for Translate Original into Another Language */}
+                            <div className="flex items-center gap-2 flex-1 max-w-xl">
+                              <select
+                                value={selectedTargetLangForAdd}
+                                onChange={(e) => setSelectedTargetLangForAdd(e.target.value)}
+                                className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-white border-2 border-indigo-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-2xs cursor-pointer transition-colors"
+                              >
+                                <optgroup label="── ASEAN Languages (EN English / Global first) ──">
+                                  {aseanLanguages.map(l => (
+                                    <option key={l.code} value={l.code}>{l.flag} {l.label}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="── Regional Dialogue Partners ──">
+                                  {regionalLanguages.map(l => (
+                                    <option key={l.code} value={l.code}>{l.flag} {l.label}</option>
+                                  ))}
+                                </optgroup>
+                              </select>
+
+                              <button
+                                type="button"
+                                onClick={() => handleAddTranslationSlot(selectedTargetLangForAdd, true)}
+                                disabled={!originalDocContent.trim()}
+                                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 shrink-0"
+                                title="Translate original text into this chosen language"
+                              >
+                                <Plus className="w-4 h-4 stroke-[3]" />
+                                <span>Translate</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ─── GLOBAL SAVE EVERYTHING TO RAG (WHEN SLOTS EXIST) ─── */}
+                    {translationSlots.length > 0 && (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-indigo-200/80">
+                        <span className="text-xs text-slate-600 font-medium">
+                          Total translations configured: <strong className="text-indigo-900 font-bold">{translationSlots.length}</strong>
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={handleSaveAllTranslations}
+                          disabled={isSavingAllSlots || translationSlots.every(s => !s.content.trim())}
+                          className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-95"
+                        >
+                          <BookOpen className={`w-4 h-4 ${isSavingAllSlots ? 'animate-spin' : ''}`} />
+                          <span>{isSavingAllSlots ? 'Vectorizing & Saving Everything...' : 'Save Everything to RAG'}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Global Save All Feedback Banner */}
+                    {saveAllSlotsFeedback && (
+                      <div className={`p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${
+                        saveAllSlotsFeedback.success
+                          ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                          : 'bg-rose-50 border border-rose-200 text-rose-800'
+                      }`}>
+                        {saveAllSlotsFeedback.success ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        )}
+                        <span>{saveAllSlotsFeedback.message}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })()}
@@ -1100,19 +1647,19 @@ Higher education providers may grant credit transfer of up to 50% of the course 
         <div className="lg:col-span-5 space-y-6">
           {/* Document Ingestion Card */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-7 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-emerald-600" />
-                  <span>Ingest Document & Auto-Vectorize</span>
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="min-w-0">
+                <h3 className="text-sm sm:text-base xl:text-lg font-bold text-slate-900 flex items-center gap-2 whitespace-nowrap">
+                  <FileText className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span className="whitespace-nowrap">Ingest Document &amp; Auto-Vectorize</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Paste whole documents in any language & let AI sort out title, category, language, and embeddings.
+                  Paste whole documents in any language &amp; let AI sort out title, category, language, and embeddings.
                 </p>
               </div>
 
               {/* Mode Toggle */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold shrink-0">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold shrink-0 self-start xl:self-auto">
                 <button
                   type="button"
                   onClick={() => setIngestMode('autosort')}
@@ -1220,15 +1767,22 @@ Higher education providers may grant credit transfer of up to 50% of the course 
                     <select
                       value={ingestForm.language}
                       onChange={(e) => setIngestForm({ ...ingestForm, language: e.target.value })}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                     >
-                      <option value="en">English (Default)</option>
-                      <option value="ja">Japanese (日本語)</option>
-                      <option value="zh">Chinese (中文)</option>
-                      <option value="vi">Vietnamese (Tiếng Việt)</option>
-                      <option value="th">Thai (ไทย)</option>
-                      <option value="km">Khmer (ភាសាខ្មែរ)</option>
-                      <option value="id">Indonesian (Bahasa)</option>
+                      <optgroup label="── ASEAN Languages (EN English / Global first) ──">
+                        {aseanLanguages.map((l) => (
+                          <option key={l.code} value={l.code}>
+                            {l.flag} {l.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="── Regional Dialogue Partners ──">
+                        {regionalLanguages.map((l) => (
+                          <option key={l.code} value={l.code}>
+                            {l.flag} {l.label}
+                          </option>
+                        ))}
+                      </optgroup>
                     </select>
                   </div>
                 </div>

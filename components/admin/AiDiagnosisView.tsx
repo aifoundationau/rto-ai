@@ -41,14 +41,14 @@ export interface LanguageOption {
 }
 
 export const ASEAN_LANGUAGES: LanguageOption[] = [
+  { code: 'en', name: 'EN English / Global', flag: '🌐', country: 'Global', group: 'ASEAN' },
+  { code: 'kh', name: 'Khmer (ភាសាខ្មែរ - Cambodia)', flag: '🇰🇭', country: 'Cambodia', group: 'ASEAN' },
   { code: 'id', name: 'Indonesian (Bahasa Indonesia)', flag: '🇮🇩', country: 'Indonesia', group: 'ASEAN' },
   { code: 'vi', name: 'Vietnamese (Tiếng Việt)', flag: '🇻🇳', country: 'Vietnam', group: 'ASEAN' },
   { code: 'th', name: 'Thai (ภาษาไทย)', flag: '🇹🇭', country: 'Thailand', group: 'ASEAN' },
   { code: 'tl', name: 'Filipino / Tagalog', flag: '🇵🇭', country: 'Philippines', group: 'ASEAN' },
   { code: 'ms', name: 'Malay (Bahasa Melayu)', flag: '🇲🇾', country: 'Malaysia / Brunei', group: 'ASEAN' },
-  { code: 'en', name: 'English (Singapore / Global)', flag: '🇸🇬', country: 'Singapore', group: 'ASEAN' },
   { code: 'my', name: 'Burmese (မြန်မာဘာသာ)', flag: '🇲🇲', country: 'Myanmar', group: 'ASEAN' },
-  { code: 'km', name: 'Khmer (ភាសាខ្មែរ)', flag: '🇰🇭', country: 'Cambodia', group: 'ASEAN' },
   { code: 'lo', name: 'Lao (ພາສາລາວ)', flag: '🇱🇦', country: 'Laos', group: 'ASEAN' },
   { code: 'tet', name: 'Tetum (Lian Tetun)', flag: '🇹🇱', country: 'Timor-Leste', group: 'ASEAN' },
 ];
@@ -65,29 +65,17 @@ export const MULTILINGUAL_OPTIONS: LanguageOption[] = [
 ];
 
 export const ALL_INQUIRY_LANGUAGES: LanguageOption[] = [
-  { code: 'en', name: 'English (Australia / Global)', flag: '🇦🇺', country: 'Australia / Global', group: 'ASEAN' },
-  ...ASEAN_LANGUAGES.filter(l => l.code !== 'en'),
+  ...ASEAN_LANGUAGES,
   ...REGIONAL_PARTNER_LANGUAGES,
 ];
 
 export const TRANSLATE_TARGET_LANGUAGES: LanguageOption[] = [
-  { code: 'en', name: 'English (Australia / Global)', flag: '🇦🇺', country: 'Australia / Global', group: 'ASEAN' },
-  { code: 'kh', name: 'Khmer (ភាសាខ្មែរ - Cambodia)', flag: '🇰🇭', country: 'Cambodia', group: 'ASEAN' },
-  { code: 'id', name: 'Indonesian (Bahasa Indonesia)', flag: '🇮🇩', country: 'Indonesia', group: 'ASEAN' },
-  { code: 'vi', name: 'Vietnamese (Tiếng Việt)', flag: '🇻🇳', country: 'Vietnam', group: 'ASEAN' },
-  { code: 'th', name: 'Thai (ภาษาไทย)', flag: '🇹🇭', country: 'Thailand', group: 'ASEAN' },
-  { code: 'tl', name: 'Filipino / Tagalog', flag: '🇵🇭', country: 'Philippines', group: 'ASEAN' },
-  { code: 'ms', name: 'Malay (Bahasa Melayu)', flag: '🇲🇾', country: 'Malaysia / Brunei', group: 'ASEAN' },
-  { code: 'my', name: 'Burmese (မြန်မာဘာသာ)', flag: '🇲🇲', country: 'Myanmar', group: 'ASEAN' },
-  { code: 'lo', name: 'Lao (ພາສາລາວ)', flag: '🇱🇦', country: 'Laos', group: 'ASEAN' },
-  { code: 'tet', name: 'Tetum (Lian Tetun)', flag: '🇹🇱', country: 'Timor-Leste', group: 'ASEAN' },
-  { code: 'zh', name: 'Chinese (中文)', flag: '🇨🇳', country: 'China', group: 'Regional Partner' },
-  { code: 'ja', name: 'Japanese (日本語)', flag: '🇯🇵', country: 'Japan', group: 'Regional Partner' },
-  { code: 'ko', name: 'Korean (한국어)', flag: '🇰🇷', country: 'South Korea', group: 'Regional Partner' },
+  ...ASEAN_LANGUAGES,
+  ...REGIONAL_PARTNER_LANGUAGES,
 ];
 
 export function detectInquiryLanguage(text: string): { code: string; name: string; flag: string } {
-  if (!text || !text.trim()) return { code: 'en', name: 'English (Australia / Global)', flag: '🇦🇺' };
+  if (!text || !text.trim()) return { code: 'en', name: 'EN English / Global', flag: '🌐' };
 
   // 1. Script checks (very reliable, distinctive non-Latin Unicode blocks)
   // Myanmar / Burmese script
@@ -153,7 +141,7 @@ export function detectInquiryLanguage(text: string): { code: string; name: strin
   }
 
   // Default safely to English
-  return { code: 'en', name: 'English (Australia / Global)', flag: '🇦🇺' };
+  return { code: 'en', name: 'EN English / Global', flag: '🌐' };
 }
 
 
@@ -197,11 +185,10 @@ export const AiDiagnosisView: React.FC = () => {
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationsCache, setTranslationsCache] = useState<Record<string, { question: string; answer: string }>>({});
 
-  // Edit AI Response & RAG Ingestion state
+  // Edit Original AI Response state
   const [isEditingAnswer, setIsEditingAnswer] = useState(false);
   const [editedAnswerText, setEditedAnswerText] = useState('');
   const [editLanguage, setEditLanguage] = useState('en');
-  const [isAutoTranslatingDraft, setIsAutoTranslatingDraft] = useState(false);
   const [isIngestingToRag, setIsIngestingToRag] = useState(false);
   const [ragFeedbackMsg, setRagFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -210,12 +197,16 @@ export const AiDiagnosisView: React.FC = () => {
   const [languageFeedbackMsg, setLanguageFeedbackMsg] = useState<string | null>(null);
   const [isEditingInquiryLang, setIsEditingInquiryLang] = useState(false);
 
-  // Translate Edited AI Response section state (en and kh first on list)
-  const [selectedTranslateLang, setSelectedTranslateLang] = useState<string>('kh');
-  const [showMoreTranslations, setShowMoreTranslations] = useState<boolean>(false);
+  // Translate into another language section state (optional & collapsable)
+  const [isTranslateSectionOpen, setIsTranslateSectionOpen] = useState(false);
+  const [selectedTranslateLang, setSelectedTranslateLang] = useState<string>('en');
   const [isTranslatingResponse, setIsTranslatingResponse] = useState(false);
+  const [translatedQuestionText, setTranslatedQuestionText] = useState<string | null>(null);
+  const [translatedResponseText, setTranslatedResponseText] = useState<string | null>(null);
+  const [translatedResponseLang, setTranslatedResponseLang] = useState<string | null>(null);
   const [translateSuccessMsg, setTranslateSuccessMsg] = useState<string | null>(null);
-  const [translatedResultPreview, setTranslatedResultPreview] = useState<string | null>(null);
+  const [translateErrorMsg, setTranslateErrorMsg] = useState<string | null>(null);
+  const [isIngestingTranslation, setIsIngestingTranslation] = useState(false);
 
   // Prevent background scrolling and remove body scrollbar when inspection modal is active
   useEffect(() => {
@@ -311,10 +302,15 @@ export const AiDiagnosisView: React.FC = () => {
     setIsEditingInquiryLang(false);
     const activeInquiry = record.inquiryLanguage || record.adminFeedback?.correctedLanguage || detectInquiryLanguage(record.userQuestion);
     setEditLanguage(activeInquiry.code);
-    setTranslatedResultPreview(null);
+    setIsTranslateSectionOpen(false);
+    setSelectedTranslateLang('en');
+    setIsTranslatingResponse(false);
     setTranslateSuccessMsg(null);
-    setSelectedTranslateLang('kh');
-    setShowMoreTranslations(false);
+    setTranslateErrorMsg(null);
+    setTranslatedQuestionText(null);
+    setTranslatedResponseText(null);
+    setTranslatedResponseLang(null);
+    setIsIngestingTranslation(false);
   };
 
   const handleCorrectInquiryLanguage = async (newLangCode: string) => {
@@ -418,95 +414,137 @@ export const AiDiagnosisView: React.FC = () => {
     }
   };
 
-  const handleAutoTranslateDraft = async (targetLang: string) => {
-    if (!editedAnswerText.trim()) return;
-    setIsAutoTranslatingDraft(true);
-    try {
-      const res = await fetch('/api/rag/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: editedAnswerText, targetLanguage: targetLang }),
-      });
-      const data = await res.json();
-      if (data.translatedText) {
-        setEditedAnswerText(data.translatedText);
-        setEditLanguage(targetLang);
-      }
-    } catch (err) {
-      console.error('Draft translation error:', err);
-    } finally {
-      setIsAutoTranslatingDraft(false);
-    }
-  };
-
-  const handleTranslateEditedResponse = async (targetLangCode?: string) => {
+  // Translates Question and Response from the saved top boxes without altering original text
+  const handleTranslateSavedResponse = async (targetLangCode?: string) => {
     if (!inspectRecord) return;
     const targetCode = targetLangCode || selectedTranslateLang;
-    const sourceText = editedAnswerText.trim() || inspectRecord.aiAnswer;
-    if (!sourceText) return;
+    const sourceAnswer = inspectRecord.aiAnswer;
+    const sourceQuestion = inspectRecord.userQuestion;
+    if (!sourceAnswer || !sourceAnswer.trim()) {
+      setTranslateErrorMsg('No saved response text found above to translate. Please ensure the response above is saved.');
+      return;
+    }
 
     setIsTranslatingResponse(true);
     setTranslateSuccessMsg(null);
+    setTranslateErrorMsg(null);
 
     try {
-      const res = await fetch('/api/rag/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: sourceText,
-          targetLanguage: targetCode === 'kh' ? 'km' : targetCode,
+      const mappedLang = targetCode === 'kh' ? 'km' : targetCode;
+      const [resQ, resA] = await Promise.all([
+        fetch('/api/rag/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: sourceQuestion,
+            targetLanguage: mappedLang,
+          }),
         }),
-      });
+        fetch('/api/rag/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: sourceAnswer,
+            targetLanguage: mappedLang,
+          }),
+        }),
+      ]);
 
-      const data = await res.json();
-      if (data.translatedText) {
-        setEditedAnswerText(data.translatedText);
-        setEditLanguage(targetCode);
-        setIsEditingAnswer(true);
-        setTranslatedResultPreview(data.translatedText);
+      const [dataQ, dataA] = await Promise.all([resQ.json(), resA.json()]);
+
+      if (dataQ.translatedText || dataA.translatedText) {
+        // Crucial: do NOT touch editedAnswerText or inspectRecord.aiAnswer!
+        setTranslatedQuestionText(dataQ.translatedText || sourceQuestion);
+        setTranslatedResponseText(dataA.translatedText || sourceAnswer);
+        setTranslatedResponseLang(targetCode);
 
         const targetObj = TRANSLATE_TARGET_LANGUAGES.find(l => l.code === targetCode) || {
           flag: '🌐',
           name: targetCode.toUpperCase()
         };
 
-        setTranslateSuccessMsg(`✓ Successfully translated into ${targetObj.flag} ${targetObj.name}! Synced to AI Response Output Editor above.`);
-        setTimeout(() => setTranslateSuccessMsg(null), 6000);
+        setTranslateSuccessMsg(`✓ Successfully translated Question & Response into ${targetObj.flag} ${targetObj.name}. Review below and save to Multilingual RAG.`);
+      } else {
+        setTranslateErrorMsg('Translation service returned an empty response. Please try again.');
       }
     } catch (err: any) {
       console.error('Translation error in inspection modal:', err);
+      setTranslateErrorMsg(err.message || 'Failed to translate question and response.');
     } finally {
       setIsTranslatingResponse(false);
     }
   };
 
   const handleCancelTranslation = () => {
-    setShowMoreTranslations(false);
-    setTranslatedResultPreview(null);
+    setTranslatedQuestionText(null);
+    setTranslatedResponseText(null);
+    setTranslatedResponseLang(null);
     setTranslateSuccessMsg(null);
-    if (inspectRecord) {
-      setEditedAnswerText(inspectRecord.aiAnswer);
-      const activeInquiry = inspectRecord.inquiryLanguage || inspectRecord.adminFeedback?.correctedLanguage || detectInquiryLanguage(inspectRecord.userQuestion);
-      setEditLanguage(activeInquiry.code);
+    setTranslateErrorMsg(null);
+  };
+
+  const handleSaveTranslationToRag = async () => {
+    if (!inspectRecord || (!translatedResponseText && !translatedQuestionText) || !translatedResponseLang) return;
+    setIsIngestingTranslation(true);
+    setTranslateSuccessMsg(null);
+    setTranslateErrorMsg(null);
+
+    const targetObj = TRANSLATE_TARGET_LANGUAGES.find(l => l.code === translatedResponseLang) || {
+      flag: '🌐',
+      name: translatedResponseLang.toUpperCase(),
+    };
+
+    try {
+      const qText = (translatedQuestionText || inspectRecord.userQuestion).trim();
+      const aText = (translatedResponseText || inspectRecord.aiAnswer).trim();
+      const qSnippet = qText.slice(0, 75).trim();
+
+      const ragRes = await fetch('/api/rag/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Verified Q&A (${targetObj.name}): ${qSnippet}`,
+          content: `### Student Question (${targetObj.name})\n${qText}\n\n### Verified Institutional Response (${targetObj.name})\n${aText}`,
+          category: 'Verified Multilingual Response',
+          language: translatedResponseLang,
+          source: 'AI Diagnosis Multilingual Translation',
+          tenantTag: 'rto-ai',
+        }),
+      });
+
+      if (ragRes.ok) {
+        setTranslateSuccessMsg(`✓ Successfully saved ${targetObj.flag} ${targetObj.name} translation to Multilingual RAG! (Original text above remains unchanged)`);
+      } else {
+        setTranslateErrorMsg('Failed to save translation to Multilingual RAG.');
+      }
+    } catch (err: any) {
+      console.error('Save translation to RAG error:', err);
+      setTranslateErrorMsg(err.message || 'Failed to save translation to RAG.');
+    } finally {
+      setIsIngestingTranslation(false);
     }
   };
 
-  const handleSaveAndIngestRag = async () => {
+  const handleSaveOriginalResponse = async () => {
     if (!inspectRecord || !editedAnswerText.trim()) return;
     setIsIngestingToRag(true);
     setRagFeedbackMsg(null);
 
+    const savedText = editedAnswerText.trim();
+    const activeInquiry = inspectRecord.inquiryLanguage || inspectRecord.adminFeedback?.correctedLanguage || detectInquiryLanguage(inspectRecord.userQuestion);
+    const langCode = activeInquiry.code || 'en';
+
     try {
-      // 1. Ingest into Multilingual RAG Vector Index
+      // 1. Ingest original text into Multilingual RAG Vector Index
       const qSnippet = inspectRecord.userQuestion.slice(0, 75).trim();
       const ragRes = await fetch('/api/rag/ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: `Verified Q&A: ${qSnippet}`,
-          content: `### Student Question\n${inspectRecord.userQuestion}\n\n### Verified Institutional Response\n${editedAnswerText.trim()}`,
+          content: `### Student Question\n${inspectRecord.userQuestion}\n\n### Verified Institutional Response\n${savedText}`,
           category: 'Verified Q&A Knowledge Bank',
-          language: editLanguage,
+          language: langCode,
           source: 'AI Diagnosis Staff Review',
           tenantTag: 'rto-ai',
         }),
@@ -521,9 +559,9 @@ export const AiDiagnosisView: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: inspectRecord.id,
-          updatedAnswer: editedAnswerText.trim(),
+          updatedAnswer: savedText,
           verifiedAccuracy: 100,
-          notes: `Response edited & ingested into Multilingual RAG (${editLanguage.toUpperCase()}) by Staff.`,
+          notes: `Original response edited & verified by Staff.`,
           reviewerEmail: 'staff@ai-foundation.org',
           ragIngested: true,
           ragDocId,
@@ -533,21 +571,23 @@ export const AiDiagnosisView: React.FC = () => {
       if (patchRes.ok) {
         setRagFeedbackMsg({
           type: 'success',
-          text: `✓ Successfully saved and indexed into Multilingual RAG! Future student queries in any language will cite this verified answer.`
+          text: `✓ Successfully saved original response and updated RAG!`,
         });
 
         // Update local interaction in state
         const updatedRecord: AiInteractionRecord = {
           ...inspectRecord,
-          aiAnswer: editedAnswerText.trim(),
+          aiAnswer: savedText,
           perceivedAccuracy: 100,
           confidenceLevel: 'HIGH',
           adminFeedback: {
             reviewed: true,
             verifiedAccuracy: 100,
-            notes: `Response edited & ingested into Multilingual RAG (${editLanguage.toUpperCase()}) by Staff.`,
+            notes: `Original response edited & verified by Staff.`,
             reviewerEmail: 'staff@ai-foundation.org',
             reviewedAt: new Date().toISOString(),
+            ragIngested: true,
+            ragDocId,
           }
         };
 
@@ -558,14 +598,14 @@ export const AiDiagnosisView: React.FC = () => {
       } else {
         setRagFeedbackMsg({
           type: 'error',
-          text: 'Failed to update interaction record after RAG ingestion.'
+          text: 'Failed to update interaction record after saving.'
         });
       }
     } catch (err: any) {
-      console.error('RAG ingestion error:', err);
+      console.error('Save original response error:', err);
       setRagFeedbackMsg({
         type: 'error',
-        text: err.message || 'Failed to ingest verified answer into RAG.'
+        text: err.message || 'Failed to save original response.'
       });
     } finally {
       setIsIngestingToRag(false);
@@ -1214,7 +1254,7 @@ export const AiDiagnosisView: React.FC = () => {
                         disabled={isUpdatingLanguage}
                         className="w-full px-3 py-2 bg-slate-900 border border-indigo-400 rounded-xl text-xs sm:text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer shadow-inner"
                       >
-                        <option value="en">🇦🇺 English (Australia / Global)</option>
+                        <option value="en">🌐 EN English / Global</option>
                         <optgroup label="── ASEAN Languages ──">
                           {ASEAN_LANGUAGES.filter(l => l.code !== 'en').map(opt => (
                             <option key={opt.code} value={opt.code}>
@@ -1255,8 +1295,8 @@ export const AiDiagnosisView: React.FC = () => {
                             : 'bg-slate-900 hover:bg-indigo-900 text-slate-200 border-indigo-800'
                         }`}
                       >
-                        <span>🇦🇺</span>
-                        <span>English</span>
+                        <span>🌐</span>
+                        <span>EN English / Global</span>
                       </button>
                       {ASEAN_LANGUAGES.filter(l => l.code !== 'en').map(opt => (
                         <button
@@ -1367,165 +1407,34 @@ export const AiDiagnosisView: React.FC = () => {
                     </div>
                   ) : (
                     <div className="p-4 rounded-2xl bg-indigo-50/70 border-2 border-indigo-400 space-y-3 animate-in fade-in">
-                      <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2 border-b border-indigo-200/70">
-                        <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                      <div className="flex items-center justify-between pb-2 border-b border-indigo-200/70">
+                        <div className="flex items-center gap-2">
                           <Edit3 className="w-4 h-4 text-indigo-600" />
-                          Edit Response & Update Multilingual RAG
+                          <span className="text-xs font-bold text-indigo-950">
+                            Edit Original AI Response
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-semibold border border-indigo-200">
+                            Original Text Only
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
+                          Edit original response text below, then press Save
                         </span>
-                        
-                        {/* Edit Detected Inquiry Language Control */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => setIsEditingInquiryLang(!isEditingInquiryLang)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 ${
-                              isEditingInquiryLang
-                                ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 font-black ring-2 ring-amber-300'
-                                : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                            }`}
-                            title="Edit Detected Inquiry Language"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                            <span>{isEditingInquiryLang ? 'Close Language Editor' : '✏️ Edit Detected Inquiry Language'}</span>
-                          </button>
-
-                          <div className="flex items-center gap-1.5 bg-white border border-indigo-300 rounded-xl px-2.5 py-1 shadow-2xs">
-                            <span className="text-[11px] font-bold text-slate-600">Language:</span>
-                            <select
-                              value={activeInquiryLang.code}
-                              onChange={(e) => {
-                                const newCode = e.target.value;
-                                setEditLanguage(newCode);
-                                handleCorrectInquiryLanguage(newCode);
-                              }}
-                              disabled={isUpdatingLanguage}
-                              className="bg-transparent text-xs font-bold text-indigo-900 focus:outline-none cursor-pointer"
-                              title="Select inquiry and RAG language"
-                            >
-                              <option value="en">🇦🇺 English (Australia / Global)</option>
-                              <optgroup label="── ASEAN Languages ──">
-                                {ASEAN_LANGUAGES.filter(l => l.code !== 'en').map(opt => (
-                                  <option key={opt.code} value={opt.code}>
-                                    {opt.flag} {opt.name}
-                                  </option>
-                                ))}
-                              </optgroup>
-                              <optgroup label="── Regional Dialogue Partners ──">
-                                {REGIONAL_PARTNER_LANGUAGES.map(opt => (
-                                  <option key={opt.code} value={opt.code}>
-                                    {opt.flag} {opt.name}
-                                  </option>
-                                ))}
-                              </optgroup>
-                            </select>
-                          </div>
-
-                          {isStaffCorrected ? (
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300 flex items-center gap-1">
-                              <Check className="w-3 h-3 text-emerald-600" />
-                              <span>Staff Corrected</span>
-                            </span>
-                          ) : (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-200 text-slate-600 font-medium">
-                              AI Detected
-                            </span>
-                          )}
-
-                          {isUpdatingLanguage && (
-                            <RefreshCw className="w-3.5 h-3.5 text-indigo-600 animate-spin" />
-                          )}
-                        </div>
                       </div>
-
-                      {/* Expanded Quick Language Selection Panel */}
-                      {isEditingInquiryLang && (
-                        <div className="p-3 bg-white rounded-xl border border-indigo-300 shadow-sm space-y-2 animate-in fade-in">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                              <Languages className="w-3.5 h-3.5 text-indigo-600" />
-                              <span>1-Click Correct Detected Inquiry &amp; RAG Language:</span>
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setIsEditingInquiryLang(false)}
-                              className="text-[11px] text-slate-500 hover:text-indigo-600 font-bold"
-                            >
-                              Done
-                            </button>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditLanguage('en');
-                                handleCorrectInquiryLanguage('en');
-                              }}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition flex items-center gap-1 cursor-pointer ${
-                                activeInquiryLang.code === 'en'
-                                  ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-xs font-black'
-                                  : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200'
-                              }`}
-                            >
-                              <span>🇦🇺</span>
-                              <span>English</span>
-                            </button>
-                            {ASEAN_LANGUAGES.filter(l => l.code !== 'en').map(opt => (
-                              <button
-                                key={opt.code}
-                                type="button"
-                                onClick={() => {
-                                  setEditLanguage(opt.code);
-                                  handleCorrectInquiryLanguage(opt.code);
-                                }}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition flex items-center gap-1 cursor-pointer ${
-                                  activeInquiryLang.code === opt.code
-                                    ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-xs font-black'
-                                    : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200'
-                                }`}
-                              >
-                                <span>{opt.flag}</span>
-                                <span>{opt.name.split(' ')[0]}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
 
                       <textarea
                         rows={5}
                         value={editedAnswerText}
                         onChange={(e) => setEditedAnswerText(e.target.value)}
-                        placeholder="Enter verified institutional answer..."
+                        placeholder="Enter verified original answer..."
                         className="w-full p-3 bg-white border border-indigo-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono leading-relaxed resize-y no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                       />
 
-                      {/* Quick translate toolbar for editing */}
-                      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-1 border-t border-indigo-200/60">
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-indigo-900">
-                          <Languages className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                          <span className="font-semibold whitespace-nowrap">Auto-Translate Draft:</span>
-                          <div className="flex flex-wrap items-center gap-1">
-                            {ASEAN_LANGUAGES.map(opt => (
-                              <button
-                                key={opt.code}
-                                type="button"
-                                onClick={() => handleAutoTranslateDraft(opt.code)}
-                                disabled={isAutoTranslatingDraft}
-                                title={`Translate draft to ${opt.name} (${opt.country})`}
-                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all flex items-center gap-1 ${
-                                  editLanguage === opt.code
-                                    ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
-                                    : 'bg-white hover:bg-indigo-100 text-indigo-800 border-indigo-300'
-                                } disabled:opacity-50`}
-                              >
-                                <span>{opt.flag}</span>
-                                <span>{opt.code.toUpperCase()}</span>
-                              </button>
-                            ))}
-                            {isAutoTranslatingDraft && <RefreshCw className="w-3 h-3 text-indigo-600 animate-spin ml-1" />}
-                          </div>
-                        </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-indigo-200/60">
+                        <span className="text-[11px] text-slate-500">
+                          Saves original response in the top box.
+                        </span>
 
                         <div className="flex items-center gap-2 ml-auto">
                           <button
@@ -1534,19 +1443,19 @@ export const AiDiagnosisView: React.FC = () => {
                               setIsEditingAnswer(false);
                               setEditedAnswerText(inspectRecord.aiAnswer);
                             }}
-                            className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition-all"
+                            className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition-all cursor-pointer"
                           >
                             Cancel
                           </button>
 
                           <button
                             type="button"
-                            onClick={handleSaveAndIngestRag}
+                            onClick={handleSaveOriginalResponse}
                             disabled={isIngestingToRag || !editedAnswerText.trim()}
-                            className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                            className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
                           >
                             <BookOpen className="w-3.5 h-3.5" />
-                            <span>{isIngestingToRag ? 'Ingesting into RAG...' : 'Save & Ingest into RAG'}</span>
+                            <span>{isIngestingToRag ? 'Saving...' : 'Save Original Response'}</span>
                           </button>
                         </div>
                       </div>
@@ -1654,155 +1563,186 @@ export const AiDiagnosisView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Translate into another language section */}
-                <div className="p-3.5 sm:p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200/90 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                      <Globe className="w-4 h-4 text-indigo-600" />
-                      <span>Translate into another language</span>
-                    </label>
-                    {isTranslatingResponse && (
-                      <span className="text-[10px] font-bold text-indigo-600 flex items-center gap-1 animate-pulse">
-                        <RefreshCw className="w-3 h-3 animate-spin" /> Translating response...
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Translate the edited AI Response Output into other languages. Click on &ldquo;More Translations&rdquo; to select a target language from the ASEAN &amp; regional partner dropdown.
-                  </p>
-
-                  {!showMoreTranslations ? (
-                    <div className="flex items-center gap-2 pt-0.5">
-                      <button
-                        type="button"
-                        onClick={() => setShowMoreTranslations(true)}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 active:scale-95 cursor-pointer"
-                        title="Click for dropdown box to select translation language"
-                      >
-                        <Languages className="w-4 h-4" />
-                        <span>More Translations</span>
-                        <ChevronDown className="w-3.5 h-3.5 opacity-80" />
-                      </button>
-
-                      {translatedResultPreview && (
-                        <button
-                          type="button"
-                          onClick={handleCancelTranslation}
-                          className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                          <span>Cancel Translation</span>
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-3 animate-in fade-in">
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                        <select
-                          value={selectedTranslateLang}
-                          onChange={(e) => setSelectedTranslateLang(e.target.value)}
-                          disabled={isTranslatingResponse}
-                          className="flex-1 px-3 py-2 bg-white border border-indigo-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-2xs"
-                        >
-                          <optgroup label="── Priority Languages (en & kh first) ──">
-                            <option value="en">🇦🇺 English (Australia / Global)</option>
-                            <option value="kh">🇰🇭 Khmer (ភាសាខ្មែរ - Cambodia)</option>
-                          </optgroup>
-                          <optgroup label="── All ASEAN Languages ──">
-                            {TRANSLATE_TARGET_LANGUAGES.filter(l => l.group === 'ASEAN' && l.code !== 'en' && l.code !== 'kh').map(opt => (
-                              <option key={opt.code} value={opt.code}>
-                                {opt.flag} {opt.name} ({opt.country})
-                              </option>
-                            ))}
-                          </optgroup>
-                          <optgroup label="── Regional Dialogue Partners ──">
-                            {TRANSLATE_TARGET_LANGUAGES.filter(l => l.group === 'Regional Partner').map(opt => (
-                              <option key={opt.code} value={opt.code}>
-                                {opt.flag} {opt.name} ({opt.country})
-                              </option>
-                            ))}
-                          </optgroup>
-                        </select>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleTranslateEditedResponse(selectedTranslateLang)}
-                            disabled={isTranslatingResponse}
-                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
-                          >
-                            {isTranslatingResponse ? (
-                              <>
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                <span>Translating...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Globe className="w-3.5 h-3.5" />
-                                <span>Translate AI Response</span>
-                              </>
-                            )}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={handleCancelTranslation}
-                            disabled={isTranslatingResponse}
-                            className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 active:scale-95 cursor-pointer"
-                            title="Cancel and close translation selector"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                            <span>Cancel</span>
-                          </button>
+                {/* Translate into another language section (Optional & Collapsible) */}
+                <div className="rounded-2xl border border-indigo-200/90 bg-indigo-50/70 overflow-hidden shadow-xs">
+                  {/* Collapsible Header */}
+                  <button
+                    type="button"
+                    onClick={() => setIsTranslateSectionOpen(!isTranslateSectionOpen)}
+                    className="w-full p-3.5 sm:p-4 flex items-center justify-between text-left hover:bg-indigo-100/50 transition cursor-pointer"
+                    aria-expanded={isTranslateSectionOpen}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-xs">
+                        <Globe className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-indigo-950">
+                            Translate into another language
+                          </span>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+                            Optional &amp; Collapsible
+                          </span>
+                          {(translatedResponseText || translatedQuestionText) && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              ✓ {TRANSLATE_TARGET_LANGUAGES.find(l => l.code === translatedResponseLang)?.name || 'Translated'}
+                            </span>
+                          )}
                         </div>
+                        <p className="text-[11px] text-slate-500 font-normal">
+                          Translates question &amp; saved response into other languages (does not change original text above)
+                        </p>
                       </div>
                     </div>
-                  )}
 
-                  {/* Feedback Message */}
-                  {translateSuccessMsg && (
-                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2 animate-in fade-in">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="font-semibold">{translateSuccessMsg}</span>
+                    <div className="flex items-center gap-1.5 text-indigo-600 text-xs font-bold shrink-0 ml-2">
+                      <span>{isTranslateSectionOpen ? 'Collapse' : 'Expand'}</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isTranslateSectionOpen ? 'rotate-180' : ''}`} />
                     </div>
-                  )}
+                  </button>
 
-                  {/* Translated Preview Box */}
-                  {translatedResultPreview && (
-                    <div className="p-3 bg-white rounded-xl border border-indigo-200 space-y-2 animate-in fade-in">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-bold text-indigo-950 flex items-center gap-1.5">
-                          <span>{TRANSLATE_TARGET_LANGUAGES.find(l => l.code === selectedTranslateLang)?.flag || '🌐'}</span>
-                          <span>Translated Response Preview ({TRANSLATE_TARGET_LANGUAGES.find(l => l.code === selectedTranslateLang)?.name}):</span>
-                        </span>
-                        <span className="text-[10px] text-emerald-600 font-bold">✓ Synced to AI Response Output Editor above</span>
-                      </div>
-                      <div
-                        className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 whitespace-pre-wrap font-sans leading-relaxed max-h-48 overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden select-text"
-                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                      >
-                        {translatedResultPreview}
-                      </div>
-                      <div className="flex items-center justify-between pt-1">
+                  {/* Expanded Translation Body */}
+                  {isTranslateSectionOpen && (
+                    <div className="p-3.5 sm:p-4 border-t border-indigo-200/70 space-y-3.5 bg-white/60 animate-in fade-in">
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        Select a language from the dropdown below to translate both the question and saved response. The original text in the box above will remain untouched.
+                      </p>
+
+                      {/* Dropdown & Translate Button */}
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <div className="flex-1">
+                          <select
+                            value={selectedTranslateLang}
+                            onChange={(e) => setSelectedTranslateLang(e.target.value)}
+                            disabled={isTranslatingResponse}
+                            className="w-full px-3.5 py-2.5 bg-white border border-indigo-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-2xs"
+                          >
+                            <optgroup label="── Priority Languages (EN &amp; KH first) ──">
+                              <option value="en">🌐 EN English / Global</option>
+                              <option value="kh">🇰🇭 Khmer (ភាសាខ្មែរ - Cambodia)</option>
+                            </optgroup>
+                            <optgroup label="── All ASEAN Languages ──">
+                              {TRANSLATE_TARGET_LANGUAGES.filter(l => l.group === 'ASEAN' && l.code !== 'en' && l.code !== 'kh').map(opt => (
+                                <option key={opt.code} value={opt.code}>
+                                  {opt.flag} {opt.name} ({opt.country})
+                                </option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="── Regional Dialogue Partners ──">
+                              {TRANSLATE_TARGET_LANGUAGES.filter(l => l.group === 'Regional Partner').map(opt => (
+                                <option key={opt.code} value={opt.code}>
+                                  {opt.flag} {opt.name} ({opt.country})
+                                </option>
+                              ))}
+                            </optgroup>
+                          </select>
+                        </div>
+
                         <button
                           type="button"
-                          onClick={handleCancelTranslation}
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                          onClick={() => handleTranslateSavedResponse(selectedTranslateLang)}
+                          disabled={isTranslatingResponse || !inspectRecord.aiAnswer?.trim()}
+                          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
                         >
-                          <X className="w-3 h-3" />
-                          <span>Cancel Translation</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleSaveAndIngestRag}
-                          disabled={isIngestingToRag}
-                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer"
-                        >
-                          <Database className="w-3.5 h-3.5" />
-                          <span>{isIngestingToRag ? 'Indexing...' : 'Save & Ingest to Multilingual RAG'}</span>
+                          {isTranslatingResponse ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              <span>Translating...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Globe className="w-3.5 h-3.5" />
+                              <span>Translate</span>
+                            </>
+                          )}
                         </button>
                       </div>
+
+                      {/* Feedback Messages */}
+                      {translateSuccessMsg && (
+                        <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2 animate-in fade-in">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span className="font-medium">{translateSuccessMsg}</span>
+                        </div>
+                      )}
+
+                      {translateErrorMsg && (
+                        <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-center gap-2 animate-in fade-in">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                          <span className="font-medium">{translateErrorMsg}</span>
+                        </div>
+                      )}
+
+                      {/* Translated Output Box */}
+                      {(translatedResponseText || translatedQuestionText) && (
+                        <div className="p-3.5 sm:p-4 bg-white rounded-xl border-2 border-indigo-300 space-y-3.5 animate-in fade-in shadow-xs">
+                          <div className="flex items-center justify-between text-xs flex-wrap gap-2 pb-1.5 border-b border-indigo-100">
+                            <span className="font-bold text-indigo-950 flex items-center gap-1.5">
+                              <span className="text-base">{TRANSLATE_TARGET_LANGUAGES.find(l => l.code === translatedResponseLang)?.flag || '🌐'}</span>
+                              <span>
+                                Translation ({TRANSLATE_TARGET_LANGUAGES.find(l => l.code === translatedResponseLang)?.name || translatedResponseLang}):
+                              </span>
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-semibold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                              Original question &amp; saved response above remain intact
+                            </span>
+                          </div>
+
+                          {/* Translated Question */}
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                              <span>Question:</span>
+                              <span className="text-[10px] font-semibold text-indigo-600">
+                                ({TRANSLATE_TARGET_LANGUAGES.find(l => l.code === translatedResponseLang)?.name || translatedResponseLang})
+                              </span>
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={translatedQuestionText || ''}
+                              onChange={(e) => setTranslatedQuestionText(e.target.value)}
+                              placeholder="Translated question..."
+                              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-sans leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                          </div>
+
+                          {/* Translated Response */}
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                              <span>Translated Response ({TRANSLATE_TARGET_LANGUAGES.find(l => l.code === translatedResponseLang)?.name || translatedResponseLang}):</span>
+                            </label>
+                            <textarea
+                              rows={5}
+                              value={translatedResponseText || ''}
+                              onChange={(e) => setTranslatedResponseText(e.target.value)}
+                              placeholder="Translated response..."
+                              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 font-sans leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-indigo-500 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={handleCancelTranslation}
+                              className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                              <span>Cancel</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleSaveTranslationToRag}
+                              disabled={isIngestingTranslation || (!translatedResponseText?.trim() && !translatedQuestionText?.trim())}
+                              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer"
+                            >
+                              <Database className="w-3.5 h-3.5" />
+                              <span>{isIngestingTranslation ? 'Saving to RAG...' : 'Save Translation to Multilingual RAG'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
