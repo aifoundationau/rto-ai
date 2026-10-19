@@ -485,8 +485,10 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             }`}
           >
             <Activity className="w-3.5 h-3.5 text-emerald-300" />
-            <span>Firebase Telemetry</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+            <span>AI Telemetry & Diagnosis</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-purple-500/40 text-purple-200 text-[9px] font-mono font-bold">
+              #ai
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('staff_messaging')}

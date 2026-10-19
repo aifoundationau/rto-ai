@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Globe2, 
+  Globe,
   Search, 
   Database, 
   Sparkles, 
@@ -29,8 +30,11 @@ import {
   Unlock,
   Eye,
   EyeOff,
-  Languages
+  Languages,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
+import { IngestedDocumentEntry } from '@/lib/rag/types';
 import { isProjectOwnerEmail, normalizeRole } from '@/lib/auth/roles';
 
 interface MultilingualRagManagerProps {
@@ -126,93 +130,62 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
     { code: 'tet', label: 'Tetum', flag: '🇹🇱', isAsean: true },
   ];
 
-  // Quick test query samples across global and all ASEAN languages
-  const sampleQueries = [
-    {
-      label: '🇯🇵 Japanese',
-      subtitle: 'AI Admission',
-      text: 'オーストラリアの大学で人工知能（AI）学士号を取得したいのですが、入学条件と必要な英語スコア（IELTS）を教えてください。',
-      isAsean: false
-    },
-    {
-      label: '🇨🇳 Chinese',
-      subtitle: 'AQF & RPL',
-      text: '澳大利亚学历资格框架AQF对学士学位的要求是什么？先前学习认定RPL可以减免多少学分？',
-      isAsean: false
-    },
-    {
-      label: '🇻🇳 Vietnamese',
-      subtitle: 'AI Pathways',
-      text: 'Điều kiện tuyển sinh và yêu cầu tiếng Anh cho chương trình Cử nhân Trí tuệ Nhân tạo tại Úc là gì?',
-      isAsean: true
-    },
-    {
-      label: '🇹🇭 Thai',
-      subtitle: 'Admissions & Visa',
-      text: 'เกณฑ์การรับเข้าศึกษาต่อระดับปริญญาตรีด้าน AI ในออสเตรเลียและคะแนน IELTS ขั้นต่ำคือเท่าใด?',
-      isAsean: true
-    },
-    {
-      label: '🇬🇧 English',
-      subtitle: 'TEQSA Standards',
-      text: 'What are the TEQSA threshold standards regarding teaching faculty qualifications and academic governance?',
-      isAsean: false
-    },
-    {
-      label: '🇮🇩 Indonesian',
-      subtitle: 'Syarat Masuk & Beasiswa',
-      text: 'Bagaimana syarat pendaftaran program Sarjana Kecerdasan Buatan (AI) di Australia dan berapa skor minimum IELTS atau TOEFL yang diperlukan?',
-      isAsean: true
-    },
-    {
-      label: '🇲🇾 Malay',
-      subtitle: 'Kemasukan & Kredit RPL',
-      text: 'Apakah syarat kelayakan kemasukan bagi Ijazah Sarjana Muda Kecerdasan Buatan (AI) di Australia dan bagaimana penilaian pemindahan kredit RPL dijalankan?',
-      isAsean: true
-    },
-    {
-      label: '🇵🇭 Filipino',
-      subtitle: 'Pangangailangan sa Pagpasok',
-      text: 'Ano ang mga kinakailangang marka sa IELTS at proseso ng pagpasok sa Bachelor of Artificial Intelligence sa Australia para sa mga mag-aaral mula sa Pilipinas?',
-      isAsean: true
-    },
-    {
-      label: '🇸🇬 Singapore',
-      subtitle: 'Polytechnic Articulation',
-      text: 'What are the credit exemptions and direct advanced standing pathways for Singapore Polytechnic diploma holders entering Australian university degrees?',
-      isAsean: true
-    },
-    {
-      label: '🇰🇭 Khmer',
-      subtitle: 'លក្ខខណ្ឌចុះឈ្មោះ & IELTS',
-      text: 'តើអ្វីជាលក្ខខណ្ឌចូលរៀនសម្រាប់កម្មវិធីបរិញ្ញាបត្របញ្ញាសិប្បនិម្មិត (AI) នៅអូស្ត្រាលី និងកម្រិតពិន្ទុ IELTS ដែលតម្រូវ?',
-      isAsean: true
-    },
-    {
-      label: '🇲🇲 Burmese',
-      subtitle: 'ဝင်ခွင့်သတ်မှတ်ချက်များ',
-      text: 'ဩစတြေးလျတက္ကသိုလ်များတွင် AI ဘွဲ့ကြိုသင်တန်းတက်ရောက်ရန် ဝင်ခွင့်သတ်မှတ်ချက်များနှင့် လိုအပ်သော IELTS ရမှတ်ကို သိရှိလိုပါသည်။',
-      isAsean: true
-    },
-    {
-      label: '🇱🇦 Lao',
-      subtitle: 'ເງື່ອນໄຂການຮຽນ & ທຶນ',
-      text: 'ເງື່ອນໄຂການສະໝັກຮຽນລະດັບປະລິນຍາຕີດ້ານ AI ໃນປະເທດອົດສະຕຣາລີ ແລະ ຄະແນນ IELTS ຂັ້ນຕ່ຳແມ່ນເທົ່າໃດ?',
-      isAsean: true
-    },
-    {
-      label: '🇧🇳 Brunei',
-      subtitle: 'Akreditasi & Kemasukan',
-      text: 'Apakah piawaian akreditasi TEQSA dan kelayakan kemasukan bagi pemohon dari Brunei untuk program ijazah kecerdasan buatan di Australia?',
-      isAsean: true
-    },
-    {
-      label: '🇹🇱 Tetum',
-      subtitle: 'Kriteriu Simu Estudante',
-      text: 'Saida mak rekezitus hodi tama kursu Lisensiatura Intelijénsia Artifisiál (AI) iha Austrália no valór IELTS mínimu hira?',
-      isAsean: true
-    }
+  // ASEAN & Regional Language Definitions
+  const aseanLanguages = [
+    { code: 'id', label: 'Indonesian (Bahasa Indonesia)', short: 'ID', flag: '🇮🇩', country: 'Indonesia' },
+    { code: 'vi', label: 'Vietnamese (Tiếng Việt)', short: 'VI', flag: '🇻🇳', country: 'Vietnam' },
+    { code: 'th', label: 'Thai (ภาษาไทย)', short: 'TH', flag: '🇹🇭', country: 'Thailand' },
+    { code: 'tl', label: 'Filipino / Tagalog', short: 'TL', flag: '🇵🇭', country: 'Philippines' },
+    { code: 'ms', label: 'Malay (Bahasa Melayu)', short: 'MS', flag: '🇲🇾', country: 'Malaysia / Brunei' },
+    { code: 'en', label: 'English (Singapore / Global)', short: 'EN', flag: '🇸🇬', country: 'Singapore' },
+    { code: 'my', label: 'Burmese (မြန်မာဘာသာ)', short: 'MY', flag: '🇲🇲', country: 'Myanmar' },
+    { code: 'km', label: 'Khmer (ភាសាខ្មែរ)', short: 'KM', flag: '🇰🇭', country: 'Cambodia' },
+    { code: 'lo', label: 'Lao (ພາສາລາວ)', short: 'LO', flag: '🇱🇦', country: 'Laos' },
+    { code: 'tet', label: 'Tetum (Lian Tetun)', short: 'TET', flag: '🇹🇱', country: 'Timor-Leste' },
   ];
+
+  const regionalLanguages = [
+    { code: 'zh', label: 'Chinese (中文)', short: 'ZH', flag: '🇨🇳', country: 'China' },
+    { code: 'ja', label: 'Japanese (日本語)', short: 'JA', flag: '🇯🇵', country: 'Japan' },
+    { code: 'ko', label: 'Korean (한국어)', short: 'KO', flag: '🇰🇷', country: 'South Korea' },
+  ];
+
+  const allSupportedLanguages = [...aseanLanguages, ...regionalLanguages];
+
+  const getLanguageFlag = (code: string) => {
+    const match = allSupportedLanguages.find(l => l.code === (code || '').toLowerCase());
+    return match?.flag || '🌐';
+  };
+
+  const getLanguageLabel = (code: string) => {
+    const match = allSupportedLanguages.find(l => l.code === (code || '').toLowerCase());
+    return match?.label || (code || '').toUpperCase();
+  };
+
+  // Ingested Entries State (Populated from Ingest Document & Auto-Vectorize)
+  const [ingestedEntries, setIngestedEntries] = useState<IngestedDocumentEntry[]>([]);
+  const [isLoadingEntries, setIsLoadingEntries] = useState<boolean>(false);
+  const [selectedEntryId, setSelectedEntryId] = useState<string>('');
+  const [entrySearchQuery, setEntrySearchQuery] = useState<string>('');
+  const [entryCategoryFilter, setEntryCategoryFilter] = useState<string>('ALL');
+
+  // Translation & In-Place Verification State for Selected Entry
+  const [targetTranslationLang, setTargetTranslationLang] = useState<string>('id');
+  const [isTranslatingEntry, setIsTranslatingEntry] = useState<boolean>(false);
+  const [translatedDoc, setTranslatedDoc] = useState<{
+    originalDocId: string;
+    targetLang: string;
+    title: string;
+    content: string;
+  } | null>(null);
+  const [editedDocTitle, setEditedDocTitle] = useState<string>('');
+  const [editedDocContent, setEditedDocContent] = useState<string>('');
+  const [isStoringTranslation, setIsStoringTranslation] = useState<boolean>(false);
+  const [translationStoreFeedback, setTranslationStoreFeedback] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
+  const [showOriginalContent, setShowOriginalContent] = useState<boolean>(false);
 
   // Fetch stats on load
   const loadStats = async () => {
@@ -230,9 +203,135 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
     }
   };
 
+  // Load Ingested Documents from RAG Vector Store
+  const loadIngestedEntries = async () => {
+    setIsLoadingEntries(true);
+    try {
+      const res = await fetch('/api/rag/ingest');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.documents)) {
+        setIngestedEntries(data.documents);
+        setSelectedEntryId(prev => {
+          if (prev && data.documents.some((d: IngestedDocumentEntry) => d.id === prev)) {
+            return prev;
+          }
+          return data.documents[0]?.id || '';
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to load ingested document entries:', err);
+    } finally {
+      setIsLoadingEntries(false);
+    }
+  };
+
   useEffect(() => {
     loadStats();
+    loadIngestedEntries();
   }, []);
+
+  // Translate selected document entry into target language
+  const handleTranslateEntry = async (targetLang: string) => {
+    const entry = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
+    if (!entry) return;
+
+    setIsTranslatingEntry(true);
+    setTranslationStoreFeedback(null);
+    setTargetTranslationLang(targetLang);
+
+    try {
+      const [resTitle, resContent] = await Promise.all([
+        fetch('/api/rag/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: entry.title,
+            targetLanguage: targetLang,
+            apiKey: apiKey || undefined,
+          }),
+        }),
+        fetch('/api/rag/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: entry.content,
+            targetLanguage: targetLang,
+            apiKey: apiKey || undefined,
+          }),
+        }),
+      ]);
+
+      const dataTitle = await resTitle.json();
+      const dataContent = await resContent.json();
+
+      const translatedTitle = dataTitle.translatedText || entry.title;
+      const translatedContent = dataContent.translatedText || entry.content;
+
+      setTranslatedDoc({
+        originalDocId: entry.id,
+        targetLang,
+        title: translatedTitle,
+        content: translatedContent,
+      });
+      setEditedDocTitle(translatedTitle);
+      setEditedDocContent(translatedContent);
+    } catch (err: any) {
+      console.error('Entry translation error:', err);
+      setTranslationStoreFeedback({
+        success: false,
+        message: err.message || 'Failed to translate document entry',
+      });
+    } finally {
+      setIsTranslatingEntry(false);
+    }
+  };
+
+  // Store & vectorize verified translation into RAG
+  const handleStoreTranslationIntoRag = async () => {
+    const entry = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
+    if (!entry || !editedDocContent.trim() || !editedDocTitle.trim()) return;
+
+    setIsStoringTranslation(true);
+    setTranslationStoreFeedback(null);
+
+    try {
+      const res = await fetch('/api/rag/ingest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editedDocTitle.trim(),
+          content: editedDocContent.trim(),
+          language: targetTranslationLang,
+          category: entry.category,
+          source: `Verified Translation (${entry.language.toUpperCase()} → ${targetTranslationLang.toUpperCase()}): ${entry.source || entry.title}`,
+          tenantTag: 'rto-ai',
+          apiKey: apiKey || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setTranslationStoreFeedback({
+          success: true,
+          message: `✓ Successfully stored and indexed "${editedDocTitle.trim()}" in ${getLanguageLabel(targetTranslationLang)} (${data.data?.chunksCreated || 1} vector chunks) into Multilingual RAG!`,
+        });
+        loadStats();
+        loadIngestedEntries();
+      } else {
+        setTranslationStoreFeedback({
+          success: false,
+          message: data.error || 'Failed to store translation in RAG vector store',
+        });
+      }
+    } catch (err: any) {
+      setTranslationStoreFeedback({
+        success: false,
+        message: err.message || 'Network error storing translation in RAG',
+      });
+    } finally {
+      setIsStoringTranslation(false);
+    }
+  };
 
   // Handle Seeding
   const handleSeed = async () => {
@@ -248,6 +347,7 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
       if (data.success) {
         setSeedSuccessMessage(`Successfully seeded ${data.data?.totalProcessed || 7} documents (${data.data?.totalChunks || 11} vector chunks) across 5 languages!`);
         if (data.stats) setStats(data.stats);
+        loadIngestedEntries();
       }
     } catch (e: any) {
       console.error('Seeding error:', e);
@@ -440,6 +540,7 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
         });
         setWholeDocumentContent('');
         loadStats();
+        loadIngestedEntries();
       } else {
         setIngestFeedback({
           success: false,
@@ -487,6 +588,7 @@ export const MultilingualRagManager: React.FC<MultilingualRagManagerProps> = ({
           content: ''
         });
         loadStats();
+        loadIngestedEntries();
       } else {
         setIngestFeedback({
           success: false,
@@ -605,286 +707,392 @@ Higher education providers may grant credit transfer of up to 50% of the course 
         {/* Left Column: Cross-Lingual Live Testing Playground & Multi-Language Translation Editor */}
         <div className="lg:col-span-7 space-y-6">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-7 space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Search className="w-5 h-5 text-indigo-600" />
-                  Cross-Lingual Semantic Retrieval Playground
+                  <Globe2 className="w-5 h-5 text-indigo-600" />
+                  <span>Cross-Lingual Semantic Retrieval Playground</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Query in any script & retrieve cross-lingual translations with real-time editorial control.
+                  Entries from Ingest Document &amp; Auto-Vectorize • Select entry, translate to ASEAN languages, check &amp; edit, and store into RAG.
                 </p>
               </div>
-              <span className="text-xs px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full font-medium">
-                Live Query Tester
+              <span className="text-xs px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200/60 rounded-full font-bold flex items-center gap-1.5 self-start sm:self-auto">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                Multilingual RAG Engine
               </span>
             </div>
 
-            {/* Quick Sample Queries */}
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  1-Click Multilingual Test Prompts:
-                </label>
-                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-full">
-                  Global &amp; All ASEAN Languages
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {sampleQueries.map((sample, idx) => (
+{/* SECTION 1: ENTRIES FROM INGEST DOCUMENT & AUTO-VECTORIZE */}
+            <div className="space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Database className="w-4 h-4 text-indigo-600" />
+                    <span>Entries from Ingest Document &amp; Auto-Vectorize</span>
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Select any entry to translate into ASEAN languages, check &amp; edit, and store in RAG.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-full">
+                    {ingestedEntries.length} Document Entries
+                  </span>
                   <button
-                    key={idx}
                     type="button"
-                    onClick={() => setQueryInput(sample.text)}
-                    className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 rounded-xl border border-slate-200 transition font-medium text-left cursor-pointer flex items-center gap-1.5 shadow-sm hover:border-indigo-300"
-                    title={`Click to load ${sample.label} prompt`}
+                    onClick={loadIngestedEntries}
+                    disabled={isLoadingEntries}
+                    className="p-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition cursor-pointer"
+                    title="Refresh Ingested Entries"
                   >
-                    <span className="font-semibold">{sample.label}</span>
-                    <span className="text-[11px] text-slate-500 font-normal">({sample.subtitle})</span>
-                    {sample.isAsean && (
-                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded border border-emerald-300/60 ml-0.5">
-                        ASEAN
-                      </span>
-                    )}
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingEntries ? 'animate-spin' : ''}`} />
                   </button>
-                ))}
+                </div>
               </div>
-            </div>
 
-            {/* Search Input Box */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-600">
-                User Query (in any language):
-              </label>
-              <div className="relative">
-                <textarea
-                  rows={3}
-                  value={queryInput}
-                  onChange={(e) => setQueryInput(e.target.value)}
-                  placeholder="Ask a question in Japanese, Chinese, Vietnamese, Thai, Indonesian, Malay, Filipino, Khmer, Burmese, Lao, English, etc..."
-                  className="w-full p-3.5 pr-28 rounded-2xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm outline-none resize-none"
-                />
-                <button
-                  type="button"
-                  onClick={handleRunQuery}
-                  disabled={isQuerying || !queryInput.trim()}
-                  className="absolute bottom-3 right-3 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow cursor-pointer"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  {isQuerying ? 'Searching...' : 'Run Query'}
-                </button>
-              </div>
-            </div>
-
-            {queryError && (
-              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                <span>{queryError}</span>
-              </div>
-            )}
-
-            {/* Query Results Display & Multi-Language Translation Editor */}
-            {queryResult && (
-              <div className="space-y-5 pt-4 border-t border-slate-100 animate-fadeIn">
-                {/* Meta stats bar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-xs">
-                  <div className="flex items-center gap-3">
-                    <span className="font-semibold text-indigo-900">
-                      Query Language: <strong className="text-indigo-600">{queryResult.queryLanguage}</strong> ({queryResult.queryLanguageCode})
-                    </span>
-                    <span className="text-slate-400">|</span>
-                    <span className="text-slate-600">
-                      Execution Time: <strong>{queryResult.executionTimeMs} ms</strong>
-                    </span>
-                  </div>
-                  <div className="font-semibold text-emerald-700">
-                    Confidence: {Math.round(queryResult.confidence * 100)}%
-                  </div>
+              {/* Search & Category Filter */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={entrySearchQuery}
+                    onChange={(e) => setEntrySearchQuery(e.target.value)}
+                    placeholder="Search entries by title, category, keywords..."
+                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
                 </div>
 
-                {/* MULTI-LANGUAGE TRANSLATIONS PANEL WITH EDITING */}
-                <div className="space-y-3 bg-slate-50/80 rounded-2xl p-4 sm:p-5 border border-slate-200">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                      <Languages className="w-4 h-4 text-indigo-600" />
-                      <span>Multiple Language Translations (Editable)</span>
-                    </h4>
-                    <span className="text-[11px] text-slate-500">
-                      Select language tab & click &ldquo;Edit Translation&rdquo; to customize text
-                    </span>
+                <select
+                  value={entryCategoryFilter}
+                  onChange={(e) => setEntryCategoryFilter(e.target.value)}
+                  className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="ALL">All Categories ({ingestedEntries.length})</option>
+                  {Array.from(new Set(ingestedEntries.map(e => e.category).filter(Boolean))).map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Scrollable Entries List Cards */}
+              <div className="max-h-56 overflow-y-auto space-y-2 pr-1 border border-slate-100 rounded-2xl p-2 bg-slate-50/50">
+                {isLoadingEntries && ingestedEntries.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin text-indigo-600" />
+                    <span>Loading ingested knowledge documents...</span>
                   </div>
+                ) : ingestedEntries.filter(entry => {
+                  if (entryCategoryFilter !== 'ALL' && entry.category !== entryCategoryFilter) return false;
+                  if (entrySearchQuery.trim()) {
+                    const q = entrySearchQuery.toLowerCase();
+                    return entry.title.toLowerCase().includes(q) ||
+                      entry.category.toLowerCase().includes(q) ||
+                      entry.content.toLowerCase().includes(q) ||
+                      (entry.languageName || entry.language).toLowerCase().includes(q);
+                  }
+                  return true;
+                }).length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400">
+                    No entries found matching &ldquo;{entrySearchQuery}&rdquo;
+                  </div>
+                ) : (
+                  ingestedEntries.filter(entry => {
+                    if (entryCategoryFilter !== 'ALL' && entry.category !== entryCategoryFilter) return false;
+                    if (entrySearchQuery.trim()) {
+                      const q = entrySearchQuery.toLowerCase();
+                      return entry.title.toLowerCase().includes(q) ||
+                        entry.category.toLowerCase().includes(q) ||
+                        entry.content.toLowerCase().includes(q) ||
+                        (entry.languageName || entry.language).toLowerCase().includes(q);
+                    }
+                    return true;
+                  }).map((entry) => {
+                    const isSelected = (selectedEntryId ? selectedEntryId === entry.id : ingestedEntries[0]?.id === entry.id);
+                    return (
+                      <div
+                        key={entry.id}
+                        onClick={() => {
+                          setSelectedEntryId(entry.id);
+                          setTranslatedDoc(null);
+                          setTranslationStoreFeedback(null);
+                        }}
+                        className={`p-3 rounded-xl border transition-all cursor-pointer text-left space-y-1.5 ${
+                          isSelected
+                            ? 'bg-indigo-50/90 border-indigo-500 shadow-sm ring-1 ring-indigo-400'
+                            : 'bg-white hover:bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-800 text-[10px] font-bold flex items-center gap-1 shadow-2xs">
+                              <span>{getLanguageFlag(entry.language)}</span>
+                              <span>{entry.language.toUpperCase()}</span>
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-bold">
+                              {entry.category}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {entry.chunkCount || 1} {entry.chunkCount === 1 ? 'chunk' : 'chunks'}
+                            </span>
+                          </div>
 
-                  {/* Language Selection Tabs */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
-                    {languageTabOptions.map((opt) => {
-                      const isActive = activeLangTab === opt.code;
-                      const hasTranslation = Boolean(translationsMap[opt.code]);
-                      const isEdited = editedLangsSet.has(opt.code);
-
-                      return (
-                        <button
-                          key={opt.code}
-                          type="button"
-                          onClick={() => handleSelectLangTab(opt.code)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0 ${
-                            isActive
-                              ? 'bg-indigo-600 text-white shadow-sm'
-                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          <span>{opt.flag}</span>
-                          <span>{opt.label}</span>
-                          {opt.isAsean && (
-                            <span className={`text-[8px] font-black uppercase px-1 py-0.2 rounded ${isActive ? 'bg-indigo-500 text-white' : 'bg-emerald-100 text-emerald-800'}`}>
-                              ASEAN
+                          {isSelected ? (
+                            <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center gap-1 shadow-2xs shrink-0">
+                              <Check className="w-3 h-3" />
+                              <span>Selected Entry</span>
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                              Click to Select
                             </span>
                           )}
-                          {isEdited && (
-                            <span className="w-2 h-2 rounded-full bg-amber-400" title="Custom Edited by Admin" />
-                          )}
-                          {!hasTranslation && !isActive && (
-                            <span className="text-[10px] text-slate-400 font-normal">(AI)</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                        </div>
 
-                  {/* Translation Content & In-Place Editor */}
-                  <div className="space-y-3 pt-1">
-                    <div className="flex items-center justify-between text-xs">
+                        <div className="font-bold text-xs text-slate-900 leading-snug line-clamp-1">
+                          {entry.title}
+                        </div>
+
+                        <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed font-sans">
+                          {entry.content}
+                        </p>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* SECTION 2: SELECTED ENTRY WORKSPACE & ASEAN TRANSLATION CONTROLS */}
+            {(() => {
+              const currentEntry = ingestedEntries.find(e => e.id === selectedEntryId) || ingestedEntries[0];
+              if (!currentEntry) return null;
+
+              return (
+                <div className="pt-3 border-t border-slate-100 space-y-3.5">
+                  {/* Selected Document Info Banner */}
+                  <div className="p-3.5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl space-y-2 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-700">
-                          {languageTabOptions.find(o => o.code === activeLangTab)?.label || activeLangTab.toUpperCase()} View:
+                        <span className="text-xs px-2 py-0.5 rounded-md bg-indigo-500/30 text-indigo-200 border border-indigo-400/30 font-bold flex items-center gap-1">
+                          <span>{getLanguageFlag(currentEntry.language)}</span>
+                          <span>Original Language: {currentEntry.languageName || currentEntry.language.toUpperCase()}</span>
                         </span>
-                        {editedLangsSet.has(activeLangTab) ? (
-                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md text-[10px] font-bold border border-amber-200">
-                            Admin Verified Edit
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-md text-[10px] font-bold border border-indigo-200">
-                            AI Synthesis
-                          </span>
-                        )}
+                        <span className="text-xs text-slate-300 font-medium">{currentEntry.category}</span>
                       </div>
 
+                      <button
+                        type="button"
+                        onClick={() => setShowOriginalContent(!showOriginalContent)}
+                        className="text-[11px] text-indigo-300 hover:text-white underline font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        {showOriginalContent ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        <span>{showOriginalContent ? 'Hide Original Text' : 'View Original Text'}</span>
+                      </button>
+                    </div>
+
+                    <div className="font-bold text-sm text-white">{currentEntry.title}</div>
+
+                    {showOriginalContent && (
+                      <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-xs text-slate-200 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed animate-in fade-in">
+                        {currentEntry.content}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Translation Action Bar: Dropdown Menu & 1-Click ASEAN Buttons */}
+                  <div className="space-y-3 p-4 sm:p-5 bg-indigo-50/70 border border-indigo-200/80 rounded-2xl">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
-                        {!isEditingTranslation ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={handleStartEditingTranslation}
-                              className="px-2.5 py-1 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer shadow-sm"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              <span>Edit Translation</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleCopyTranslation}
-                              className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer shadow-sm"
-                              title="Copy to clipboard"
-                            >
-                              {copiedLang === activeLangTab ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                              <span>{copiedLang === activeLangTab ? 'Copied' : 'Copy'}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleReTranslateWithAi}
-                              disabled={isReTranslating}
-                              className="px-2.5 py-1 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer shadow-sm"
-                              title="Re-translate with AI"
-                            >
-                              <Wand2 className={`w-3.5 h-3.5 ${isReTranslating ? 'animate-spin' : ''}`} />
-                              <span>{isReTranslating ? 'Translating...' : 'AI Re-Translate'}</span>
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={handleSaveTranslation}
-                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow"
-                            >
-                              <Save className="w-3.5 h-3.5" />
-                              <span>Save Translation</span>
-                            </button>
-                            {editedLangsSet.has(activeLangTab) && (
-                              <button
-                                type="button"
-                                onClick={handleResetTranslation}
-                                className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                                <span>Reset Original</span>
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setIsEditingTranslation(false)}
-                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs transition cursor-pointer"
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        )}
+                        <Languages className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <div>
+                          <label className="text-xs font-bold text-slate-800 block">
+                            Translate Original into Another Language:
+                          </label>
+                          <span className="text-[11px] text-slate-500">
+                            Select target language from the dropdown menu or use quick buttons
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Dropdown Menu for Translation */}
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <select
+                          value={targetTranslationLang}
+                          onChange={(e) => {
+                            const newLang = e.target.value;
+                            setTargetTranslationLang(newLang);
+                            handleTranslateEntry(newLang);
+                          }}
+                          disabled={isTranslatingEntry}
+                          className="flex-1 sm:flex-initial px-3 py-2 bg-white border border-indigo-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs cursor-pointer"
+                        >
+                          <optgroup label="── ASEAN Languages ──">
+                            {aseanLanguages.map(l => (
+                              <option key={l.code} value={l.code}>{l.flag} {l.label}</option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="── Regional Dialogue Partners ──">
+                            {regionalLanguages.map(l => (
+                              <option key={l.code} value={l.code}>{l.flag} {l.label}</option>
+                            ))}
+                          </optgroup>
+                        </select>
+
+                        <button
+                          type="button"
+                          onClick={() => handleTranslateEntry(targetTranslationLang)}
+                          disabled={isTranslatingEntry}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow cursor-pointer active:scale-95 shrink-0"
+                        >
+                          <Sparkles className={`w-3.5 h-3.5 ${isTranslatingEntry ? 'animate-spin' : ''}`} />
+                          <span>{isTranslatingEntry ? 'Translating...' : 'Translate'}</span>
+                        </button>
                       </div>
                     </div>
 
-                    {/* Content Box (View or Edit) */}
-                    {isEditingTranslation ? (
-                      <div className="space-y-2">
-                        <textarea
-                          rows={8}
-                          value={editingText}
-                          onChange={(e) => setEditingText(e.target.value)}
-                          placeholder="Edit the translation text here..."
-                          className="w-full p-4 bg-white border-2 border-indigo-400 rounded-xl text-sm leading-relaxed text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500 font-sans shadow-inner"
-                        />
-                        <div className="flex justify-between items-center text-[11px] text-slate-400">
-                          <span>Characters: {editingText.length} • Words: {editingText.trim().split(/\s+/).filter(Boolean).length}</span>
-                          <span className="text-indigo-600 font-medium">Live editorial draft in progress</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 bg-white border border-slate-200 rounded-xl text-sm leading-relaxed text-slate-800 whitespace-pre-line max-h-96 overflow-y-auto shadow-inner">
-                        {translationsMap[activeLangTab] || queryResult.answer || 'Translation loading...'}
-                      </div>
-                    )}
+                    {/* Quick ASEAN Language Buttons */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-indigo-200/60">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-900 mr-1 flex items-center gap-1">
+                        <Globe className="w-3 h-3 text-indigo-600" />
+                        <span>Quick ASEAN:</span>
+                      </span>
+                      {aseanLanguages.map(l => (
+                        <button
+                          key={l.code}
+                          type="button"
+                          onClick={() => {
+                            setTargetTranslationLang(l.code);
+                            handleTranslateEntry(l.code);
+                          }}
+                          disabled={isTranslatingEntry}
+                          title={`Translate into ${l.label} (${l.country})`}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition flex items-center gap-1 cursor-pointer active:scale-95 ${
+                            targetTranslationLang === l.code && translatedDoc
+                              ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
+                              : 'bg-white hover:bg-indigo-100 text-indigo-900 border-indigo-200'
+                          } disabled:opacity-50`}
+                        >
+                          <span>{l.flag}</span>
+                          <span>{l.short}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                {/* Sources Retrieved */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5 text-blue-600" />
-                    Retrieved Cross-Lingual Context Sources ({queryResult.sources?.length || 0})
-                  </h4>
-                  <div className="space-y-2">
-                    {queryResult.sources?.map((s: any, idx: number) => (
-                      <div key={idx} className="p-3 bg-white border border-slate-200 rounded-xl text-xs space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-slate-900">
-                            {idx + 1}. {s.title}
+                  {/* SECTION 3: CHECK, EDIT & STORE TRANSLATION IN RAG */}
+                  {translatedDoc ? (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-indigo-300 space-y-3.5 shadow-sm animate-in fade-in">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-indigo-100">
+                        <div className="flex items-center gap-2">
+                          <Edit3 className="w-4 h-4 text-indigo-600" />
+                          <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                            <span>Check &amp; Edit Translation:</span>
+                            <span className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold flex items-center gap-1">
+                              <span>{getLanguageFlag(translatedDoc.targetLang)}</span>
+                              <span>{getLanguageLabel(translatedDoc.targetLang)}</span>
+                            </span>
                           </span>
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded font-medium text-[10px]">
-                              {s.language}
-                            </span>
-                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-medium text-[10px]">
-                              Score: {s.relevanceScore}
-                            </span>
-                          </div>
                         </div>
-                        <p className="text-slate-600 line-clamp-2 italic">
-                          &ldquo;{s.excerpt}&rdquo;
-                        </p>
+
+                        <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                          <span>Words: {editedDocContent.trim().split(/\s+/).filter(Boolean).length}</span>
+                          <span>•</span>
+                          <span>Chars: {editedDocContent.length}</span>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+
+                      {/* Translated Title Edit */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Translated Document Title:</label>
+                        <input
+                          type="text"
+                          value={editedDocTitle}
+                          onChange={(e) => setEditedDocTitle(e.target.value)}
+                          className="w-full px-3.5 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Translated Content Edit */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-700">Translated Document Content (Editable):</label>
+                        <textarea
+                          rows={7}
+                          value={editedDocContent}
+                          onChange={(e) => setEditedDocContent(e.target.value)}
+                          className="w-full p-3.5 border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none leading-relaxed font-sans"
+                        />
+                      </div>
+
+                      {/* Action Bar: Store Translation into RAG */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-indigo-100">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleTranslateEntry(targetTranslationLang)}
+                            disabled={isTranslatingEntry}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Re-Translate</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(editedDocContent);
+                              setCopiedLang('draft');
+                              setTimeout(() => setCopiedLang(null), 2000);
+                            }}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                          >
+                            {copiedLang === 'draft' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            <span>{copiedLang === 'draft' ? 'Copied' : 'Copy'}</span>
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleStoreTranslationIntoRag}
+                          disabled={isStoringTranslation || !editedDocContent.trim() || !editedDocTitle.trim()}
+                          className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95"
+                        >
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>{isStoringTranslation ? 'Vectorizing & Storing into RAG...' : 'Store New Language Translation into RAG'}</span>
+                        </button>
+                      </div>
+
+                      {/* Translation Storage Feedback Banner */}
+                      {translationStoreFeedback && (
+                        <div className={`p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${
+                          translationStoreFeedback.success
+                            ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                            : 'bg-rose-50 border border-rose-200 text-rose-800'
+                        }`}>
+                          {translationStoreFeedback.success ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                          )}
+                          <span>{translationStoreFeedback.message}</span>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-indigo-50/40 border border-dashed border-indigo-200 text-center space-y-1.5">
+                      <Sparkles className="w-5 h-5 text-indigo-500 mx-auto" />
+                      <p className="text-xs font-semibold text-indigo-950">
+                        Ready to translate &ldquo;{currentEntry.title}&rdquo;
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Choose an ASEAN or regional language from the dropdown menu above or click any quick button to translate, check and edit, and store into the RAG.
+                      </p>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
 

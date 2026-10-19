@@ -14,8 +14,11 @@ import {
   Layers,
   Clock,
   ArrowUpRight,
-  Filter
+  Filter,
+  Cpu,
+  Sparkles
 } from 'lucide-react';
+import { AiDiagnosisView } from './AiDiagnosisView';
 
 interface TelemetryLog {
   id: string;
@@ -29,6 +32,7 @@ interface TelemetryLog {
 }
 
 export const FirebaseTelemetryView: React.FC = () => {
+  const [subView, setSubView] = useState<'ai_diagnosis' | 'universal_stream'>('ai_diagnosis');
   const [logs, setLogs] = useState<TelemetryLog[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -113,8 +117,49 @@ export const FirebaseTelemetryView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-800/40 text-white shadow-xl relative overflow-hidden">
+      {/* Sub-Navigation View Switcher */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-slate-900 rounded-2xl border border-indigo-900/40 shadow-md">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSubView('ai_diagnosis')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              subView === 'ai_diagnosis'
+                ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/30 ring-2 ring-indigo-400/40'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Cpu className="w-4 h-4 text-indigo-300" />
+            <span>AI Diagnosis & #ai-interactions</span>
+            <span className="px-1.5 py-0.2 rounded-md bg-purple-500/30 text-purple-200 text-[10px] font-mono font-bold">
+              OBSERVABILITY
+            </span>
+          </button>
+
+          <button
+            onClick={() => setSubView('universal_stream')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              subView === 'universal_stream'
+                ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-md shadow-emerald-600/30 ring-2 ring-emerald-400/40'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Database className="w-4 h-4 text-emerald-400" />
+            <span>Universal Event Stream</span>
+          </button>
+        </div>
+
+        <div className="text-xs text-slate-400 px-3 hidden sm:block">
+          Active View: <strong className="text-slate-200">{subView === 'ai_diagnosis' ? 'AI Interaction Tracking (#ai-interactions)' : 'Universal Firestore Telemetry'}</strong>
+        </div>
+      </div>
+
+      {subView === 'ai_diagnosis' ? (
+        <AiDiagnosisView />
+      ) : (
+        <>
+          {/* Header Banner */}
+          <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-800/40 text-white shadow-xl relative overflow-hidden">
+
         <div className="absolute right-0 top-0 -mt-8 -mr-8 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -353,6 +398,9 @@ export const FirebaseTelemetryView: React.FC = () => {
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 };
+

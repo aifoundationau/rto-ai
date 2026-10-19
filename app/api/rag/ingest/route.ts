@@ -1,7 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ingestDocument } from '@/lib/rag/ragPipeline';
+import { getIngestedDocuments } from '@/lib/rag/vectorStore';
 
 export const dynamic = 'force-dynamic';
+
+export async function GET() {
+  try {
+    const documents = await getIngestedDocuments();
+    return NextResponse.json({
+      success: true,
+      documents,
+      total: documents.length,
+    });
+  } catch (error: any) {
+    console.error('[/api/rag/ingest GET] Error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Failed to retrieve ingested documents' },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {

@@ -10,6 +10,7 @@ export type SupportedLanguageCode =
   | 'vi'  // Vietnamese
   | 'th'  // Thai
   | 'km'  // Khmer
+  | 'kh'  // Khmer (Cambodia)
   | 'id'  // Indonesian
   | 'ms'  // Malay
   | 'tl'  // Tagalog / Filipino
@@ -55,6 +56,19 @@ export interface IngestResult {
   chunksCreated: number;
   success: boolean;
   message: string;
+}
+
+export interface IngestedDocumentEntry {
+  id: string;
+  title: string;
+  category: string;
+  language: string;
+  languageName: string;
+  source: string;
+  content: string;
+  chunkCount: number;
+  createdAt: string;
+  keywords: string[];
 }
 
 export interface RagSearchResult {

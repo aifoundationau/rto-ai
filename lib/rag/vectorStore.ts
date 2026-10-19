@@ -5,11 +5,14 @@
  */
 
 import { db, FieldValue, isFirebaseConfigured } from '@/lib/firebase/admin';
-import { MultilingualChunk, RagSearchResult } from './types';
+import { MultilingualChunk, RagSearchResult, IngestedDocumentEntry } from './types';
 import { cosineSimilarity, generateDeterministicEmbedding } from './embeddings';
 import { SEED_KNOWLEDGE_DOCUMENTS } from './seedData';
 
 export const KNOWLEDGE_COLLECTION = 'knowledge_embeddings';
+
+// Resilient in-memory runtime cache of stored chunks
+export const RUNTIME_STORED_CHUNKS: MultilingualChunk[] = [];
 
 /**
  * In-memory fallback: scores seed documents with deterministic embeddings
@@ -78,6 +81,11 @@ export async function storeChunks(chunks: MultilingualChunk[]): Promise<{
   insertedCount: number;
   errors: string[];
 }> {
+  // Always record into runtime memory cache for instant playground access
+  for (const chunk of chunks) {
+    RUNTIME_STORED_CHUNKS.push(chunk);
+  }
+
   if (!isFirebaseConfigured) {
     return { insertedCount: chunks.length, errors: [] };
   }
@@ -320,4 +328,119 @@ export async function getVectorStoreStats(): Promise<{
       distinctCategories: ['Accreditation Standards', 'Degree Programs', 'Vocational Compliance', 'Admissions & Visas', 'Course Architecture'],
     };
   }
+}
+
+/**
+ * Maps language code to human-readable language name.
+ */
+function getLanguageDisplayName(code: string): string {
+  const map: Record<string, string> = {
+    en: 'English',
+    id: 'Indonesian (Bahasa Indonesia)',
+    vi: 'Vietnamese (Tiếng Việt)',
+    th: 'Thai (ภาษาไทย)',
+    tl: 'Filipino / Tagalog',
+    ms: 'Malay (Bahasa Melayu)',
+    my: 'Burmese (မြန်မာဘာသာ)',
+    km: 'Khmer (ភាសាខ្មែរ)',
+    lo: 'Lao (ພາສາລາວ)',
+    tet: 'Tetum (Lian Tetun)',
+    zh: 'Chinese (中文)',
+    ja: 'Japanese (日本語)',
+    ko: 'Korean (한국어)',
+  };
+  return map[code.toLowerCase()] || code.toUpperCase();
+}
+
+/**
+ * Retrieves all ingested documents from Firestore and seed sources,
+ * grouped by document ID with reconstructed text content.
+ */
+export async function getIngestedDocuments(): Promise<IngestedDocumentEntry[]> {
+  const docMap = new Map<string, IngestedDocumentEntry>();
+
+  // 1. Seed documents as base foundation
+  for (const seed of SEED_KNOWLEDGE_DOCUMENTS) {
+    const id = seed.id || 'seed_doc';
+    docMap.set(id, {
+      id,
+      title: seed.title,
+      category: seed.category || 'General',
+      language: seed.language || 'en',
+      languageName: getLanguageDisplayName(seed.language || 'en'),
+      source: seed.source || 'Institutional Archive',
+      content: seed.content,
+      chunkCount: 1,
+      createdAt: new Date().toISOString(),
+      keywords: Array.isArray(seed.keywords) ? seed.keywords : [],
+    });
+  }
+
+  // 2. Chunks from Cloud Firestore
+  if (isFirebaseConfigured) {
+    try {
+      const snapshot = await db.collection(KNOWLEDGE_COLLECTION).limit(500).get();
+      const chunksByDoc = new Map<string, any[]>();
+
+      snapshot.docs.forEach(docSnap => {
+        const d = docSnap.data();
+        const docId = d.docId || d.id;
+        if (!chunksByDoc.has(docId)) {
+          chunksByDoc.set(docId, []);
+        }
+        chunksByDoc.get(docId)!.push(d);
+      });
+
+      chunksByDoc.forEach((chunks, docId) => {
+        chunks.sort((a, b) => (a.chunkIndex || 0) - (b.chunkIndex || 0));
+        const first = chunks[0];
+        const reconstructedContent = chunks.map(c => c.text).filter(Boolean).join('\n\n');
+
+        docMap.set(docId, {
+          id: docId,
+          title: first.title || 'Untitled Document',
+          category: first.category || 'General',
+          language: first.language || 'en',
+          languageName: first.languageName || getLanguageDisplayName(first.language || 'en'),
+          source: first.source || 'Institutional Document Portal',
+          content: reconstructedContent || first.text || '',
+          chunkCount: chunks.length,
+          createdAt: first.createdAt || new Date().toISOString(),
+          keywords: Array.isArray(first.keywords) ? first.keywords : [],
+        });
+      });
+    } catch (err) {
+      console.warn('[getIngestedDocuments] Firestore query error:', err);
+    }
+  }
+
+  // 3. Runtime stored chunks (in-memory)
+  const runtimeByDoc = new Map<string, MultilingualChunk[]>();
+  for (const chunk of RUNTIME_STORED_CHUNKS) {
+    if (!runtimeByDoc.has(chunk.docId)) {
+      runtimeByDoc.set(chunk.docId, []);
+    }
+    runtimeByDoc.get(chunk.docId)!.push(chunk);
+  }
+
+  runtimeByDoc.forEach((chunks, docId) => {
+    chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+    const first = chunks[0];
+    const reconstructedContent = chunks.map(c => c.text).filter(Boolean).join('\n\n');
+
+    docMap.set(docId, {
+      id: docId,
+      title: first.title || 'Untitled Document',
+      category: first.category || 'General',
+      language: first.language || 'en',
+      languageName: first.languageName || getLanguageDisplayName(first.language || 'en'),
+      source: first.source || 'Institutional Document Portal',
+      content: reconstructedContent || first.text || '',
+      chunkCount: chunks.length,
+      createdAt: first.createdAt || new Date().toISOString(),
+      keywords: first.keywords || [],
+    });
+  });
+
+  return Array.from(docMap.values());
 }

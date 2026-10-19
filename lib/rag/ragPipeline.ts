@@ -400,10 +400,29 @@ export async function translateText(
   const apiKey = customApiKey || process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.length < 10) return text;
 
+  const LANGUAGE_NAME_MAP: Record<string, string> = {
+    en: 'English',
+    id: 'Indonesian (Bahasa Indonesia)',
+    vi: 'Vietnamese (Tiếng Việt)',
+    th: 'Thai (ภาษาไทย)',
+    tl: 'Filipino / Tagalog (Wikang Filipino)',
+    ms: 'Malay (Bahasa Melayu)',
+    my: 'Burmese (မြန်မာဘာသာ - Myanmar)',
+    km: 'Khmer (ភាសាខ្មែរ - Cambodia)',
+    kh: 'Khmer (ភាសាខ្មែរ - Cambodia)',
+    lo: 'Lao (ພາສາລາວ - Laos)',
+    tet: 'Tetum (Lian Tetun - Timor-Leste)',
+    zh: 'Chinese (中文)',
+    ja: 'Japanese (日本語)',
+    ko: 'Korean (한국어)',
+  };
+
+  const resolvedLanguage = LANGUAGE_NAME_MAP[targetLanguage.toLowerCase()] || targetLanguage;
+
   try {
     const ai = new GoogleGenAI({ apiKey });
     const prompt = `You are an expert academic and educational translator.
-Translate the following academic / accreditation text into ${targetLanguage}.
+Translate the following academic / accreditation text into ${resolvedLanguage}.
 Keep higher education and vocational acronyms intact (TEQSA, AQF, ASQA, RPL, CRICOS, IELTS, GPA).
 Format the response using clean Markdown.
 
